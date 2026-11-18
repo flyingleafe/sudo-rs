@@ -1,0 +1,127 @@
+name: Verification
+
+permissions:
+  contents: read
+
+on:
+  push:
+    paths:
+      - "proofs/**"
+      - "src/sudoers/**"
+      - "Cargo.toml"
+      - "flake.*"
+      - ".github/workflows/verification.yml"
+  pull_request:
+    paths:
+      - "proofs/**"
+      - "src/sudoers/**"
+      - "Cargo.toml"
+      - "flake.*"
+      - ".github/workflows/verification.yml"
+  workflow_dispatch:
+    inputs:
+      extract:
+        description: "Also run the extraction drift check (builds Charon/Aeneas, ~40 min)"
+        type: boolean
+        default: false
+  schedule:
+    - cron: "17 3 * * 1" # weekly extraction drift check
+
+concurrency:
+  group: verification-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  gate:
+    name: Gate (tokens spec lean axioms quint rust)
+    if: github.event_name != 'schedule'
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    env:
+      CHECK_LOG_DIR: ${{ github.workspace }}/check-logs
+      CHECK_CARGO_TARGET_DIR: ${{ github.workspace }}/target-check
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: cachix/install-nix-action@3dc140bfc76c49fbd4dd958429132e3746bcb086 # v31.11.5
+        with:
+          github_access_token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Cache Nix store
+        uses: nix-community/cache-nix-action@7df957e333c1e5da7721f60227dbba6d06080569 # v7.0.2
+        with:
+          primary-key: nix-gate-${{ runner.os }}-${{ hashFiles('flake.lock', 'flake.nix') }}
+          restore-prefixes-first-match: nix-gate-${{ runner.os }}-
+          gc-max-store-size-linux: 6G
+
+      - name: Cache Lean toolchain and Lake dependencies (Mathlib oleans)
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.elan
+            proofs/lean/.lake/packages
+          key: lean-deps-${{ runner.os }}-${{ hashFiles('proofs/*/lean-toolchain', 'proofs/*/lake-manifest.json') }}
+
+      - name: Cache Lake builds of the proof projects
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            proofs/lean/.lake/build
+            proofs/spec/.lake/build
+          key: lean-build-${{ runner.os }}-${{ hashFiles('proofs/*/lean-toolchain', 'proofs/*/lake-manifest.json') }}-${{ github.sha }}
+          restore-keys: |
+            lean-build-${{ runner.os }}-${{ hashFiles('proofs/*/lean-toolchain', 'proofs/*/lake-manifest.json') }}-
+
+      - name: Cache cargo target
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cargo/registry
+            target-check
+          key: cargo-check-${{ runner.os }}-${{ hashFiles('Cargo.lock', 'flake.lock') }}
+          restore-keys: cargo-check-${{ runner.os }}-
+
+      - name: Run gate
+        run: nix develop -c proofs/check.sh tokens spec lean axioms quint rust
+
+      - name: Upload stage logs
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: check-logs
+          path: check-logs
+
+  extract:
+    name: Extraction drift (charon + aeneas)
+    if: github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.extract)
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    env:
+      CHECK_LOG_DIR: ${{ github.workspace }}/check-logs
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: cachix/install-nix-action@3dc140bfc76c49fbd4dd958429132e3746bcb086 # v31.11.5
+        with:
+          github_access_token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Cache Nix store (Charon/Aeneas builds)
+        uses: nix-community/cache-nix-action@7df957e333c1e5da7721f60227dbba6d06080569 # v7.0.2
+        with:
+          primary-key: nix-extract-${{ runner.os }}-${{ hashFiles('flake.lock', 'flake.nix') }}
+          restore-prefixes-first-match: nix-extract-${{ runner.os }}-
+          gc-max-store-size-linux: 8G
+
+      - name: Run extraction drift check
+        run: nix develop -c proofs/check.sh extract
+
+      - name: Upload stage logs
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: extract-logs
+          path: check-logs
