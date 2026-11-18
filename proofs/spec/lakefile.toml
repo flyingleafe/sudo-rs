@@ -1,0 +1,5 @@
+name = "sudoers-spec"
+defaultTargets = ["SudoersSpec"]
+
+[[lean_lib]]
+name = "SudoersSpec"
