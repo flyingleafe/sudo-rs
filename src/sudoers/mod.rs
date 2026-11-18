@@ -537,13 +537,24 @@ fn check_permission<User: UnixUser + PartialEq<User>, Group: UnixGroup>(
         }
     };
 
-    let user_specs = matching_permissions(rules, aliases, am_user, on_host);
+    let user_matcher = &match_user(am_user);
+    let host_matcher = &match_token(on_host);
+    let user_aliases = get_aliases(&aliases.user, user_matcher);
+    let host_aliases = get_aliases(&aliases.host, host_matcher);
 
     let mut result = None;
     let mut i = 0;
-    while i < user_specs.len() {
-        let (rule, permission) = user_specs[i];
-        result = check_commands(result, &rules[rule].permissions[permission].1, &verdict);
+    while i < rules.len() {
+        if find_item(&rules[i].users, user_matcher, &user_aliases) {
+            let permissions = &rules[i].permissions;
+            let mut j = 0;
+            while j < permissions.len() {
+                if find_item(&permissions[j].0, host_matcher, &host_aliases) {
+                    result = check_commands(result, &permissions[j].1, &verdict);
+                }
+                j += 1;
+            }
+        }
         i += 1;
     }
 
@@ -807,6 +818,9 @@ enum Ignored<'a> {
 /// The only side effect of the permission check; it is kept opaque for the formal verification
 /// (see `package.metadata.charon` in `Cargo.toml`)
 fn warn_ignored(item: Ignored) {
+    #[cfg(test)]
+    test::record_ignored(&item);
+
     match item {
         Ignored::NonunixGroup(group) => auth_warn!("warning: non-unix group {group} was ignored"),
         Ignored::GroupInRunasAlias => {

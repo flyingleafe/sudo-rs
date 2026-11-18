@@ -945,3 +945,43 @@ fn fuzz_topo_sort(siz: usize) {
 fn fuzz_topo_sort7() {
     fuzz_topo_sort(7)
 }
+
+thread_local! {
+    static IGNORED: std::cell::RefCell<Vec<String>> = const { std::cell::RefCell::new(Vec::new()) };
+}
+
+/// Records the warnings issued by [warn_ignored] (per thread, so tests do not interfere)
+pub(super) fn record_ignored(item: &Ignored) {
+    let message = match item {
+        Ignored::NonunixGroup(group) => group.to_string(),
+        Ignored::GroupInRunasAlias => "%group in Runas_Alias".to_string(),
+    };
+    IGNORED.with_borrow_mut(|log| log.push(message));
+}
+
+#[test]
+fn ignored_specifiers_are_reported_in_sudoers_order() {
+    let (sudoers, _) = analyze(
+        Path::new("/etc/fakesudoers"),
+        sudoer![
+            "alice ALL = (%:RUNASBAD) /bin/true",
+            "%:USERBAD ALL = (root) /bin/true"
+        ],
+    );
+    let request = Request {
+        user: &Named("root"),
+        group: &Named("root"),
+        command: Path::new("/bin/true"),
+        arguments: &[],
+    };
+
+    IGNORED.with_borrow_mut(Vec::clear);
+    check_permission(
+        &sudoers.rules,
+        &sudoers.aliases,
+        &Named("alice"),
+        &system::Hostname::fake("host"),
+        request,
+    );
+    assert_eq!(IGNORED.with_borrow(Vec::clone), ["RUNASBAD", "USERBAD"]);
+}
