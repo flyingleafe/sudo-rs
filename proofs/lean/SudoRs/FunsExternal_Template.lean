@@ -146,6 +146,6 @@ axiom common.string.SudoString.Insts.CoreCmpPartialEqStr.eq
   : common.string.SudoString → Str → Result Bool
 
 /-- [sudo_rs::sudoers::warn_ignored]:
-    Source: 'src/sudoers/mod.rs', lines 809:0-816:1 -/
+    Source: 'src/sudoers/mod.rs', lines 820:0-830:1 -/
 axiom sudoers.warn_ignored : sudoers.Ignored → Result Unit
 

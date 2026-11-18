@@ -243,47 +243,47 @@ structure system.interface.UnixUser (Self : Type _) (Self_Group : Type _) where
   group : Self → Result Self_Group
 
 /-- [sudo_rs::sudoers::FoundAliases]
-    Source: 'src/sudoers/mod.rs', lines 684:0-684:41 -/
+    Source: 'src/sudoers/mod.rs', lines 695:0-695:41 -/
 @[reducible]
 def sudoers.FoundAliases := alloc.vec.Vec (String × Bool)
 
 /-- [sudo_rs::sudoers::match_command::{closure}]
-    Source: 'src/sudoers/mod.rs', lines 827:4-833:5 -/
+    Source: 'src/sudoers/mod.rs', lines 841:4-847:5 -/
 def sudoers.match_command.closure :=
   std.path.Path × glob.MatchOptions × Slice std.ffi.os_str.OsString
 
+/-- [sudo_rs::sudoers::match_token::{closure}]
+    Source: 'src/sudoers/mod.rs', lines 833:4-833:39 -/
+@[reducible]
+def sudoers.match_token.closure (T : Type _) := Str
+
 /-- [sudo_rs::sudoers::Ignored]
-    Source: 'src/sudoers/mod.rs', lines 802:0-805:1 -/
+    Source: 'src/sudoers/mod.rs', lines 813:0-816:1 -/
 @[discriminant isize]
 inductive sudoers.Ignored where
 | NonunixGroup : sudoers.ast.Identifier → sudoers.Ignored
 | GroupInRunasAlias : sudoers.Ignored
 
 /-- [sudo_rs::sudoers::match_group_alias::{closure}]
-    Source: 'src/sudoers/mod.rs', lines 790:4-798:5 -/
+    Source: 'src/sudoers/mod.rs', lines 801:4-809:5 -/
 @[reducible]
 def sudoers.match_group_alias.closure (T0 : Type _) := T0
 
 /-- [sudo_rs::sudoers::match_group::{closure}::{closure}]
-    Source: 'src/sudoers/mod.rs', lines 785:66-785:79 -/
+    Source: 'src/sudoers/mod.rs', lines 796:66-796:79 -/
 @[reducible]
 def sudoers.match_group.closure.closure (T0 : Type _) :=
   common.string.SudoString
 
 /-- [sudo_rs::sudoers::match_group::{closure}]
-    Source: 'src/sudoers/mod.rs', lines 783:4-786:5 -/
+    Source: 'src/sudoers/mod.rs', lines 794:4-797:5 -/
 @[reducible]
 def sudoers.match_group.closure (T0 : Type _) := T0
 
 /-- [sudo_rs::sudoers::match_user::{closure}]
-    Source: 'src/sudoers/mod.rs', lines 766:4-775:5 -/
+    Source: 'src/sudoers/mod.rs', lines 777:4-786:5 -/
 @[reducible]
 def sudoers.match_user.closure (T0 : Type _) (Clause0_Group : Type _) := T0
-
-/-- [sudo_rs::sudoers::match_token::{closure}]
-    Source: 'src/sudoers/mod.rs', lines 819:4-819:39 -/
-@[reducible]
-def sudoers.match_token.closure (T : Type _) := Str
 
 /-- [sudo_rs::sudoers::check_permission::{closure}]
     Source: 'src/sudoers/mod.rs', lines 517:18-538:5 -/
