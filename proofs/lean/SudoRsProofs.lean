@@ -10,4 +10,7 @@ import SudoRsProofs.Matchers
 import SudoRsProofs.AbsTags
 import SudoRsProofs.Tags
 import SudoRsProofs.Commands
+import SudoRsProofs.PermSpec
+import SudoRsProofs.AbsPolicy
+import SudoRsProofs.Permission
 import SudoRsProofs.Axioms

@@ -226,4 +226,125 @@ theorem perm_outer_loop_spec (hO : InstOracle uInst eqInst gInst O) (hG : GlobOr
 termination_by rules.val.length - i.val
 decreasing_by all_goals scalar_decr_tac
 
+/-! ## `check_permission` -/
+
+/-- **`check_permission` refines `SudoersSpec.checkPermission`**: on a policy satisfying
+`PolicyOK` and a host name that fits in memory, with the user/group instances, the glob
+matcher and host matching agreeing with the oracle `O`, the Rust function returns (no panic,
+no divergence) a tag whose abstraction is the spec's decision on the abstracted policy and
+request. -/
+theorem check_permission_spec (hO : InstOracle uInst eqInst gInst O) (hG : GlobOracle A O)
+    (hH : O.SudoRsHosts) (rules : Slice sudo_rs.sudoers.ast.PermissionSpec)
+    (aliases : sudo_rs.sudoers.AliasTable) (hpol : PolicyOK rules aliases) (amUser : U)
+    (onHost : sudo_rs.system.Hostname) (hhost : Fits onHost.inner)
+    (request : sudo_rs.sudoers.Request U G UG) :
+    sudo_rs.sudoers.check_permission uInst eqInst gInst rules aliases amUser onHost request
+      ⦃ res => res.map absTag = SudoersSpec.checkPermission O (absPolicy A rules aliases)
+        (absRequest A amUser onHost request) ⦄ := by
+  obtain ⟨⟨⟨hu1, hu2, hu3⟩, ⟨hh1, hh2, hh3⟩, ⟨hc1, hc2⟩, ⟨hr1, hr2, hr3⟩⟩, hrules⟩ := hpol
+  unfold sudo_rs.sudoers.check_permission
+  step with match_command_spec (A := A) hG request.command request.arguments as ⟨c, hc, _⟩
+  subst hc
+  simp only [uncurry]
+  step with get_aliases_match_command_spec hG request.command request.arguments aliases.cmnd
+    hc1 hc2 as ⟨CA, hCA, hCAf⟩
+  simp only [sudo_rs.sudoers.match_user, sudo_rs.sudoers.match_group_alias,
+    sudo_rs.sudoers.match_token, Aeneas.Std.bind_ok]
+  step with get_aliases_match_user_spec hO request.user aliases.runas hr1 hr2 hr3
+    as ⟨RU, hRU, hRUf⟩
+  step with get_aliases_match_group_alias_spec hO request.group aliases.runas hr1 hr2 hr3
+    as ⟨RG, hRG, hRGf⟩
+  step with system_hostname_deref_spec onHost hhost as ⟨s1, hs1⟩
+  step with get_aliases_match_user_spec hO amUser aliases.user hu1 hu2 hu3 as ⟨UA, hUA, hUAf⟩
+  step with get_aliases_match_token_spec hH (absSysHostname onHost) s1 hs1 aliases.host hh1 hh2
+    hh3 as ⟨HA, hHA, hHAf⟩
+  refine WP.spec_mono (perm_outer_loop_spec (A := A) hO hG hH
+    (absRequest A amUser onHost request) request.command request.arguments rfl rfl
+    RU RG CA UA HA hRUf hRGf hCAf hUAf hHAf s1 hs1 rules hrules none 0#usize) ?_
+  intro res hres
+  rw [hres, ← checkRules_eq, checkRulesFrom]
+  have h1 : userTest O (absRequest A amUser onHost request).invokingUser UA =
+      userOK O (absPolicy A rules aliases) (absRequest A amUser onHost request) := by
+    funext us
+    simp only [userTest, userOK, hUA]
+    rfl
+  have h2 : hostTest O (absRequest A amUser onHost request).host HA =
+      hostOK O (absPolicy A rules aliases) (absRequest A amUser onHost request) := by
+    funext hs
+    simp only [hostTest, hostOK, hHA]
+    rfl
+  have h3 : permVerdict O (absRequest A amUser onHost request) (absFound RU) (absFound RG)
+      (absFound CA) = policyVerdict O (absPolicy A rules aliases)
+        (absRequest A amUser onHost request) := by
+    simp only [policyVerdict, hRU, hRG, hCA]
+    rfl
+  have h0 : (0#usize : Usize).val = 0 := by simp
+  rw [h1, h2, h3, h0, List.drop_zero]
+  rfl
+
+/-! ## `permission_flags` -/
+
+/-- **`permission_flags` refines `SudoersSpec.authorize`** (the flags of `Sudoers::check`):
+`check_permission` followed by the NOPASSWD rule for root and for running as oneself with one
+of one's own groups. Same hypotheses as `check_permission_spec`. -/
+theorem permission_flags_spec (hO : InstOracle uInst eqInst gInst O) (hG : GlobOracle A O)
+    (hH : O.SudoRsHosts) (rules : Slice sudo_rs.sudoers.ast.PermissionSpec)
+    (aliases : sudo_rs.sudoers.AliasTable) (hpol : PolicyOK rules aliases) (amUser : U)
+    (onHost : sudo_rs.system.Hostname) (hhost : Fits onHost.inner)
+    (request : sudo_rs.sudoers.Request U G UG) :
+    sudo_rs.sudoers.permission_flags uInst eqInst gInst rules aliases amUser onHost request
+      ⦃ res => res.map absTag = SudoersSpec.authorize O (absPolicy A rules aliases)
+        (absRequest A amUser onHost request) ⦄ := by
+  unfold sudo_rs.sudoers.permission_flags
+  rw [hO.is_root, Aeneas.Std.bind_ok]
+  apply WP.spec_bind
+    (Pₘ := fun b => b = SudoersSpec.skipPasswd O (absRequest A amUser onHost request))
+  · simp only [SudoersSpec.skipPasswd, absRequest]
+    cases O.isRoot amUser
+    · simp only [core.cmp.impls.PartialEqShared.eq, hO.eq, Bool.false_eq_true, ite_false,
+        Aeneas.Std.bind_ok, Bool.false_or]
+      cases O.userEq request.user amUser
+      · simp
+      · simp [in_group_eq hO]
+    · simp
+  intro skip hskip
+  step with check_permission_spec (A := A) hO hG hH rules aliases hpol amUser onHost hhost request
+    as ⟨flags, hflags⟩
+  rw [SudoersSpec.authorize, ← hflags, ← hskip]
+  cases flags with
+  | none => simp
+  | some t =>
+    cases skip
+    · simp
+    · simp [absTag, absAuthenticate]
+
+/-! ## Equation forms -/
+
+/-- `check_permission` returns `ok r` (no panic, no divergence) with
+`r.map absTag = SudoersSpec.checkPermission …`. -/
+theorem check_permission_eq (hO : InstOracle uInst eqInst gInst O) (hG : GlobOracle A O)
+    (hH : O.SudoRsHosts) (rules : Slice sudo_rs.sudoers.ast.PermissionSpec)
+    (aliases : sudo_rs.sudoers.AliasTable) (hpol : PolicyOK rules aliases) (amUser : U)
+    (onHost : sudo_rs.system.Hostname) (hhost : Fits onHost.inner)
+    (request : sudo_rs.sudoers.Request U G UG) :
+    ∃ r, sudo_rs.sudoers.check_permission uInst eqInst gInst rules aliases amUser onHost request =
+        ok r ∧
+      r.map absTag = SudoersSpec.checkPermission O (absPolicy A rules aliases)
+        (absRequest A amUser onHost request) :=
+  exists_eq_ok_of_spec
+    (check_permission_spec hO hG hH rules aliases hpol amUser onHost hhost request)
+
+/-- `permission_flags` returns `ok r` with `r.map absTag = SudoersSpec.authorize …`. -/
+theorem permission_flags_eq (hO : InstOracle uInst eqInst gInst O) (hG : GlobOracle A O)
+    (hH : O.SudoRsHosts) (rules : Slice sudo_rs.sudoers.ast.PermissionSpec)
+    (aliases : sudo_rs.sudoers.AliasTable) (hpol : PolicyOK rules aliases) (amUser : U)
+    (onHost : sudo_rs.system.Hostname) (hhost : Fits onHost.inner)
+    (request : sudo_rs.sudoers.Request U G UG) :
+    ∃ r, sudo_rs.sudoers.permission_flags uInst eqInst gInst rules aliases amUser onHost request =
+        ok r ∧
+      r.map absTag = SudoersSpec.authorize O (absPolicy A rules aliases)
+        (absRequest A amUser onHost request) :=
+  exists_eq_ok_of_spec
+    (permission_flags_spec hO hG hH rules aliases hpol amUser onHost hhost request)
+
 end SudoRsProofs

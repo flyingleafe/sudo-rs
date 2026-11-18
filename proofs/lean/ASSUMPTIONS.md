@@ -49,8 +49,7 @@ Helpers: `sudo_rs.stringBytes s` = the UTF-8 bytes of `s` as `U8`s; `sudo_rs.str
 
 ## Hypotheses of the theorems
 
-The theorems in `SudoRsProofs/` (`FoundAliases.lean`, `FindItem.lean`, `GetAliases.lean`) take
-these hypotheses instead of axioms:
+The theorems in `SudoRsProofs/` take these hypotheses instead of axioms:
 
 | Hypothesis | Where | Why it is needed |
 |---|---|---|
@@ -65,3 +64,21 @@ these hypotheses instead of axioms:
 
 The tag layer is generic in the abstraction of runas specs and commands (`fr`, `fc` in
 `SudoRsProofs/AbsTags.lean`): `distribute_tags` never looks inside them.
+
+## Hypotheses of the top-level theorems
+
+`check_permission_spec` / `check_permission_eq` (against `SudoersSpec.checkPermission`) and
+`permission_flags_spec` / `permission_flags_eq` (against `SudoersSpec.authorize`), in
+`SudoRsProofs/Permission.lean`, carry exactly these hypotheses; everything else in the table
+above is discharged inside the proofs.
+
+| Hypothesis | Meaning | Why it is needed |
+|---|---|---|
+| `hO : InstOracle uInst eqInst gInst O` (`AbsMatch.lean`) | The `UnixUser`/`PartialEq`/`UnixGroup` instances of the Rust user and group types are pure, total and agree with the spec oracle `O` (whose user and group types are the Rust ones): `has_name` (text linked by UTF-8 bytes), `has_uid`, `is_root`, `in_group_by_name` (on the `CStr` content), `in_group_by_gid`, `eq`, `ne` (= `!eq`), `as_gid`, `try_as_name`. | The decision is generic in these traits; the spec takes their answers as an oracle. |
+| `hG : GlobOracle A O` (`AbsMatch.lean`) | `glob::Pattern::matches_path_with` with the options of `match_command` (`require_literal_separator: true`, other fields as `MatchOptions::new()`) returns `ok (O.globMatches (A.pat pat) (A.path path))`; `A.os` (the reading of an `OsString` as text) is injective. | `matches_path_with` is `opaque`; `Pattern`, `Path`, `OsString` are opaque types read as text through `A : GlobAbs`. |
+| `hH : O.SudoRsHosts` | `O.hostMatches p h = (p == h)`. | sudo-rs (`match_token`) compares host names by string equality; the spec allows any host predicate. |
+| `hpol : PolicyOK rules aliases` (`AbsPolicy.lean`) | Alias tables: valid processing orders (`TableWF`), names that fit (`TableFits`), identifier names that fit (`TableGood`). Rules: user/host lists and runas user/group lists with names that fit (`ItemsFit`, `ItemsGood UserSpecFits / IdentFits / Fits`), command alias names that fit (`CmdOK`), parser-produced modifiers (`LineWF`) whose number per line fits in `usize`. | The side conditions of the layers below, collected; all hold for every policy that `analyze` builds from a parsed sudoers file. |
+| `hhost : Fits onHost.inner` | The current host name fits in memory. | `Deref<str>` of `system::Hostname`. |
+
+The theorems quantify over the oracle `O`, the abstraction `A`, the instances and all inputs, so
+they hold for every OS user database and glob semantics consistent with the hypotheses.
