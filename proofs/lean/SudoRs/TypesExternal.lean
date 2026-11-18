@@ -1,5 +1,6 @@
 -- Hand-maintained models of external definitions used by the generated code.
 -- Seeded from TypesExternal_Template.lean by proofs/extract.sh; never overwritten by it.
+-- Every entry is listed in `proofs/lean/ASSUMPTIONS.md`.
 -- [sudo_rs]: external types.
 module
 public import Aeneas
@@ -13,31 +14,22 @@ set_option linter.style.setOption false
 set_option linter.style.longLine false
 set_option linter.internalConstructors false
 
-/- You can set the `maxHeartbeats` value with the `-max-heartbeats` CLI option -/
-set_option maxHeartbeats 1000000
+/-- [core::ffi::c_str::CStr]. In the extracted code a `CStr` is only ever produced by
+`SudoString::as_cstr`, so it is modelled by its content (without the terminating NUL). -/
+structure core.ffi.c_str.CStr where
+  str : String
 
-/- You can set the `maxRecDepth` value with the `-max-recdepth` CLI option -/
-set_option maxRecDepth 2048
+/-- [std::ffi::os_str::OsString]: abstract. -/
+opaque std.ffi.os_str.OsString : Type
 
-/-- [std::collections::hash::map::HashMap]
-    Source: '/rustc/library/std/src/collections/hash/map.rs', lines 245:0-250:1
-    Name pattern: [std::collections::hash::map::HashMap]
-    Visibility: public -/
-@[rust_type "std::collections::hash::map::HashMap"]
-axiom std.collections.hash.map.HashMap (K : Type _) (V : Type _) (S : Type _)
-  (A : Type _) : Type
+/-- [std::path::Path]: abstract. -/
+opaque std.path.Path : Type
 
-/-- [std::hash::random::RandomState]
-    Source: '/rustc/library/std/src/hash/random.rs', lines 35:0-35:22
-    Name pattern: [std::hash::random::RandomState]
-    Visibility: public -/
-@[rust_type "std::hash::random::RandomState"]
-axiom std.hash.random.RandomState : Type
+/-- [glob::Pattern]: abstract. -/
+opaque glob.Pattern : Type
 
-/-- [std::hash::random::DefaultHasher]
-    Source: '/rustc/library/std/src/hash/random.rs', lines 94:0-94:24
-    Name pattern: [std::hash::random::DefaultHasher]
-    Visibility: public -/
-@[rust_type "std::hash::random::DefaultHasher"]
-axiom std.hash.random.DefaultHasher : Type
-
+/-- [sudo_rs::common::string::SudoString] (`src/common/string.rs`), kept opaque for Charon.
+Modelled by the text its `Deref<Target = str>` exposes, i.e. the Rust `inner` field without its
+trailing NUL byte. -/
+structure common.string.SudoString where
+  str : String

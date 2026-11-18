@@ -1,5 +1,6 @@
 -- Hand-maintained models of external definitions used by the generated code.
 -- Seeded from FunsExternal_Template.lean by proofs/extract.sh; never overwritten by it.
+-- Every entry is listed in `proofs/lean/ASSUMPTIONS.md`.
 -- [sudo_rs]: external functions.
 module
 public import Aeneas
@@ -21,79 +22,99 @@ set_option maxHeartbeats 1000000
 set_option maxRecDepth 2048
 open sudo_rs
 
-/-- [std::collections::hash::map::{std::collections::hash::map::HashMap<K, V, S, A>}::contains_key]:
-    Source: '/rustc/library/std/src/collections/hash/map.rs', lines 1268:4-1271:21
-    Name pattern: [std::collections::hash::map::{std::collections::hash::map::HashMap<@K, @V, @S, @A>}::contains_key]
-    Visibility: public -/
-@[rust_fun
-  "std::collections::hash::map::{std::collections::hash::map::HashMap<@K, @V, @S, @A>}::contains_key"]
-axiom std.collections.hash.map.HashMap.contains_key
-  {K : Type _} {V : Type _} {S : Type _} {A : Type _} {Q : Type _}
-  {Clause2_Hasher : Type _} (corecmpEqInst : core.cmp.Eq K) (corehashHashInst :
-  core.hash.Hash K) (corehashBuildHasherInst : core.hash.BuildHasher S
-  Clause2_Hasher) (coreborrowBorrowInst : core.borrow.Borrow K Q)
-  (corehashHashInst1 : core.hash.Hash Q) (corecmpEqInst1 : core.cmp.Eq Q) :
-  std.collections.hash.map.HashMap K V S A → Q → Result Bool
+namespace sudo_rs
 
-/-- [std::collections::hash::map::{impl core::ops::index::Index<&'_0 Q, V> for std::collections::hash::map::HashMap<K, V, S, A>}::index]:
-    Source: '/rustc/library/std/src/collections/hash/map.rs', lines 1515:4-1515:34
-    Name pattern: [std::collections::hash::map::{core::ops::index::Index<std::collections::hash::map::HashMap<@K, @V, @S, @A>, &'0 @Q, @V>}::index]
-    Visibility: public -/
-@[rust_fun
-  "std::collections::hash::map::{core::ops::index::Index<std::collections::hash::map::HashMap<@K, @V, @S, @A>, &'0 @Q, @V>}::index"]
-axiom std.collections.hash.map.HashMap.Insts.CoreOpsIndexIndexShared0QV.index
-  {K : Type _} {Q : Type _} {V : Type _} {S : Type _} {A : Type _}
-  {Clause5_Hasher : Type _} (corecmpEqInst : core.cmp.Eq K) (corehashHashInst :
-  core.hash.Hash K) (coreborrowBorrowInst : core.borrow.Borrow K Q)
-  (corecmpEqInst1 : core.cmp.Eq Q) (corehashHashInst1 : core.hash.Hash Q)
-  (corehashBuildHasherInst : core.hash.BuildHasher S Clause5_Hasher) :
-  std.collections.hash.map.HashMap K V S A → Q → Result V
+/-- The UTF-8 encoding of a string, as Rust `u8`s. -/
+def stringBytes (s : String) : List U8 :=
+  s.toByteArray.data.toList.map fun b => ⟨b.toBitVec⟩
 
-/-- [std::hash::random::{impl core::hash::Hasher for std::hash::random::DefaultHasher}::finish]:
-    Source: '/rustc/library/std/src/hash/random.rs', lines 140:4-140:27
-    Name pattern: [std::hash::random::{core::hash::Hasher<std::hash::random::DefaultHasher>}::finish]
-    Visibility: public -/
-@[rust_fun
-  "std::hash::random::{core::hash::Hasher<std::hash::random::DefaultHasher>}::finish"]
-axiom std.hash.random.DefaultHasher.Insts.CoreHashHasher.finish
-  : std.hash.random.DefaultHasher → Result Std.U64
+/-- The `&str` view of a Rust `String`: its UTF-8 bytes. A Rust `String` never exceeds
+`isize::MAX` bytes; a Lean `String` longer than `usize::MAX` bytes has no Rust counterpart and
+fails here. -/
+def strOfString (s : String) : Result Str :=
+  if h : (stringBytes s).length ≤ Usize.max then ok (Slice.from (stringBytes s) h)
+  else fail .maximumSizeExceeded
 
-/-- [std::hash::random::{impl core::hash::Hasher for std::hash::random::DefaultHasher}::write]:
-    Source: '/rustc/library/std/src/hash/random.rs', lines 130:4-130:35
-    Name pattern: [std::hash::random::{core::hash::Hasher<std::hash::random::DefaultHasher>}::write]
-    Visibility: public -/
-@[rust_fun
-  "std::hash::random::{core::hash::Hasher<std::hash::random::DefaultHasher>}::write"]
-axiom std.hash.random.DefaultHasher.Insts.CoreHashHasher.write
-  :
-  std.hash.random.DefaultHasher → Slice Std.U8 → Result
-    std.hash.random.DefaultHasher
+end sudo_rs
 
-/-- [std::hash::random::{impl core::hash::BuildHasher<std::hash::random::DefaultHasher> for std::hash::random::RandomState}::build_hasher]:
-    Source: '/rustc/library/std/src/hash/random.rs', lines 83:4-83:43
-    Name pattern: [std::hash::random::{core::hash::BuildHasher<std::hash::random::RandomState, std::hash::random::DefaultHasher>}::build_hasher]
-    Visibility: public -/
-@[rust_fun
-  "std::hash::random::{core::hash::BuildHasher<std::hash::random::RandomState, std::hash::random::DefaultHasher>}::build_hasher"]
-axiom
-  std.hash.random.RandomState.Insts.CoreHashBuildHasherDefaultHasher.build_hasher
-  : std.hash.random.RandomState → Result std.hash.random.DefaultHasher
+/-- [core::option::{core::option::Option<T>}::as_ref]: `&Option<T> → Option<&T>`; borrows are
+erased. -/
+def core.option.Option.as_ref {T : Type _} (x : Option T) : Result (Option T) := ok x
 
-/-- [alloc::string::{impl core::cmp::PartialEq<alloc::string::String> for alloc::string::String}::eq]:
-    Source: '/rustc/library/alloc/src/string.rs', lines 350:9-350:18
-    Name pattern: [alloc::string::{core::cmp::PartialEq<alloc::string::String, alloc::string::String>}::eq]
-    Visibility: public -/
-@[rust_fun
-  "alloc::string::{core::cmp::PartialEq<alloc::string::String, alloc::string::String>}::eq"]
-axiom alloc.string.String.Insts.CoreCmpPartialEqString.eq
-  : String → String → Result Bool
+/-- [core::option::{impl core::clone::Clone for core::option::Option<T>}::clone] -/
+def core.option.Option.Insts.CoreCloneClone.clone
+  {T : Type _} (cloneCloneInst : core.clone.Clone T) : Option T → Result (Option T)
+  | none => ok none
+  | some x => do
+    let y ← cloneCloneInst.clone x
+    ok (some y)
 
-/-- [alloc::string::{impl core::hash::Hash for alloc::string::String}::hash]:
-    Source: '/rustc/library/alloc/src/string.rs', lines 2801:4-2801:51
-    Name pattern: [alloc::string::{core::hash::Hash<alloc::string::String>}::hash]
-    Visibility: public -/
-@[rust_fun "alloc::string::{core::hash::Hash<alloc::string::String>}::hash"]
-axiom alloc.string.String.Insts.CoreHashHash.hash
-  {H : Type _} (corehashHasherInst : core.hash.Hasher H) :
-  String → H → Result H
+/-- [core::option::{impl core::default::Default for core::option::Option<T>}::default] -/
+def core.option.Option.Insts.CoreDefaultDefault.default (T : Type _) : Result (Option T) :=
+  ok none
 
+/-- [core::slice::{[T]}::starts_with]: `self.len() >= n && needle == &self[..n]` with
+`n = needle.len()`; slice equality compares `needle[i]` with `self[i]` in order and stops at the
+first difference. -/
+def core.slice.Slice.starts_with
+  {T : Type _} (cmpPartialEqInst : core.cmp.PartialEq T T) (s needle : Slice T) : Result Bool :=
+  if s.val.length < needle.val.length then ok false
+  else List.allM (fun (p : T × T) => cmpPartialEqInst.eq p.1 p.2) (List.zip needle.val s.val)
+
+/-- [core::str::traits::{impl core::cmp::PartialEq<str> for str}::eq]: byte equality. -/
+def Str.Insts.CoreCmpPartialEqStr.eq (a b : Str) : Result Bool := ok (decide (a = b))
+
+open Classical in
+/-- [std::ffi::os_str::{impl core::cmp::PartialEq<std::ffi::os_str::OsString> for std::ffi::os_str::OsString}::eq]:
+equality of the (abstract) values. -/
+noncomputable def std.ffi.os_str.OsString.Insts.CoreCmpPartialEqOsString.eq
+  (a b : std.ffi.os_str.OsString) : Result Bool := ok (decide (a = b))
+
+/-- [alloc::boxed::{impl core::convert::AsRef<T> for alloc::boxed::Box<T>}::as_ref]: boxes and
+borrows are erased. -/
+def Box.Insts.CoreConvertAsRef.as_ref {T : Type _} (A : Type _) (x : T) : Result T := ok x
+
+/-- [alloc::string::{alloc::string::String}::as_str] -/
+def alloc.string.String.as_str (s : String) : Result Str := strOfString s
+
+/-- [alloc::string::{impl core::clone::Clone for alloc::string::String}::clone] -/
+def alloc.string.String.Insts.CoreCloneClone.clone (s : String) : Result String := ok s
+
+/-- [alloc::string::{impl core::ops::deref::Deref<str> for alloc::string::String}::deref] -/
+def alloc.string.String.Insts.CoreOpsDerefDerefStr.deref (s : String) : Result Str :=
+  strOfString s
+
+/-- [alloc::vec::{impl core::default::Default for alloc::vec::Vec<T>}::default] -/
+def alloc.vec.Vec.Insts.CoreDefaultDefault.default (T : Type _) : Result (alloc.vec.Vec T) :=
+  ok (alloc.vec.Vec.new T)
+
+/-- [glob::{glob::Pattern}::matches_path_with]: glob semantics is not modelled. Opaque (no axiom):
+theorems that reach it take its behaviour as a hypothesis. -/
+opaque glob.Pattern.matches_path_with :
+  glob.Pattern → std.path.Path → glob.MatchOptions → Result Bool
+
+/-- [glob::{glob::MatchOptions}::new] (glob 0.3.4). -/
+def glob.MatchOptions.new : Result glob.MatchOptions :=
+  ok { case_sensitive := true, require_literal_separator := false,
+       require_literal_leading_dot := false }
+
+/-- [sudo_rs::common::string::{sudo_rs::common::string::SudoString}::as_cstr]: the
+`unwrap` cannot fail because a `SudoString` has no interior NUL and ends in one. -/
+def common.string.SudoString.as_cstr (s : common.string.SudoString) :
+    Result core.ffi.c_str.CStr :=
+  ok ⟨s.str⟩
+
+/-- [sudo_rs::common::string::{impl core::ops::deref::Deref<str> for sudo_rs::common::string::SudoString}::deref] -/
+def common.string.SudoString.Insts.CoreOpsDerefDerefStr.deref (s : common.string.SudoString) :
+    Result Str :=
+  strOfString s.str
+
+/-- [sudo_rs::common::string::{impl core::cmp::PartialEq<str> for sudo_rs::common::string::SudoString}::eq]:
+`let s: &str = self; s == other`. -/
+def common.string.SudoString.Insts.CoreCmpPartialEqStr.eq (s : common.string.SudoString)
+    (other : Str) : Result Bool := do
+  let a ← common.string.SudoString.Insts.CoreOpsDerefDerefStr.deref s
+  Str.Insts.CoreCmpPartialEqStr.eq a other
+
+/-- [sudo_rs::sudoers::warn_ignored]: only writes a diagnostic to the log. -/
+def sudoers.warn_ignored (_ : sudoers.Ignored) : Result Unit := ok ()
