@@ -19,25 +19,36 @@ set_option maxHeartbeats 1000000
 /- You can set the `maxRecDepth` value with the `-max-recdepth` CLI option -/
 set_option maxRecDepth 2048
 
-/-- [std::collections::hash::map::HashMap]
-    Source: '/rustc/library/std/src/collections/hash/map.rs', lines 245:0-250:1
-    Name pattern: [std::collections::hash::map::HashMap]
+/-- [core::ffi::c_str::CStr]
+    Source: '/rustc/library/core/src/ffi/c_str.rs', lines 102:0-102:15
+    Name pattern: [core::ffi::c_str::CStr]
     Visibility: public -/
-@[rust_type "std::collections::hash::map::HashMap"]
-axiom std.collections.hash.map.HashMap (K : Type _) (V : Type _) (S : Type _)
-  (A : Type _) : Type
+@[rust_type "core::ffi::c_str::CStr"]
+axiom core.ffi.c_str.CStr : Type
 
-/-- [std::hash::random::RandomState]
-    Source: '/rustc/library/std/src/hash/random.rs', lines 35:0-35:22
-    Name pattern: [std::hash::random::RandomState]
+/-- [std::ffi::os_str::OsString]
+    Source: '/rustc/library/std/src/ffi/os_str.rs', lines 93:0-93:19
+    Name pattern: [std::ffi::os_str::OsString]
     Visibility: public -/
-@[rust_type "std::hash::random::RandomState"]
-axiom std.hash.random.RandomState : Type
+@[rust_type "std::ffi::os_str::OsString"]
+axiom std.ffi.os_str.OsString : Type
 
-/-- [std::hash::random::DefaultHasher]
-    Source: '/rustc/library/std/src/hash/random.rs', lines 94:0-94:24
-    Name pattern: [std::hash::random::DefaultHasher]
+/-- [std::path::Path]
+    Source: '/rustc/library/std/src/path.rs', lines 2356:0-2356:15
+    Name pattern: [std::path::Path]
     Visibility: public -/
-@[rust_type "std::hash::random::DefaultHasher"]
-axiom std.hash.random.DefaultHasher : Type
+@[rust_type "std::path::Path"]
+axiom std.path.Path : Type
+
+/-- [glob::Pattern]
+    Source: '/cargo/registry/src/index.crates.io-1949cf8c6b5b557f/glob-0.3.4/src/lib.rs', lines 556:0-556:18
+    Name pattern: [glob::Pattern]
+    Visibility: public -/
+@[rust_type "glob::Pattern"]
+axiom glob.Pattern : Type
+
+/-- [sudo_rs::common::string::SudoString]
+    Source: 'src/common/string.rs', lines 16:0-18:1
+    Visibility: public -/
+axiom common.string.SudoString : Type
 
