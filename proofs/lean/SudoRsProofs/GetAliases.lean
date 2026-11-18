@@ -27,11 +27,12 @@ theorem getAliasesStep_absDef (p : β → Bool) (A : SudoersSpec.FoundAliases) (
         SudoersSpec.withUnit (absSpecList f list.val))).isSome <;> simp [h1, h2]
 
 theorem get_aliases_loop_spec (inst : core.ops.function.Fn P T Bool) (pred : P) (f : T → β)
-    (p : β → Bool) (hp : ∀ x, inst.call pred x = ok (p (f x)))
+    (p : β → Bool) (Good : T → Prop) (hp : ∀ x, Good x → inst.call pred x = ok (p (f x)))
     (order : alloc.vec.Vec Usize) (defs : alloc.vec.Vec (RDef T))
     (set : sudo_rs.sudoers.FoundAliases) (i : Usize)
     (hwf : ∀ j ∈ order.val, j.val < defs.val.length)
     (hfit : ∀ d ∈ defs.val, Fits d.1 ∧ ItemsFit d.2.val)
+    (hgood : ∀ d ∈ defs.val, ItemsGood Good d.2.val)
     (hset : FoundFits set) (hlen : set.val.length ≤ i.val) :
     sudo_rs.sudoers.get_aliases_loop inst pred order defs set i ⦃ r =>
       absFound r = (((order.val.drop i.val).filterMap fun j => defs.val[j.val]?).map
@@ -46,7 +47,9 @@ theorem get_aliases_loop_spec (inst : core.ops.function.Fn P T Bool) (pred : P) 
     have hjlt : j.val < defs.val.length := hwf j (by rw [hj]; exact List.getElem_mem hlt)
     apply WP.spec_bind (alloc.vec.Vec.index_usize_spec defs j hjlt)
     intro d hd
-    obtain ⟨hdn, hdi⟩ := hfit d (by rw [hd]; exact List.getElem_mem hjlt)
+    have hdmem : d ∈ defs.val := by rw [hd]; exact List.getElem_mem hjlt
+    obtain ⟨hdn, hdi⟩ := hfit d hdmem
+    have hdg := hgood d hdmem
     have hfm : ((order.val.drop i.val).filterMap fun j => defs.val[j.val]?) =
         d :: ((order.val.drop (i.val + 1)).filterMap fun j => defs.val[j.val]?) := by
       rw [hdrop, List.filterMap_cons, ← hj, List.getElem?_eq_getElem hjlt, ← hd]
@@ -55,7 +58,9 @@ theorem get_aliases_loop_spec (inst : core.ops.function.Fn P T Bool) (pred : P) 
     have hmax : set.val.length < Usize.max := by scalar_tac
     simp only [getAliasesStep_absDef]
     have hdi' : ItemsFit (alloc.vec.Vec.deref list).val := by simpa using hdi
-    step with find_item_spec inst pred f p hp (alloc.vec.Vec.deref list) set hset hdi' as ⟨b, hb⟩
+    have hdg' : ItemsGood Good (alloc.vec.Vec.deref list).val := by simpa using hdg
+    step with find_item_spec inst pred f p Good hp (alloc.vec.Vec.deref list) set hset hdi' hdg'
+      as ⟨b, hb⟩
     simp only [Vec.deref_val] at hb
     -- what the recursive call needs from the new set
     have hrec : ∀ set1 : sudo_rs.sudoers.FoundAliases, FoundFits set1 →
@@ -68,7 +73,8 @@ theorem get_aliases_loop_spec (inst : core.ops.function.Fn P T Bool) (pred : P) 
       intro set1 hfit1 hlen1
       step as ⟨i3, hi3⟩
       have hlen3 : set1.val.length ≤ i3.val := by scalar_tac
-      step with get_aliases_loop_spec inst pred f p hp order defs set1 i3 hwf hfit hfit1 hlen3
+      step with get_aliases_loop_spec inst pred f p Good hp order defs set1 i3 hwf hfit hgood hfit1
+        hlen3
         as ⟨r, hr, hrfit⟩
       exact ⟨by rw [hr, hi3], hrfit⟩
     have hins : ∀ bv : Bool, ∀ set1 : sudo_rs.sudoers.FoundAliases,
@@ -90,8 +96,8 @@ theorem get_aliases_loop_spec (inst : core.ops.function.Fn P T Bool) (pred : P) 
       have hbf' : (SudoersSpec.findItem p (absFound set)
           (SudoersSpec.withUnit (absSpecList f list.val))).isSome = false := by
         rw [← hb]; simpa using hbf
-      step with find_item_after_spec inst pred f p hp true (alloc.vec.Vec.deref list) set hset
-        hdi' as ⟨b1, hb1⟩
+      step with find_item_after_spec inst pred f p Good hp true (alloc.vec.Vec.deref list) set
+        hset hdi' hdg' as ⟨b1, hb1⟩
       simp only [Vec.deref_val] at hb1
       split
       · rename_i hb1t
@@ -116,15 +122,16 @@ processing order is valid) whose names fit in memory, the returned `FoundAliases
 `SudoersSpec.getAliases` on the abstracted table; all names it stores fit in memory. -/
 @[step]
 theorem get_aliases_spec (inst : core.ops.function.Fn P T Bool) (pred : P) (f : T → β)
-    (p : β → Bool) (hp : ∀ x, inst.call pred x = ok (p (f x)))
-    (table : sudo_rs.sudoers.VecOrd (RDef T)) (hwf : TableWF table) (hfit : TableFits table) :
+    (p : β → Bool) (Good : T → Prop) (hp : ∀ x, Good x → inst.call pred x = ok (p (f x)))
+    (table : sudo_rs.sudoers.VecOrd (RDef T)) (hwf : TableWF table) (hfit : TableFits table)
+    (hgood : TableGood Good table) :
     sudo_rs.sudoers.get_aliases inst table pred ⦃ r =>
       absFound r = SudoersSpec.getAliases (absTable f table) p ∧ FoundFits r ⦄ := by
   obtain ⟨order, defs⟩ := table
   unfold sudo_rs.sudoers.get_aliases
   step as ⟨set, hsv, hsabs⟩
   have hset : FoundFits set := by intro q hq; simp [hsv] at hq
-  step with get_aliases_loop_spec inst pred f p hp order defs set 0#usize hwf hfit hset
+  step with get_aliases_loop_spec inst pred f p Good hp order defs set 0#usize hwf hfit hgood hset
     (by simp [hsv]) as ⟨r, hr, hrfit⟩
   refine ⟨?_, hrfit⟩
   rw [hr, hsabs]
@@ -132,11 +139,12 @@ theorem get_aliases_spec (inst : core.ops.function.Fn P T Bool) (pred : P) (f : 
 
 /-- `get_aliases_spec` as an equation: the call terminates without panicking. -/
 theorem get_aliases_eq (inst : core.ops.function.Fn P T Bool) (pred : P) (f : T → β)
-    (p : β → Bool) (hp : ∀ x, inst.call pred x = ok (p (f x)))
-    (table : sudo_rs.sudoers.VecOrd (RDef T)) (hwf : TableWF table) (hfit : TableFits table) :
+    (p : β → Bool) (Good : T → Prop) (hp : ∀ x, Good x → inst.call pred x = ok (p (f x)))
+    (table : sudo_rs.sudoers.VecOrd (RDef T)) (hwf : TableWF table) (hfit : TableFits table)
+    (hgood : TableGood Good table) :
     ∃ r, sudo_rs.sudoers.get_aliases inst table pred = ok r ∧
       absFound r = SudoersSpec.getAliases (absTable f table) p :=
-  exists_eq_ok_of_spec (get_aliases_spec inst pred f p hp table hwf hfit) |>.imp
+  exists_eq_ok_of_spec (get_aliases_spec inst pred f p Good hp table hwf hfit hgood) |>.imp
     fun _ h => ⟨h.1, h.2.1⟩
 
 end SudoRsProofs

@@ -82,9 +82,9 @@ theorem findItem_initial (p : β → Bool) (A : SudoersSpec.FoundAliases)
 
 @[step]
 theorem item_verdict_spec (inst : core.ops.function.Fn P T Bool) (pred : P) (f : T → β)
-    (p : β → Bool) (hp : ∀ x, inst.call pred x = ok (p (f x))) (item : RSpec T)
-    (v : sudo_rs.sudoers.FoundAliases) (hv : FoundFits v)
-    (hi : ∀ n, aliasName item = some n → Fits n) :
+    (p : β → Bool) (Good : T → Prop) (hp : ∀ x, Good x → inst.call pred x = ok (p (f x)))
+    (item : RSpec T) (v : sudo_rs.sudoers.FoundAliases) (hv : FoundFits v)
+    (hi : ∀ n, aliasName item = some n → Fits n) (hg : ∀ x, onlyItem item = some x → Good x) :
     sudo_rs.sudoers.item_verdict inst item pred v
       ⦃ o => o = itemVerdict p (absFound v) (absSpec f item) ⦄ := by
   unfold sudo_rs.sudoers.item_verdict
@@ -93,7 +93,8 @@ theorem item_verdict_spec (inst : core.ops.function.Fn P T Bool) (pred : P) (f :
     cases m with
     | All => simp [absSpec, absQualified, absMeta, itemVerdict]
     | Only x =>
-      by_cases h : p (f x) <;> simp [hp, h, absSpec, absQualified, absMeta, itemVerdict]
+      have hx := hp x (hg x rfl)
+      by_cases h : p (f x) <;> simp [hx, h, absSpec, absQualified, absMeta, itemVerdict]
     | Alias n =>
       have hn : Fits n := hi n rfl
       step as ⟨s, hs⟩
@@ -101,12 +102,16 @@ theorem item_verdict_spec (inst : core.ops.function.Fn P T Bool) (pred : P) (f :
       rcases hA : absFound v n with _ | _ | _ <;>
         simp [ho, hA, absSpec, absQualified, absMeta, itemVerdict]
 
-/-! ## `find_item_after` / `find_item` -/
+/-! ## `find_item_after` / `find_item`
+
+`Good` is the domain on which the closure is pure and total (e.g. identifiers whose names fit in
+memory); `ItemsGood Good items` says every directly named item lies in it. -/
 
 theorem find_item_after_loop_spec (inst : core.ops.function.Fn P T Bool) (pred : P)
-    (f : T → β) (p : β → Bool) (hp : ∀ x, inst.call pred x = ok (p (f x))) (r : Bool)
+    (f : T → β) (p : β → Bool) (Good : T → Prop)
+    (hp : ∀ x, Good x → inst.call pred x = ok (p (f x))) (r : Bool)
     (items : Slice (RSpec T)) (v : sudo_rs.sudoers.FoundAliases) (hv : FoundFits v)
-    (hi : ItemsFit items.val) (i : Usize) :
+    (hi : ItemsFit items.val) (hg : ItemsGood Good items.val) (i : Usize) :
     sudo_rs.sudoers.find_item_after_loop inst r items pred v i
       ⦃ b => b = verdictFold p (absFound v) (absSpecList f (items.val.drop i.val)) r ⦄ := by
   unfold sudo_rs.sudoers.find_item_after_loop
@@ -115,8 +120,8 @@ theorem find_item_after_loop_spec (inst : core.ops.function.Fn P T Bool) (pred :
   · have hlt : i.val < items.val.length := by scalar_tac
     have hdrop := List.drop_eq_getElem_cons hlt
     step as ⟨q, hq⟩
-    have hqi : ∀ n, aliasName q = some n → Fits n := hi q (by rw [hq]; exact List.getElem_mem hlt)
-    step with item_verdict_spec inst pred f p hp q v hv hqi as ⟨o, ho⟩
+    have hqm : q ∈ items.val := by rw [hq]; exact List.getElem_mem hlt
+    step with item_verdict_spec inst pred f p Good hp q v hv (hi q hqm) (hg q hqm) as ⟨o, ho⟩
     cases o <;> dsimp only <;> step as ⟨i2, hi2⟩ <;> step as ⟨b, hb⟩ <;>
       (rw [hb, hdrop, absSpecList_cons]
        simp only [verdictFold, List.foldl_cons, hi2, ← hq, ← ho, Option.getD_none,
@@ -130,34 +135,34 @@ decreasing_by all_goals (simp_all; scalar_tac)
 initial `result` is `true`. -/
 @[step]
 theorem find_item_after_spec (inst : core.ops.function.Fn P T Bool) (pred : P) (f : T → β)
-    (p : β → Bool) (hp : ∀ x, inst.call pred x = ok (p (f x))) (r : Bool)
-    (items : Slice (RSpec T)) (v : sudo_rs.sudoers.FoundAliases) (hv : FoundFits v)
-    (hi : ItemsFit items.val) :
+    (p : β → Bool) (Good : T → Prop) (hp : ∀ x, Good x → inst.call pred x = ok (p (f x)))
+    (r : Bool) (items : Slice (RSpec T)) (v : sudo_rs.sudoers.FoundAliases) (hv : FoundFits v)
+    (hi : ItemsFit items.val) (hg : ItemsGood Good items.val) :
     sudo_rs.sudoers.find_item_after inst r items pred v
       ⦃ b => b = (SudoersSpec.findItem p (absFound v)
           (initialItems r ++ SudoersSpec.withUnit (absSpecList f items.val))).isSome ⦄ := by
   rw [findItem_initial]
-  simpa using find_item_after_loop_spec inst pred f p hp r items v hv hi 0#usize
+  simpa using find_item_after_loop_spec inst pred f p Good hp r items v hv hi hg 0#usize
 
 /-- **`find_item` is `findItem`** on the abstracted entries (`bool` = `isSome`). -/
 @[step]
 theorem find_item_spec (inst : core.ops.function.Fn P T Bool) (pred : P) (f : T → β)
-    (p : β → Bool) (hp : ∀ x, inst.call pred x = ok (p (f x)))
+    (p : β → Bool) (Good : T → Prop) (hp : ∀ x, Good x → inst.call pred x = ok (p (f x)))
     (items : Slice (RSpec T)) (v : sudo_rs.sudoers.FoundAliases) (hv : FoundFits v)
-    (hi : ItemsFit items.val) :
+    (hi : ItemsFit items.val) (hg : ItemsGood Good items.val) :
     sudo_rs.sudoers.find_item inst items pred v
       ⦃ b => b = (SudoersSpec.findItem p (absFound v)
           (SudoersSpec.withUnit (absSpecList f items.val))).isSome ⦄ := by
   unfold sudo_rs.sudoers.find_item
-  simpa [initialItems] using find_item_after_spec inst pred f p hp false items v hv hi
+  simpa [initialItems] using find_item_after_spec inst pred f p Good hp false items v hv hi hg
 
 /-- `find_item_spec` as an equation. -/
 theorem find_item_eq (inst : core.ops.function.Fn P T Bool) (pred : P) (f : T → β)
-    (p : β → Bool) (hp : ∀ x, inst.call pred x = ok (p (f x)))
+    (p : β → Bool) (Good : T → Prop) (hp : ∀ x, Good x → inst.call pred x = ok (p (f x)))
     (items : Slice (RSpec T)) (v : sudo_rs.sudoers.FoundAliases) (hv : FoundFits v)
-    (hi : ItemsFit items.val) :
+    (hi : ItemsFit items.val) (hg : ItemsGood Good items.val) :
     sudo_rs.sudoers.find_item inst items pred v =
       ok (SudoersSpec.findItem p (absFound v) (SudoersSpec.withUnit (absSpecList f items.val))).isSome :=
-  eq_ok_of_spec (find_item_spec inst pred f p hp items v hv hi)
+  eq_ok_of_spec (find_item_spec inst pred f p Good hp items v hv hi hg)
 
 end SudoRsProofs

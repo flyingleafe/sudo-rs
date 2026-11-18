@@ -53,6 +53,16 @@ def aliasName {α : Type} : RSpec α → Option String
 def ItemsFit {α : Type} (l : List (RSpec α)) : Prop :=
   ∀ s ∈ l, ∀ n, aliasName s = some n → Fits n
 
+/-- The item a spec names directly (`Meta::Only`), if any. -/
+def onlyItem {α : Type} : RSpec α → Option α
+  | .Allow (.Only x) | .Forbid (.Only x) => some x
+  | _ => none
+
+/-- Every item a spec list names directly satisfies `Good`: the domain on which the matcher
+closure passed to `find_item` is known to be pure and total. -/
+def ItemsGood {α : Type} (Good : α → Prop) (l : List (RSpec α)) : Prop :=
+  ∀ s ∈ l, ∀ x, onlyItem s = some x → Good x
+
 /-! ## `FoundAliases` -/
 
 /-- The Rust `FoundAliases(Vec<(String, bool)>)` is a list of insertions; later entries win. -/
@@ -83,6 +93,10 @@ def TableWF {α : Type} (t : sudo_rs.sudoers.VecOrd (RDef α)) : Prop :=
 /-- Every name in an alias table fits in memory: definition names and referenced aliases. -/
 def TableFits {α : Type} (t : sudo_rs.sudoers.VecOrd (RDef α)) : Prop :=
   ∀ d ∈ t.2.val, Fits d.1 ∧ ItemsFit d.2.val
+
+/-- Every directly named item of every definition satisfies `Good` (see `ItemsGood`). -/
+def TableGood {α : Type} (Good : α → Prop) (t : sudo_rs.sudoers.VecOrd (RDef α)) : Prop :=
+  ∀ d ∈ t.2.val, ItemsGood Good d.2.val
 
 /-! ## Basic lemmas -/
 
