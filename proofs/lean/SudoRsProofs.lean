@@ -9,4 +9,5 @@ import SudoRsProofs.AbsMatch
 import SudoRsProofs.Matchers
 import SudoRsProofs.AbsTags
 import SudoRsProofs.Tags
+import SudoRsProofs.Commands
 import SudoRsProofs.Axioms

@@ -1,5 +1,5 @@
 import SudoRsProofs.GetAliases
-import SudoRsProofs.Tags
+import SudoRsProofs.Commands
 
 /-!
 # Axiom audit
@@ -24,3 +24,5 @@ of `SudoRs/{Types,Funs}External.lean` are definitions or `opaque` constants, nev
 #print axioms SudoRsProofs.apply_modifiers_spec
 #print axioms SudoRsProofs.command_tag_spec
 #print axioms SudoRsProofs.distribute_tags_spec
+#print axioms SudoRsProofs.command_verdict_spec
+#print axioms SudoRsProofs.check_commands_spec
