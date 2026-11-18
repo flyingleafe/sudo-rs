@@ -1,0 +1,13 @@
+name = "differential"
+defaultTargets = ["oracle"]
+
+[[require]]
+name = "sudoers-spec"
+path = "../spec"
+
+[[lean_lib]]
+name = "Differential"
+
+[[lean_exe]]
+name = "oracle"
+root = "Main"

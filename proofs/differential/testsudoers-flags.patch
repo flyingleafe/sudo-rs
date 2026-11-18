@@ -1,0 +1,11 @@
+--- a/plugins/sudoers/testsudoers.c
++++ b/plugins/sudoers/testsudoers.c
+@@ -405,6 +405,8 @@
+     if (def_authenticate) {
+ 	puts(U_("\nPassword required"));
+     }
++    printf("\nFlags: authenticate=%d setenv=%d noexec=%d\n",
++	def_authenticate ? 1 : 0, def_setenv ? 1 : 0, def_noexec ? 1 : 0);
+ 
+     /*
+      * Exit codes:

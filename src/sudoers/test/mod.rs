@@ -5,6 +5,8 @@ use super::char_stream::CharStream;
 use super::*;
 use basic_parser::{Status, parse_eval, parse_fatal, parse_lines, parse_string};
 
+mod differential;
+
 impl<T> Qualified<T> {
     pub fn as_allow(&self) -> Option<&T> {
         if let Self::Allow(v) = self {
