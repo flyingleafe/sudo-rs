@@ -87,21 +87,31 @@ else
   echo "SKIP apalache: no java on PATH (run inside nix shell nixpkgs#jdk)"
 fi
 
-echo "== mutants (up to $MUTANT_SAMPLES runs x $STEPS steps each)"
+# One simulator thread plus a fixed seed make the search deterministic; the
+# creation time Quint stamps into the ITF header is blanked so that reruns
+# reproduce the committed traces byte for byte.
+echo "== mutants (up to $MUTANT_SAMPLES runs x $STEPS steps each, 1 thread, seed $SEED)"
 mkdir -p traces
 for m in "${MUTANTS[@]}"; do
   IFS='|' read -r mod bug inv <<<"$m"
   trace="traces/$mod.itf.json"
-  rm -f "$trace"
+  raw=$(mktemp)
   out=$(quint run --main="$mod" instances.qnt --max-samples="$MUTANT_SAMPLES" --max-steps="$STEPS" \
-        --seed="$SEED" --invariant="$inv" --out-itf="$trace" --verbosity=1 2>&1)
-  if grep -q '^\[violation\]' <<<"$out" && [[ -s "$trace" ]]; then
+        --seed="$SEED" --n-threads=1 --invariant="$inv" --out-itf="$raw" --verbosity=1 2>&1)
+  if grep -q '^\[violation\]' <<<"$out" && [[ -s "$raw" ]]; then
+    sed -E 's/"description":"Created by Quint on [^"]*","timestamp":[0-9]+/"description":"Created by Quint","timestamp":0/' \
+      "$raw" > "$trace"
     echo "VIOLATED $inv by $mod ($bug), trace $trace"
   else
     echo "$out" | tail -20
     fail "$mod ($bug): expected $inv to be violated"
   fi
+  rm -f "$raw"
 done
+
+# Scratch directories quint/Apalache leave behind.
+rm -rf _apalache-out
+rmdir tmp 2>/dev/null
 
 if [[ $failures -eq 0 ]]; then echo "ALL CHECKS PASSED"; else echo "$failures UNEXPECTED OUTCOME(S)"; fi
 [[ $failures -eq 0 ]]
