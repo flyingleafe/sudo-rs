@@ -3,3 +3,6 @@ Lean specification `SudoersSpec` (`proofs/spec`). -/
 import SudoRsProofs.Util
 import SudoRsProofs.Abs
 import SudoRsProofs.FoundAliases
+import SudoRsProofs.FindItem
+import SudoRsProofs.GetAliases
+import SudoRsProofs.Axioms
