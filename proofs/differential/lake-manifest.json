@@ -1,0 +1,14 @@
+{"version": "1.3.0",
+ "packagesDir": ".lake/packages",
+ "packages":
+ [{"type": "path",
+   "scope": "",
+   "name": "«sudoers-spec»",
+   "manifestFile": "lake-manifest.json",
+   "inherited": false,
+   "dir": "../spec",
+   "copy": false,
+   "configFile": "lakefile.toml"}],
+ "name": "differential",
+ "lakeDir": ".lake",
+ "fixedToolchain": false}
