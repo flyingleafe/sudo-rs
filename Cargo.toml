@@ -58,5 +58,5 @@ uninlined_format_args = "warn"
 # Options for Charon (https://github.com/AeneasVerif/charon), which extracts the sudoers
 # authorization decision for its formal verification with Aeneas (see `proofs/`)
 [package.metadata.charon]
-start_from = ["crate::sudoers::check_permission"]
-opaque = ["crate::sudoers::warn_ignored"]
+start_from = ["crate::sudoers::permission_flags"]
+opaque = ["crate::common::string", "crate::sudoers::warn_ignored"]
