@@ -5,6 +5,9 @@ open Lake DSL
 require aeneas from git
   "https://github.com/AeneasVerif/aeneas" @ "8f4466db9f0d59267b8e76b54473a21a005cf7be" / "backends/lean"
 
+-- The hand-written specification (`proofs/spec`, library `SudoersSpec`).
+require «sudoers-spec» from "../spec"
+
 package «sudo_rs_proofs» where
   -- Generated code mirrors Rust paths (e.g. `sudo_rs.sudoers.…`).
   leanOptions := #[⟨`weak.linter.dupNamespace, false⟩]
