@@ -60,3 +60,8 @@ these hypotheses instead of axioms:
 | `a.val = stringBytes k` | `FoundAliases::get` | Links the `&str` argument to the alias name `k` of the abstract map. |
 | `v.val.length < Usize.max` | `FoundAliases::insert` | `Vec::push` fails on capacity overflow. Inside `get_aliases` this is discharged (the set grows by at most one entry per alias). |
 | `TableWF table` (`∀ i ∈ order, i < defs.len`) | `get_aliases` | `defs[order[i]]` is bounds-checked; `sanitize_alias_table` only stores valid positions. |
+| `ModifierWF m` / `LineWF line` (no `Authenticate(None)`, `Env(Implicit)`, `Exec(Implicit)` modifier) | `Modifier::apply`, `apply_modifiers`, `distribute_tags` | The spec's `Modifier` has no counterpart for these Rust values; the parser never builds them (`src/sudoers/ast.rs` `MetaOrTag::parse`, lines 376-421). |
+| `(lineMods line).length ≤ Usize.max` (with `t.ignored.len + …` for the inner loops) | `apply_modifiers`, `distribute_tags` | `Modifier::Ignored` pushes onto `Tag::ignored`; the total number of modifiers of a line, all of which are in memory, bounds that vector. |
+
+The tag layer is generic in the abstraction of runas specs and commands (`fr`, `fc` in
+`SudoRsProofs/AbsTags.lean`): `distribute_tags` never looks inside them.
