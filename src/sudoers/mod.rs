@@ -10,7 +10,7 @@ mod char_stream;
 mod entry;
 mod tokens;
 
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 use std::ffi::OsString;
 use std::fmt;
 use std::io;
@@ -123,13 +123,13 @@ impl Sudoers {
 
         let match_scope = |scope| match scope {
             ConfigScope::Generic => true,
-            ConfigScope::Host(list) => find_item(&list, host_matcher, &host_aliases).is_some(),
-            ConfigScope::User(list) => find_item(&list, user_matcher, &user_aliases).is_some(),
+            ConfigScope::Host(list) => find_item(&list, host_matcher, &host_aliases),
+            ConfigScope::User(list) => find_item(&list, user_matcher, &user_aliases),
             ConfigScope::RunAs(list) => {
                 runas_matcher_aliases
                     .as_ref()
                     .is_some_and(|(runas_matcher, runas_aliases)| {
-                        find_item(&list, runas_matcher, runas_aliases).is_some()
+                        find_item(&list, runas_matcher, runas_aliases)
                     })
             }
             ConfigScope::Command(_list) => {
@@ -153,7 +153,7 @@ impl Sudoers {
         let cmnd_aliases = get_aliases(&self.aliases.cmnd, cmnd_matcher);
 
         for (scope, modifiers) in customisers {
-            if find_item(&scope, cmnd_matcher, &cmnd_aliases).is_some() {
+            if find_item(&scope, cmnd_matcher, &cmnd_aliases) {
                 for modifier in modifiers {
                     modifier(&mut self.settings);
                 }
@@ -170,16 +170,7 @@ impl Sudoers {
         self.specify_host_user_runas(on_host, am_user, Some(request.user));
         self.specify_command(request.command, request.arguments);
 
-        // exception: if user is root or does not switch users, NOPASSWD is implied
-        let skip_passwd =
-            am_user.is_root() || (request.user == am_user && in_group(am_user, request.group));
-
-        let mut flags = check_permission(self, am_user, on_host, request);
-        if let Some(Tag { authenticate, .. }) = flags.as_mut() {
-            if skip_passwd {
-                *authenticate = Authenticate::Nopasswd;
-            }
-        }
+        let flags = permission_flags(&self.rules, &self.aliases, am_user, on_host, request);
 
         Judgement {
             flags,
@@ -270,19 +261,17 @@ impl Sudoers {
         hostname: &'a system::Hostname,
     ) -> impl Iterator<Item = impl Iterator<Item = MatchedCommand<'a>>> {
         let Self { rules, aliases, .. } = self;
-        let user_aliases = get_aliases(&aliases.user, &match_user(invoking_user));
-        let host_aliases = get_aliases(&aliases.host, &match_token(hostname));
 
-        rules
-            .iter()
-            .filter_map(move |sudo| {
-                find_item(&sudo.users, &match_user(invoking_user), &user_aliases)?;
-                Some(&sudo.permissions)
-            })
-            .flatten()
-            .filter_map(move |(hosts, runas_cmds)| {
-                find_item(hosts, &match_token(hostname), &host_aliases)?;
-                Some(distribute_tags(runas_cmds))
+        matching_permissions(rules, aliases, invoking_user, hostname)
+            .into_iter()
+            .map(|(rule, permission)| {
+                let (_, runas_cmds) = &rules[rule].permissions[permission];
+                distribute_tags(runas_cmds).into_iter().zip(runas_cmds).map(
+                    |((last_runas, tag), (_, CommandSpec(_, cmd)))| {
+                        let runas = last_runas.and_then(|i| runas_cmds[i].0.as_ref());
+                        (runas, (tag, cmd))
+                    },
+                )
             })
     }
 
@@ -485,74 +474,204 @@ impl<T> VecOrd<T> {
     }
 }
 
+/// Like [check_permission], but taking into account the exception that if the user is root or does
+/// not switch users, NOPASSWD is implied
+fn permission_flags<User: UnixUser + PartialEq<User>, Group: UnixGroup>(
+    rules: &[PermissionSpec],
+    aliases: &AliasTable,
+    am_user: &User,
+    on_host: &system::Hostname,
+    request: Request<User, Group>,
+) -> Option<Tag> {
+    let skip_passwd =
+        am_user.is_root() || (request.user == am_user && in_group(am_user, request.group));
+
+    let mut flags = check_permission(rules, aliases, am_user, on_host, request);
+    if let Some(Tag { authenticate, .. }) = &mut flags {
+        if skip_passwd {
+            *authenticate = Authenticate::Nopasswd;
+        }
+    }
+
+    flags
+}
+
 /// Check if the user `am_user` is allowed to run `cmdline` on machine `on_host` as the requested
 /// user/group. Not that in the sudoers file, later permissions override earlier restrictions.
 /// The `cmdline` argument should already be ready to essentially feed to an exec() call; or be
 /// a special command like 'sudoedit'.
-// This code is structure to allow easily reading the 'happy path'; i.e. as soon as something
-// doesn't match, we escape using the '?' mechanism.
 fn check_permission<User: UnixUser + PartialEq<User>, Group: UnixGroup>(
-    sudoers: &Sudoers,
+    rules: &[PermissionSpec],
+    aliases: &AliasTable,
     am_user: &User,
     on_host: &system::Hostname,
     request: Request<User, Group>,
 ) -> Option<Tag> {
     let cmdline = (request.command, request.arguments);
 
-    let aliases = &sudoers.aliases;
-    let cmnd_aliases = get_aliases(&aliases.cmnd, &match_command(cmdline));
+    let cmnd_matcher = &match_command(cmdline);
+    let cmnd_aliases = get_aliases(&aliases.cmnd, cmnd_matcher);
     let runas_user_aliases = get_aliases(&aliases.runas, &match_user(request.user));
     let runas_group_aliases = get_aliases(&aliases.runas, &match_group_alias(request.group));
 
-    let matching_user_specs = sudoers.matching_user_specs(am_user, on_host).flatten();
-
-    let allowed_commands: Vec<_> = matching_user_specs
-        .filter_map(|(runas, cmdspec)| {
-            if let Some(RunAs { users, groups }) = runas {
+    let verdict = |runas: Option<&RunAs>, cmd: &Spec<Command>| {
+        let runas_allowed = match runas {
+            Some(RunAs { users, groups }) => {
                 let stays_in_group = in_group(request.user, request.group);
-                if request.user != am_user || (stays_in_group && !users.is_empty()) {
-                    find_item(users, &match_user(request.user), &runas_user_aliases)?;
+                if (request.user != am_user || (stays_in_group && !users.is_empty()))
+                    && !find_item(users, &match_user(request.user), &runas_user_aliases)
+                {
+                    false
+                } else {
+                    stays_in_group
+                        || find_item(groups, &match_group(request.group), &runas_group_aliases)
                 }
-                if !stays_in_group {
-                    find_item(groups, &match_group(request.group), &runas_group_aliases)?;
-                }
-            } else if !(request.user.is_root() && in_group(request.user, request.group)) {
-                None?;
             }
+            None => request.user.is_root() && in_group(request.user, request.group),
+        };
 
-            Some(cmdspec)
-        })
-        .collect();
+        if runas_allowed {
+            item_verdict(cmd, cmnd_matcher, &cmnd_aliases)
+        } else {
+            None
+        }
+    };
 
-    find_item(&allowed_commands, &match_command(cmdline), &cmnd_aliases).cloned()
+    let user_specs = matching_permissions(rules, aliases, am_user, on_host);
+
+    let mut result = None;
+    let mut i = 0;
+    while i < user_specs.len() {
+        let (rule, permission) = user_specs[i];
+        result = check_commands(result, &rules[rule].permissions[permission].1, &verdict);
+        i += 1;
+    }
+
+    result
+}
+
+/// Continue the search of [check_permission] (where `result` is the outcome so far) through a list
+/// of RunAs + Command specifications; `verdict` decides whether a command is allowed, forbidden or
+/// not applicable.
+fn check_commands<Verdict>(
+    mut result: Option<Tag>,
+    runas_cmds: &[(Option<RunAs>, CommandSpec)],
+    verdict: &Verdict,
+) -> Option<Tag>
+where
+    Verdict: Fn(Option<&RunAs>, &Spec<Command>) -> Option<bool>,
+{
+    let tags = distribute_tags(runas_cmds);
+
+    let mut i = 0;
+    while i < tags.len() {
+        let (last_runas, tag) = &tags[i];
+        match command_verdict(runas_cmds, i, *last_runas, verdict) {
+            Some(true) => result = Some(tag.clone()),
+            Some(false) => result = None,
+            None => {}
+        }
+        i += 1;
+    }
+
+    result
+}
+
+/// The verdict on the `i`-th command in `runas_cmds`, where `last_runas` is the position of the
+/// RunAs specification that applies to it (see [distribute_tags])
+fn command_verdict<Verdict>(
+    runas_cmds: &[(Option<RunAs>, CommandSpec)],
+    i: usize,
+    last_runas: Option<usize>,
+    verdict: &Verdict,
+) -> Option<bool>
+where
+    Verdict: Fn(Option<&RunAs>, &Spec<Command>) -> Option<bool>,
+{
+    let runas = match last_runas {
+        Some(j) => runas_cmds[j].0.as_ref(),
+        None => None,
+    };
+    let (_, CommandSpec(_, cmd)) = &runas_cmds[i];
+
+    verdict(runas, cmd)
+}
+
+/// returns the positions (in `rules` and in their `permissions`) of the host/command lists of the
+/// `User_Spec`s that match `invoking_user` and `hostname`
+fn matching_permissions(
+    rules: &[PermissionSpec],
+    aliases: &AliasTable,
+    invoking_user: &impl UnixUser,
+    hostname: &system::Hostname,
+) -> Vec<(usize, usize)> {
+    let user_matcher = &match_user(invoking_user);
+    let host_matcher = &match_token(hostname);
+    let user_aliases = get_aliases(&aliases.user, user_matcher);
+    let host_aliases = get_aliases(&aliases.host, host_matcher);
+
+    let mut result = Vec::new();
+    let mut i = 0;
+    while i < rules.len() {
+        if find_item(&rules[i].users, user_matcher, &user_aliases) {
+            let permissions = &rules[i].permissions;
+            let mut j = 0;
+            while j < permissions.len() {
+                if find_item(&permissions[j].0, host_matcher, &host_aliases) {
+                    result.push((i, j));
+                }
+                j += 1;
+            }
+        }
+        i += 1;
+    }
+
+    result
 }
 
 /// Process a raw parsed AST bit of RunAs + Command specifications:
 /// - RunAs specifications distribute over the commands that follow (until overridden)
 /// - Tags accumulate over the entire line
-fn distribute_tags(
-    runas_cmds: &[(Option<RunAs>, CommandSpec)],
-) -> impl Iterator<Item = (Option<&RunAs>, (Tag, &Spec<Command>))> {
-    runas_cmds.iter().scan(
-        (None, Default::default()),
-        |(last_runas, tag), (runas, CommandSpec(mods, cmd))| {
-            *last_runas = runas.as_ref().or(*last_runas);
-            for f in mods {
-                f.apply(tag);
-            }
+///
+/// For every command, this returns the position of the RunAs specification that applies to it (if
+/// any) and its tags.
+fn distribute_tags(runas_cmds: &[(Option<RunAs>, CommandSpec)]) -> Vec<(Option<usize>, Tag)> {
+    let mut last_runas = None;
+    let mut tag = Tag::default();
 
-            let this_tag = match cmd {
-                Qualified::Allow(Meta::All) if tag.env != EnvironmentControl::Nosetenv => Tag {
-                    // "ALL" has an implicit "SETENV" that doesn't distribute
-                    env: EnvironmentControl::Setenv,
-                    ..tag.clone()
-                },
-                _ => tag.clone(),
-            };
+    let mut result = Vec::new();
+    let mut i = 0;
+    while i < runas_cmds.len() {
+        let (runas, CommandSpec(mods, cmd)) = &runas_cmds[i];
+        if runas.is_some() {
+            last_runas = Some(i);
+        }
+        apply_modifiers(mods, &mut tag);
+        result.push((last_runas, command_tag(&tag, cmd)));
+        i += 1;
+    }
 
-            Some((*last_runas, (this_tag, cmd)))
+    result
+}
+
+fn apply_modifiers(mods: &[Modifier], tag: &mut Tag) {
+    let mut i = 0;
+    while i < mods.len() {
+        mods[i].apply(tag);
+        i += 1;
+    }
+}
+
+/// The tags of a single command, given the tags that have accumulated
+fn command_tag(tag: &Tag, cmd: &Spec<Command>) -> Tag {
+    match cmd {
+        Qualified::Allow(Meta::All) if tag.env != EnvironmentControl::Nosetenv => Tag {
+            // "ALL" has an implicit "SETENV" that doesn't distribute
+            env: EnvironmentControl::Setenv,
+            ..tag.clone()
         },
-    )
+        _ => tag.clone(),
+    }
 }
 
 /// A type to represent positive or negative association with an alias; i.e. if a key maps to true,
@@ -562,10 +681,10 @@ fn distribute_tags(
 /// This is a plain list (where later entries take precedence) instead of a map, so that it can be
 /// formally verified.
 #[derive(Default)]
-struct FoundAliases<'a>(Vec<(&'a str, bool)>);
+struct FoundAliases(Vec<(String, bool)>);
 
-impl<'a> FoundAliases<'a> {
-    fn insert(&mut self, alias: &'a str, found: bool) {
+impl FoundAliases {
+    fn insert(&mut self, alias: String, found: bool) {
         self.0.push((alias, found));
     }
 
@@ -573,9 +692,9 @@ impl<'a> FoundAliases<'a> {
         let mut result = None;
         let mut i = 0;
         while i < self.0.len() {
-            let (name, found) = self.0[i];
-            if name == alias {
-                result = Some(found);
+            let (name, found) = &self.0[i];
+            if name.as_str() == alias {
+                result = Some(*found);
             }
             i += 1;
         }
@@ -587,51 +706,27 @@ impl<'a> FoundAliases<'a> {
 /// Find an item matching a certain predicate in an collection (optionally attributed) list of
 /// identifiers; identifiers can be directly identifying, wildcards, and can either be positive or
 /// negative (i.e. preceeded by an even number of exclamation marks in the sudoers file)
-fn find_item<'a, Predicate, T: 'a, Item>(
-    items: &'a [Item],
-    matches: &Predicate,
-    aliases: &FoundAliases,
-) -> Option<<&'a Item as WithInfo>::Info>
+fn find_item<Predicate, T>(items: &[Spec<T>], matches: &Predicate, aliases: &FoundAliases) -> bool
 where
     Predicate: Fn(&T) -> bool,
-    &'a Item: WithInfo<Item = &'a Spec<T>>,
 {
-    find_item_after(None, items, matches, aliases)
+    find_item_after(false, items, matches, aliases)
 }
 
 /// Like [find_item], but `result` is the outcome for some items that precede `items`
-fn find_item_after<'a, Predicate, T: 'a, Item>(
-    mut result: Option<<&'a Item as WithInfo>::Info>,
-    items: &'a [Item],
+fn find_item_after<Predicate, T>(
+    mut result: bool,
+    items: &[Spec<T>],
     matches: &Predicate,
     aliases: &FoundAliases,
-) -> Option<<&'a Item as WithInfo>::Info>
+) -> bool
 where
     Predicate: Fn(&T) -> bool,
-    &'a Item: WithInfo<Item = &'a Spec<T>>,
 {
     let mut i = 0;
     while i < items.len() {
-        let item = &items[i];
-        let (judgement, who) = match item.as_inner() {
-            Qualified::Forbid(x) => (false, x),
-            Qualified::Allow(x) => (true, x),
-        };
-        let decision = match who {
-            Meta::All => Some(judgement),
-            Meta::Only(ident) if matches(ident) => Some(judgement),
-            Meta::Alias(id) => match aliases.get(id) {
-                Some(true) => Some(judgement),
-                // in this case, an explicit negation in the alias applies
-                Some(false) => Some(!judgement),
-                None => None,
-            },
-            _ => None,
-        };
-        match decision {
-            Some(true) => result = Some(item.into_info()),
-            Some(false) => result = None,
-            None => {}
+        if let Some(judgement) = item_verdict(&items[i], matches, aliases) {
+            result = judgement;
         }
         i += 1;
     }
@@ -639,34 +734,30 @@ where
     result
 }
 
-/// A interface to access optional "satellite data"
-trait WithInfo {
-    type Item;
-    type Info;
-    fn as_inner(&self) -> Self::Item;
-    fn into_info(self) -> Self::Info;
-}
-
-/// A specific interface for `Spec<T>` --- we can't make a generic one;
-/// A `Spec<T>` does not contain any additional information.
-impl<'a, T> WithInfo for &'a Spec<T> {
-    type Item = &'a Spec<T>;
-    type Info = ();
-    fn as_inner(&self) -> &'a Spec<T> {
-        self
-    }
-    fn into_info(self) {}
-}
-
-/// A commandspec can be "tagged"
-impl<'a, 'b: 'a> WithInfo for &'a (Tag, &'b Spec<Command>) {
-    type Item = &'a Spec<Command>;
-    type Info = &'a Tag;
-    fn as_inner(&self) -> &'a Spec<Command> {
-        self.1
-    }
-    fn into_info(self) -> &'a Tag {
-        &self.0
+/// Whether a single item of a list processed by [find_item] includes (`Some(true)`) or excludes
+/// (`Some(false)`) the object, or does not apply to it (`None`)
+fn item_verdict<Predicate, T>(
+    item: &Spec<T>,
+    matches: &Predicate,
+    aliases: &FoundAliases,
+) -> Option<bool>
+where
+    Predicate: Fn(&T) -> bool,
+{
+    let (judgement, who) = match item {
+        Qualified::Forbid(x) => (false, x),
+        Qualified::Allow(x) => (true, x),
+    };
+    match who {
+        Meta::All => Some(judgement),
+        Meta::Only(ident) if matches(ident) => Some(judgement),
+        Meta::Alias(id) => match aliases.get(id) {
+            Some(true) => Some(judgement),
+            // in this case, an explicit negation in the alias applies
+            Some(false) => Some(!judgement),
+            None => None,
+        },
+        _ => None,
     }
 }
 
@@ -724,9 +815,7 @@ fn warn_ignored(item: Ignored) {
     }
 }
 
-fn match_token<T: basic_parser::Token + std::ops::Deref<Target = String>>(
-    text: &str,
-) -> impl Fn(&T) -> bool + '_ {
+fn match_token<T: std::ops::Deref<Target = String>>(text: &str) -> impl Fn(&T) -> bool + '_ {
     move |token| token.as_str() == text
 }
 
@@ -746,7 +835,7 @@ fn match_command<'a>((cmd, args): (&'a Path, &'a [OsString])) -> impl Fn(&Comman
 
 /// Find all the aliases that a object is a member of; this requires [sanitize_alias_table] to have run first;
 /// I.e. this function should not be "pub".
-fn get_aliases<'a, Predicate, T>(table: &'a VecOrd<Def<T>>, pred: &Predicate) -> FoundAliases<'a>
+fn get_aliases<Predicate, T>(table: &VecOrd<Def<T>>, pred: &Predicate) -> FoundAliases
 where
     Predicate: Fn(&T) -> bool,
 {
@@ -756,12 +845,12 @@ where
     let mut i = 0;
     while i < order.len() {
         let Def(id, list) = &defs[order[i]];
-        if find_item(list, pred, &set).is_some() {
-            set.insert(id, true);
-        } else if find_item_after(Some(()), list, pred, &set).is_none() {
+        if find_item(list, pred, &set) {
+            set.insert(id.clone(), true);
+        } else if !find_item_after(true, list, pred, &set) {
             // the item wasn't found even if we prepend ALL to the list of definitions; that means
             // it is explicitly excluded by the alias definition.
-            set.insert(id, false);
+            set.insert(id.clone(), false);
         }
         i += 1;
     }
