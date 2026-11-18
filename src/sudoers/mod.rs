@@ -536,7 +536,7 @@ fn distribute_tags(
         |(last_runas, tag), (runas, CommandSpec(mods, cmd))| {
             *last_runas = runas.as_ref().or(*last_runas);
             for f in mods {
-                f(tag);
+                f.apply(tag);
             }
 
             let this_tag = match cmd {
@@ -1008,7 +1008,7 @@ fn analyze(
             .flat_map(|(_runas, CommandSpec(tags, _cmd))| tags)
             .flat_map(|modifier| {
                 let mut tag = Tag::default();
-                modifier(&mut tag);
+                modifier.apply(&mut tag);
                 tag.ignored
             })
     }

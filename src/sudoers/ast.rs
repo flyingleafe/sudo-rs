@@ -332,7 +332,29 @@ impl Parse for RunAs {
 struct MetaOrTag(Meta<Modifier>);
 
 /// A `Modifier` is something that updates the `Tag`.
-pub type Modifier = Box<dyn Fn(&mut Tag)>;
+pub enum Modifier {
+    Authenticate(Authenticate),
+    Env(EnvironmentControl),
+    Exec(ExecControl),
+    Cwd(ChDir),
+    AppArmorProfile(String),
+    Ignored(Span),
+    NoOp,
+}
+
+impl Modifier {
+    pub fn apply(&self, tag: &mut Tag) {
+        match self {
+            Modifier::Authenticate(authenticate) => tag.authenticate = *authenticate,
+            Modifier::Env(env) => tag.env = *env,
+            Modifier::Exec(noexec) => tag.noexec = *noexec,
+            Modifier::Cwd(path) => tag.cwd = Some(path.clone()),
+            Modifier::AppArmorProfile(profile) => tag.apparmor_profile = Some(profile.clone()),
+            Modifier::Ignored(span) => tag.ignored.push(*span),
+            Modifier::NoOp => {}
+        }
+    }
+}
 
 // note: at present, "ALL" can be distinguished from a tag using a lookup of 1, since no tag starts with an "A"; but this feels like hanging onto
 // the parseability by a thread (although the original sudo also has some ugly parts, like 'sha224' being an illegal user name).
@@ -345,24 +367,24 @@ impl Parse for MetaOrTag {
         let start_pos = stream.get_pos();
         let AliasName(keyword) = try_nonterminal(stream)?;
 
-        let mut switch = |modifier: fn(&mut Tag)| {
+        let mut switch = |modifier: Modifier| {
             expect_syntax(':', stream)?;
-            make(Box::new(modifier))
+            make(modifier)
         };
 
         let result: Modifier = match keyword.as_str() {
-            "EXEC" => switch(|tag| tag.noexec = ExecControl::Exec)?,
-            "NOEXEC" => switch(|tag| tag.noexec = ExecControl::Noexec)?,
+            "EXEC" => switch(Modifier::Exec(ExecControl::Exec))?,
+            "NOEXEC" => switch(Modifier::Exec(ExecControl::Noexec))?,
 
-            "SETENV" => switch(|tag| tag.env = EnvironmentControl::Setenv)?,
-            "NOSETENV" => switch(|tag| tag.env = EnvironmentControl::Nosetenv)?,
-            "PASSWD" => switch(|tag| tag.authenticate = Authenticate::Passwd)?,
-            "NOPASSWD" => switch(|tag| tag.authenticate = Authenticate::Nopasswd)?,
+            "SETENV" => switch(Modifier::Env(EnvironmentControl::Setenv))?,
+            "NOSETENV" => switch(Modifier::Env(EnvironmentControl::Nosetenv))?,
+            "PASSWD" => switch(Modifier::Authenticate(Authenticate::Passwd))?,
+            "NOPASSWD" => switch(Modifier::Authenticate(Authenticate::Nopasswd))?,
 
             "CWD" => {
                 expect_syntax('=', stream)?;
                 let path: ChDir = expect_nonterminal(stream)?;
-                Box::new(move |tag| tag.cwd = Some(path.clone()))
+                Modifier::Cwd(path)
             }
 
             // we do not support these, and that should make sudo-rs "fail safe"
@@ -387,16 +409,16 @@ impl Parse for MetaOrTag {
                     end: stream.get_pos(),
                 };
                 expect_syntax(':', stream)?;
-                Box::new(move |tag| tag.ignored.push(ignored_location))
+                Modifier::Ignored(ignored_location)
             }
 
             // 'NOFOLLOW' and 'NOINTERCEPT' are the default behaviour.
-            "NOFOLLOW" | "NOINTERCEPT" => switch(|_| {})?,
+            "NOFOLLOW" | "NOINTERCEPT" => switch(Modifier::NoOp)?,
 
             "APPARMOR_PROFILE" => {
                 expect_syntax('=', stream)?;
                 let StringParameter(profile) = expect_nonterminal(stream)?;
-                Box::new(move |tag| tag.apparmor_profile = Some(profile.clone()))
+                Modifier::AppArmorProfile(profile)
             }
 
             "ALL" => return make(MetaOrTag(All)),
