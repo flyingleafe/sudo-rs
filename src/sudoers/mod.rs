@@ -506,23 +506,25 @@ fn check_permission<User: UnixUser + PartialEq<User>, Group: UnixGroup>(
 
     let matching_user_specs = sudoers.matching_user_specs(am_user, on_host).flatten();
 
-    let allowed_commands = matching_user_specs.filter_map(|(runas, cmdspec)| {
-        if let Some(RunAs { users, groups }) = runas {
-            let stays_in_group = in_group(request.user, request.group);
-            if request.user != am_user || (stays_in_group && !users.is_empty()) {
-                find_item(users, &match_user(request.user), &runas_user_aliases)?
+    let allowed_commands: Vec<_> = matching_user_specs
+        .filter_map(|(runas, cmdspec)| {
+            if let Some(RunAs { users, groups }) = runas {
+                let stays_in_group = in_group(request.user, request.group);
+                if request.user != am_user || (stays_in_group && !users.is_empty()) {
+                    find_item(users, &match_user(request.user), &runas_user_aliases)?;
+                }
+                if !stays_in_group {
+                    find_item(groups, &match_group(request.group), &runas_group_aliases)?;
+                }
+            } else if !(request.user.is_root() && in_group(request.user, request.group)) {
+                None?;
             }
-            if !stays_in_group {
-                find_item(groups, &match_group(request.group), &runas_group_aliases)?
-            }
-        } else if !(request.user.is_root() && in_group(request.user, request.group)) {
-            None?;
-        }
 
-        Some(cmdspec)
-    });
+            Some(cmdspec)
+        })
+        .collect();
 
-    find_item(allowed_commands, &match_command(cmdline), &cmnd_aliases)
+    find_item(&allowed_commands, &match_command(cmdline), &cmnd_aliases).cloned()
 }
 
 /// Process a raw parsed AST bit of RunAs + Command specifications:
@@ -555,42 +557,83 @@ fn distribute_tags(
 
 /// A type to represent positive or negative association with an alias; i.e. if a key maps to true,
 /// the alias affirms membership, if a key maps to false, the alias denies membership; if a key
-/// isn't present membership is affirmed nor denied
-type FoundAliases = HashMap<String, bool>;
+/// isn't present membership is affirmed nor denied.
+///
+/// This is a plain list (where later entries take precedence) instead of a map, so that it can be
+/// formally verified.
+#[derive(Default)]
+struct FoundAliases<'a>(Vec<(&'a str, bool)>);
+
+impl<'a> FoundAliases<'a> {
+    fn insert(&mut self, alias: &'a str, found: bool) {
+        self.0.push((alias, found));
+    }
+
+    fn get(&self, alias: &str) -> Option<bool> {
+        let mut result = None;
+        let mut i = 0;
+        while i < self.0.len() {
+            let (name, found) = self.0[i];
+            if name == alias {
+                result = Some(found);
+            }
+            i += 1;
+        }
+
+        result
+    }
+}
 
 /// Find an item matching a certain predicate in an collection (optionally attributed) list of
 /// identifiers; identifiers can be directly identifying, wildcards, and can either be positive or
 /// negative (i.e. preceeded by an even number of exclamation marks in the sudoers file)
-fn find_item<'a, Predicate, Iter, T: 'a>(
-    items: Iter,
+fn find_item<'a, Predicate, T: 'a, Item>(
+    items: &'a [Item],
     matches: &Predicate,
     aliases: &FoundAliases,
-) -> Option<<Iter::Item as WithInfo>::Info>
+) -> Option<<&'a Item as WithInfo>::Info>
 where
     Predicate: Fn(&T) -> bool,
-    Iter: IntoIterator,
-    Iter::Item: WithInfo<Item = &'a Spec<T>>,
+    &'a Item: WithInfo<Item = &'a Spec<T>>,
 {
-    let mut result = None;
-    for item in items {
+    find_item_after(None, items, matches, aliases)
+}
+
+/// Like [find_item], but `result` is the outcome for some items that precede `items`
+fn find_item_after<'a, Predicate, T: 'a, Item>(
+    mut result: Option<<&'a Item as WithInfo>::Info>,
+    items: &'a [Item],
+    matches: &Predicate,
+    aliases: &FoundAliases,
+) -> Option<<&'a Item as WithInfo>::Info>
+where
+    Predicate: Fn(&T) -> bool,
+    &'a Item: WithInfo<Item = &'a Spec<T>>,
+{
+    let mut i = 0;
+    while i < items.len() {
+        let item = &items[i];
         let (judgement, who) = match item.as_inner() {
             Qualified::Forbid(x) => (false, x),
             Qualified::Allow(x) => (true, x),
         };
-        let info = || item.into_info();
-        match who {
-            Meta::All => result = judgement.then(info),
-            Meta::Only(ident) if matches(ident) => result = judgement.then(info),
-            Meta::Alias(id) if aliases.contains_key(id) => {
-                result = if aliases[id] {
-                    judgement.then(info)
-                } else {
-                    // in this case, an explicit negation in the alias applies
-                    (!judgement).then(info)
-                }
-            }
-            _ => {}
+        let decision = match who {
+            Meta::All => Some(judgement),
+            Meta::Only(ident) if matches(ident) => Some(judgement),
+            Meta::Alias(id) => match aliases.get(id) {
+                Some(true) => Some(judgement),
+                // in this case, an explicit negation in the alias applies
+                Some(false) => Some(!judgement),
+                None => None,
+            },
+            _ => None,
         };
+        match decision {
+            Some(true) => result = Some(item.into_info()),
+            Some(false) => result = None,
+            None => {}
+        }
+        i += 1;
     }
 
     result
@@ -616,14 +659,14 @@ impl<'a, T> WithInfo for &'a Spec<T> {
 }
 
 /// A commandspec can be "tagged"
-impl<'a> WithInfo for (Tag, &'a Spec<Command>) {
+impl<'a, 'b: 'a> WithInfo for &'a (Tag, &'b Spec<Command>) {
     type Item = &'a Spec<Command>;
-    type Info = Tag;
+    type Info = &'a Tag;
     fn as_inner(&self) -> &'a Spec<Command> {
         self.1
     }
-    fn into_info(self) -> Tag {
-        self.0
+    fn into_info(self) -> &'a Tag {
+        &self.0
     }
 }
 
@@ -703,22 +746,24 @@ fn match_command<'a>((cmd, args): (&'a Path, &'a [OsString])) -> impl Fn(&Comman
 
 /// Find all the aliases that a object is a member of; this requires [sanitize_alias_table] to have run first;
 /// I.e. this function should not be "pub".
-fn get_aliases<Predicate, T>(table: &VecOrd<Def<T>>, pred: &Predicate) -> FoundAliases
+fn get_aliases<'a, Predicate, T>(table: &'a VecOrd<Def<T>>, pred: &Predicate) -> FoundAliases<'a>
 where
     Predicate: Fn(&T) -> bool,
 {
-    use std::iter::once;
-    let all = Qualified::Allow(Meta::All);
+    let VecOrd(order, defs) = table;
 
-    let mut set = HashMap::new();
-    for Def(id, list) in table.iter() {
-        if find_item(list, &pred, &set).is_some() {
-            set.insert(id.clone(), true);
-        } else if find_item(once(&all).chain(list), &pred, &set).is_none() {
+    let mut set = FoundAliases::default();
+    let mut i = 0;
+    while i < order.len() {
+        let Def(id, list) = &defs[order[i]];
+        if find_item(list, pred, &set).is_some() {
+            set.insert(id, true);
+        } else if find_item_after(Some(()), list, pred, &set).is_none() {
             // the item wasn't found even if we prepend ALL to the list of definitions; that means
             // it is explicitly excluded by the alias definition.
-            set.insert(id.clone(), false);
+            set.insert(id, false);
         }
+        i += 1;
     }
 
     set
