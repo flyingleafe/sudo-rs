@@ -3,7 +3,8 @@
 #   nix shell nixpkgs#quint nixpkgs#jdk -c ./check.sh
 # 1. typecheck every module;
 # 2. clean models (ogsudo, sudors): all invariants under random simulation,
-#    plus coverage witnesses; bounded `quint verify` (Apalache) when java exists;
+#    plus coverage witnesses; opt-in bounded `quint verify` (Apalache), see
+#    VERIFY_STEPS;
 # 3. every mutant: the expected invariant must be violated; the counterexample
 #    is saved as ITF under traces/.
 # Exit status is non-zero on any unexpected outcome.
@@ -14,7 +15,7 @@ cd "$(dirname "$0")"
 SAMPLES=${SAMPLES:-100000}               # random runs per clean model
 STEPS=${STEPS:-60}                       # steps per random run
 MUTANT_SAMPLES=${MUTANT_SAMPLES:-100000} # upper bound of runs per mutant
-VERIFY_STEPS=${VERIFY_STEPS:-12}         # Apalache bound (transitions)
+VERIFY_STEPS=${VERIFY_STEPS:-0}          # Apalache bound; 0 = skip (slow, see README)
 SEED=${SEED:-0x5ad0}
 
 INVARIANTS=(inv1_completeMediation inv2_authentication inv3_exactCredentials
@@ -68,8 +69,10 @@ for impl in ogsudo sudors; do
   done
 done
 
-echo "== clean models: bounded model checking (Apalache, $VERIFY_STEPS steps)"
-if command -v java >/dev/null; then
+if [[ "$VERIFY_STEPS" -eq 0 ]]; then
+  echo "== clean models: bounded model checking skipped (set VERIFY_STEPS=N to enable)"
+elif command -v java >/dev/null; then
+  echo "== clean models: bounded model checking (Apalache, $VERIFY_STEPS steps)"
   for impl in ogsudo sudors; do
     out=$(quint verify --main="$impl" instances.qnt --invariant=allInvariants \
           --max-steps="$VERIFY_STEPS" 2>&1)

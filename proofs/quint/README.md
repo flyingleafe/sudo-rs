@@ -134,7 +134,7 @@ The output has:
 - one `PASS` line per module typecheck;
 - one `PASS <impl> <invariant> (simulation)` line per invariant and implementation;
 - witness counts;
-- one `PASS ... (apalache, N steps)` line per invariant and implementation;
+- with `VERIFY_STEPS=N`, one `PASS ... (apalache, N steps)` line per invariant and implementation;
 - one `VIOLATED <invariant> by <mutant> (<bug>)` line per mutant.
 
 The script exits non-zero on any unexpected outcome. That includes a mutant that is not caught, a clean-model violation, an unreached witness, and a typecheck error.
@@ -146,10 +146,22 @@ Budgets (environment variables):
 | `SAMPLES` | 100000 | random runs per clean model |
 | `STEPS` | 60 | steps per random run (clean and mutants) |
 | `MUTANT_SAMPLES` | 100000 | maximum runs per mutant; the search stops at the first violation |
-| `VERIFY_STEPS` | VERIFY_DEFAULT | Apalache bound for `quint verify` on the clean models |
+| `VERIFY_STEPS` | 0 (off) | Apalache bound for `quint verify --invariant=allInvariants` on both clean models |
 | `SEED` | 0x5ad0 | simulator seed |
 
-Typical cost on this machine: about 1 min of simulation per clean model; each mutant fails within seconds. APALACHE_COST
+Measured cost on this machine (under load from other jobs): `check.sh` with defaults took 5.5 min in total.
+
+Apalache (0.56.1, downloaded by `quint verify`) works here but is slow on this state space, so it is opt-in. Measured times for `allInvariants`, all without violations:
+
+| Model | Steps | Time |
+|---|---|---|
+| `ogsudo` | 4 | 20 s |
+| `ogsudo` | 8 | 7.5 min |
+| `sudors` | 10 | 19 min |
+
+An exec needs at least 10 steps (`start` … `exec` on the NOPASSWD path), and a sudoedit write needs 12. The mailer path takes 8 steps.
+So depth 8 covers decisions (inv5) and helper credentials (inv4), and depth 10 is the first depth that reaches a command exec (inv1, inv3).
+Two-invocation ticket attacks need about 20 steps, which is out of Apalache's reach here; random simulation covers them.
 
 Single checks:
 
