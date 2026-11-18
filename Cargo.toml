@@ -54,3 +54,9 @@ unsafe_op_in_unsafe_fn = { level = "deny" }
 [lints.clippy]
 undocumented_unsafe_blocks = "warn"
 uninlined_format_args = "warn"
+
+# Options for Charon (https://github.com/AeneasVerif/charon), which extracts the sudoers
+# authorization decision for its formal verification with Aeneas (see `proofs/`)
+[package.metadata.charon]
+start_from = ["crate::sudoers::check_permission"]
+opaque = ["crate::sudoers::warn_ignored"]

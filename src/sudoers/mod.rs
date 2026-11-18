@@ -635,11 +635,7 @@ fn match_user(user: &impl UnixUser) -> impl Fn(&UserSpecifier) -> bool + '_ {
         UserSpecifier::Group(Identifier::ID(num)) => user.in_group_by_gid(GroupId::new(*num)),
         // nonunix-groups, netgroups, etc. are not implemented
         UserSpecifier::NonunixGroup(group) => {
-            match group {
-                Identifier::Name(name) => auth_warn!("warning: non-unix group {name} was ignored"),
-                Identifier::ID(num) => auth_warn!("warning: non-unix group #{num} was ignored"),
-            }
-
+            warn_ignored(Ignored::NonunixGroup(group));
             false
         }
     }
@@ -662,8 +658,25 @@ fn match_group_alias(group: &impl UnixGroup) -> impl Fn(&UserSpecifier) -> bool 
         /* the parser does not allow this, but can happen due to Runas_Alias,
          * see https://github.com/trifectatechfoundation/sudo-rs/issues/13 */
         _ => {
-            auth_warn!("warning: ignoring %group syntax in runas_alias for checking sudo -g");
+            warn_ignored(Ignored::GroupInRunasAlias);
             false
+        }
+    }
+}
+
+/// User specifiers that are not supported and are skipped (with a warning) while matching
+enum Ignored<'a> {
+    NonunixGroup(&'a Identifier),
+    GroupInRunasAlias,
+}
+
+/// The only side effect of the permission check; it is kept opaque for the formal verification
+/// (see `package.metadata.charon` in `Cargo.toml`)
+fn warn_ignored(item: Ignored) {
+    match item {
+        Ignored::NonunixGroup(group) => auth_warn!("warning: non-unix group {group} was ignored"),
+        Ignored::GroupInRunasAlias => {
+            auth_warn!("warning: ignoring %group syntax in runas_alias for checking sudo -g")
         }
     }
 }
