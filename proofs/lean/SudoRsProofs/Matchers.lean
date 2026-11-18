@@ -234,4 +234,108 @@ theorem match_token_spec (hH : O.SudoRsHosts) (host : String) (text : Str)
       text ⦃ c => ∀ x, Fits x → (matchTokenFn).call c x = ok (SudoersSpec.matchHost O host x) ⦄ := by
   simpa [sudo_rs.sudoers.match_token] using match_token_call hH host text ht
 
+/-! ## `match_command` -/
+
+section Command
+
+variable {A : GlobAbs}
+
+/-- `OsString == OsString`, read through an injective abstraction. -/
+theorem os_eq_eq (hinj : Function.Injective A.os) (a b : std.ffi.os_str.OsString) :
+    std.ffi.os_str.OsString.Insts.CoreCmpPartialEqOsString.eq a b = ok (A.os a == A.os b) := by
+  simp only [std.ffi.os_str.OsString.Insts.CoreCmpPartialEqOsString.eq]
+  congr 1
+  by_cases h : a = b
+  · simp [h]
+  · have : A.os a ≠ A.os b := fun e => h (hinj e)
+    simp [h, this]
+
+/-- An element-wise `allM` over a `zip` whose comparison is `==` on abstractions is
+`isPrefixOf` on the abstracted lists. -/
+theorem allM_zip_isPrefixOf {α : Type} (f : α → String) :
+    ∀ l1 l2 : List α, l1.length ≤ l2.length →
+      List.allM (fun p : α × α => (ok (f p.1 == f p.2) : Result Bool)) (l1.zip l2) =
+        ok ((l1.map f).isPrefixOf (l2.map f))
+  | [], l2, _ => by simp [List.allM]; rfl
+  | _ :: _, [], h => by simp at h
+  | a :: l1, b :: l2, h => by
+    simp only [List.zip_cons_cons, List.allM, List.map_cons, List.isPrefixOf]
+    cases hab : (f a == f b)
+    · simp; rfl
+    · simp [allM_zip_isPrefixOf f l1 l2 (by simpa using h)]
+
+theorem isPrefixOf_eq_false_of_length {α : Type} [BEq α] [LawfulBEq α] (l1 l2 : List α)
+    (h : l2.length < l1.length) : l1.isPrefixOf l2 = false := by
+  cases hp : l1.isPrefixOf l2
+  · rfl
+  · have := (List.isPrefixOf_iff_prefix.mp hp).length_le
+    omega
+
+/-- `args.starts_with(vec)` on `OsString` slices. -/
+theorem starts_with_os_eq (hinj : Function.Injective A.os)
+    (s vec : Slice std.ffi.os_str.OsString) :
+    core.slice.Slice.starts_with sudo_rs.std.ffi.os_str.OsString.Insts.CoreCmpPartialEqOsString
+      s vec = ok ((vec.val.map A.os).isPrefixOf (s.val.map A.os)) := by
+  simp only [core.slice.Slice.starts_with,
+    sudo_rs.std.ffi.os_str.OsString.Insts.CoreCmpPartialEqOsString, os_eq_eq hinj]
+  split
+  · rename_i h
+    rw [isPrefixOf_eq_false_of_length (vec.val.map A.os) (s.val.map A.os) (by simpa using h)]
+  · rename_i h
+    exact allM_zip_isPrefixOf A.os _ _ (by omega)
+
+/-- `args == vec` on `OsString` slices. -/
+theorem slice_eq_os_eq (hinj : Function.Injective A.os)
+    (s vec : Slice std.ffi.os_str.OsString) :
+    core.slice.cmp.PartialEqSlice.eq sudo_rs.std.ffi.os_str.OsString.Insts.CoreCmpPartialEqOsString
+      s vec = ok (s.val.map A.os == vec.val.map A.os) := by
+  have hne : ∀ x y, (sudo_rs.std.ffi.os_str.OsString.Insts.CoreCmpPartialEqOsString).ne x y
+      ⦃ b => b ↔ ¬ x = y ⦄ := by
+    intro x y
+    simp [sudo_rs.std.ffi.os_str.OsString.Insts.CoreCmpPartialEqOsString,
+      core.cmp.PartialEq.ne.trait_default, core.cmp.PartialEq.ne.default,
+      std.ffi.os_str.OsString.Insts.CoreCmpPartialEqOsString.eq]
+  obtain ⟨b, hb, hbv⟩ := exists_eq_ok_of_spec
+    (core.slice.cmp.PartialEqSlice.eq_homo_spec _ s vec hne)
+  rw [hb]
+  congr 1
+  have hmap : Function.Injective (List.map A.os) := List.map_injective_iff.mpr hinj
+  by_cases h : s = vec
+  · subst h; simpa using hbv
+  · have h1 : s.val ≠ vec.val := fun e => h (Slice.ext _ _ e)
+    have h2 : s.val.map A.os ≠ vec.val.map A.os := fun e => h1 (hmap e)
+    simp only [h, iff_false] at hbv
+    simp [hbv, h2]
+
+/-- **The closure of `match_command(path, args)` is `matchCommand O path args`.** -/
+theorem match_command_call (hG : GlobOracle A O) (path : std.path.Path)
+    (args : Slice std.ffi.os_str.OsString) (x : glob.Pattern × sudo_rs.sudoers.tokens.Args) :
+    (matchCommandFn).call (path, matchCommandOptions, args) x =
+      ok (SudoersSpec.matchCommand O (A.path path) (args.val.map A.os) (absCommand A x)) := by
+  obtain ⟨pat, a⟩ := x
+  simp only [sudo_rs.sudoers.match_command.closure.Insts.CoreOpsFunctionFnTupleShared2PairPatternArgsBool.call,
+    uncurry]
+  rw [hG.glob_matches]
+  simp only [bind_ok]
+  cases hb : O.globMatches (A.pat pat) (A.path path)
+  · simp [SudoersSpec.matchCommand, absCommand, hb]
+  · cases a with
+    | Prefix vec =>
+      simp [starts_with_os_eq hG.os_inj, SudoersSpec.matchCommand, SudoersSpec.argsMatch,
+        absCommand, absArgs, hb]
+    | Exact vec =>
+      simp [Box.Insts.CoreConvertAsRef.as_ref, slice_eq_os_eq hG.os_inj,
+        SudoersSpec.matchCommand, SudoersSpec.argsMatch, absCommand, absArgs, hb]
+
+@[step]
+theorem match_command_spec (hG : GlobOracle A O) (path : std.path.Path)
+    (args : Slice std.ffi.os_str.OsString) :
+    sudo_rs.sudoers.match_command (path, args) ⦃ c => c = (path, matchCommandOptions, args) ∧
+      ∀ x, (matchCommandFn).call c x =
+        ok (SudoersSpec.matchCommand O (A.path path) (args.val.map A.os) (absCommand A x)) ⦄ := by
+  simp only [sudo_rs.sudoers.match_command, glob.MatchOptions.new, bind_ok]
+  exact spec_of_eq_ok rfl ⟨rfl, match_command_call hG path args⟩
+
+end Command
+
 end SudoRsProofs
