@@ -25,6 +25,12 @@ theorem spec_of_eq_ok {α : Type _} {x : Result α} {v : α} {P : α → Prop} (
 theorem spec_eq_iff {α : Type _} {x : Result α} {v : α} : x ⦃ y => y = v ⦄ ↔ x = ok v :=
   ⟨eq_ok_of_spec, fun h => spec_of_eq_ok h rfl⟩
 
+/-- A specification means: the computation returns `ok v` for some `v` satisfying the
+postcondition (no panic, no divergence). -/
+theorem exists_eq_ok_of_spec {α : Type _} {x : Result α} {P : α → Prop} (h : x ⦃ P ⦄) :
+    ∃ v, x = ok v ∧ P v := by
+  cases x <;> simp_all
+
 /-! ## Strings -/
 
 /-- A Lean `String` that can be a Rust `String`: its UTF-8 encoding fits in `usize`. Every
@@ -78,5 +84,11 @@ theorem Str.eq_spec (a b : Str) :
 theorem String.clone_spec (s : String) :
     alloc.string.String.Insts.CoreCloneClone.clone s ⦃ r => r = s ⦄ := by
   simp [alloc.string.String.Insts.CoreCloneClone.clone]
+
+/-! ## Vec / slices -/
+
+@[simp] theorem Vec.deref_val {T : Type _} (v : alloc.vec.Vec T) :
+    (alloc.vec.Vec.deref v).val = v.val :=
+  Slice.from_val _ _
 
 end SudoRsProofs
