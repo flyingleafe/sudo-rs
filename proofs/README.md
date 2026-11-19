@@ -3,7 +3,8 @@
 **Result.** Lean proves that the extracted `sudoers::check_permission` and
 `sudoers::permission_flags` return the same decision and tags as the hand-written spec.
 The latter includes the root/self password-tag adjustment from `Sudoers::check`.
-The proof starts with a parsed policy and a resolved request, not an invocation of `sudo`.
+The same is proved for the tags behind `sudo -v` and `sudo -l` (`validate_flags`, `list_flags`).
+The proofs start with a parsed policy and a resolved request, not an invocation of `sudo`.
 
 ## Verification boundary
 
@@ -13,6 +14,14 @@ returns `ok r` (rather than an error or divergence) and that `r.map absTag` equa
 lookup, aliases, matchers, tag accumulation, and the pre-adjustment decision
 `check_permission_eq`. The spec separately proves default-deny and last-match
 properties.
+
+[`validate_flags_eq` and `list_flags_eq`](lean/SudoRsProofs/ListValidate.lean) make the
+same statement for the tags that `sudo -v` and `sudo -l` compute, against
+`SudoersSpec.validateFlags` and `SudoersSpec.listFlags`. `list_flags_eq` also assumes
+that `UnixUser::group` is a pure function (`GroupOracle`) and that `Path::new("list")`
+reads as `list` (`ListPath`); `sudo -v` and listing one's own entries need neither.
+The Defaults handling in `check_validate_permission` and `check_list_permission` and
+the `sudo -l` printing code are not verified.
 
 The [proof witnesses](lean/SudoRsProofs/NonVacuity.lean) apply the theorem to a
 synthetic policy that permits one user with explicit tags and denies another.
