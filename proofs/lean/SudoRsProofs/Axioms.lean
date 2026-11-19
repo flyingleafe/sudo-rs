@@ -1,5 +1,6 @@
 import SudoRsProofs.GetAliases
 import SudoRsProofs.Permission
+import SudoRsProofs.NonVacuity
 
 /-!
 # Axiom audit
@@ -32,3 +33,6 @@ of `SudoRs/{Types,Funs}External.lean` are definitions or `opaque` constants, nev
 #print axioms SudoRsProofs.check_permission_eq
 #print axioms SudoRsProofs.permission_flags_spec
 #print axioms SudoRsProofs.permission_flags_eq
+#print axioms SudoRsProofs.NonVacuity.permits_member
+#print axioms SudoRsProofs.NonVacuity.denies_excluded_member
+#print axioms SudoRsProofs.NonVacuity.deny_only_not_refinement
