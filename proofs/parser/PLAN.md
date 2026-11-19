@@ -115,7 +115,9 @@ Two properties follow and the specification must state them:
    newline character, not to the end of the logical line. The rest of a continued line is then
    parsed as lines of its own; in the first row it becomes a rule for `bob`.
 
-`sudo` prints the diagnostics and continues (`src/sudo/pipeline.rs`).
+`sudo` prints the diagnostics and continues (`src/sudo/pipeline.rs`). They go to standard error
+only (`src/sudo/diagnostic.rs`); C sudo also writes parse errors to its log
+(`log_parse_error`).
 
 C sudo 1.9.18 was run on three of these inputs through `testsudoers`, which lists the entries
 its parser kept:
@@ -126,8 +128,40 @@ its parser kept:
 | `alice ALL = ALL ) junk`⏎`bob ALL = ALL`⏎ | both rules | only the rule for `bob` |
 | `alice ALL = /bin/a, sha224:x \`⏎`bob ALL = (ALL) ALL`⏎ | a rule for `bob` | nothing; syntax error at 2:1 |
 
-On these inputs C sudo discards the whole logical line. Only `testsudoers` was run, not the
-`sudo` front end, and only these inputs; stage P0 has to compare systematically.
+On these inputs C sudo discards the whole logical line. That does not hold for every
+construct. The next two tables compare outcomes: sudo-rs through `analyze` and `check` in a
+scratch test, C sudo through the entries and the dump (`-d`) of `testsudoers`.
+
+| Policy | Request | sudo-rs | C sudo 1.9.18 |
+|---|---|---|---|
+| `alice ALL = ALL, !/usr/bin/su`⏎ | alice, `/usr/bin/su` | denied | denied |
+| `alice ALL = ALL !/usr/bin/su`⏎ | alice, `/usr/bin/su` | **allowed** | no rule kept |
+| `Runas_Alias NOTROOT = ALL !root`⏎`alice ALL = (NOTROOT) /usr/bin/id`⏎ | alice as root, `/usr/bin/id` | **allowed**: alias kept as `ALL` | **allowed**: alias kept as `ALL` |
+| `Cmnd_Alias SAFE = ALL !/usr/bin/su`⏎`alice ALL = SAFE`⏎ | alice, `/usr/bin/su` | denied: definition dropped | **allowed**: alias kept as `ALL` |
+| `alice ALL = ALL`⏎`alice ALL !/usr/bin/su`⏎ | alice, `/usr/bin/su` | **allowed** | **allowed** |
+| `Cmnd_Alias SHELLS /usr/bin/su, /usr/bin/bash`⏎`alice ALL = ALL, !SHELLS`⏎ | alice, `/usr/bin/su` | **allowed** | **allowed** |
+| `alice ALL = /bin/a, sha224:x \`⏎`bob ALL = (ALL) ALL`⏎ | bob, `/usr/bin/su` | **allowed** | no rule kept |
+| `alice ALL = INTERCEPT: ALL`⏎ | alice, `/usr/bin/su` | denied: tag not supported | allowed: valid for C sudo |
+
+| `Defaults` line | sudo-rs applies | C sudo keeps |
+|---|---|---|
+| `Defaults secure_path="/usr/bin", timestamp_timeout=0, noexec`⏎ | all three | all three |
+| the same with `, logfile="/var/log/sudo.log"` appended | none: `unknown setting: 'logfile'` | all four |
+| `Defaults secure_path="/usr/bin" timestamp_timeout=0`⏎ (comma missing) | `secure_path` only | nothing; syntax error |
+
+Three further properties follow:
+
+3. **Prefix acceptance is not peculiar to sudo-rs.** C sudo keeps the prefix of an alias
+   definition (`Runas_Alias`, `Cmnd_Alias` and `User_Alias` were tried) and drops rules and
+   `Defaults` lines whole. sudo-rs keeps the prefix of rules, of `Defaults` lines and of the
+   `Runas_Alias` tried, and drops the `Cmnd_Alias` tried.
+4. **One unknown setting discards its whole `Defaults` line.** The settings that sudo-rs does
+   know on that line are lost with it.
+5. **A lost line can be a restriction**: a later rule that denies, an alias that an exclusion
+   refers to, a `Defaults` line. Both implementations then allow more than the file says.
+
+Only `testsudoers` was run, not the `sudo` front end, and only these inputs; stage P0 has to
+compare systematically and per construct.
 
 ## 4. Target theorems
 
@@ -250,8 +284,9 @@ Decisions for the project owner:
 
 | Id | Observation | Basis |
 |---|---|---|
-| F-P1 | Prefix acceptance (3.3) | observed; differs from C sudo 1.9.18 on the inputs tried |
+| F-P1 | Prefix acceptance (3.3) | observed; C sudo 1.9.18 drops rules and `Defaults` lines whole but keeps the prefix of alias definitions |
 | F-P2 | Physical-line resynchronisation (3.3) | observed; differs from C sudo 1.9.18 on the input tried |
 | F-P3 | `UserSpecifier::parse` can return `Reject` after consuming a quoted token whose content is not a user (`"@x"`), contrary to the contract documented on `Parse`. Every caller appears to end in a fatal error | reading the code; not tested |
 | F-P4 | `Sudo::parse` treats any failure of `Identifier` after `#`, fatal ones included, as "not a user id" and retries the line as an include or comment | reading the code; not tested |
 | F-P5 | A command path is canonicalized at parse time if it exists, so the same text can yield different ASTs on different hosts | reading the code |
+| F-P6 | One unknown setting discards every setting on its `Defaults` line (3.3) | observed |
