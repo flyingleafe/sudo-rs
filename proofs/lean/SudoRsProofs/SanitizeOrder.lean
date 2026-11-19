@@ -4,13 +4,14 @@ import SudoRsProofs.GetAliases
 /-!
 # Alias preprocessing: the order is a sorted permutation
 
-Partial correctness of the extracted `sanitize_alias_table`: a successful return is assumed,
-termination is not proved here. The proof relies on the `HashSet` model (a list of
+Partial correctness of the extracted `sanitize_alias_table`: a successful return is assumed
+(termination: `SanitizeTotal.lean`). The proof relies on the `HashSet` model (a list of
 keys; `insert` tests membership with the key's equality) and on the `alias_diagnostic` model
 (appends exactly one error) of `SudoRs/FunsExternal.lean`.
 
-* `sanitize_alias_table_distinct`: the returned positions are pairwise distinct and the
-  diagnostics passed in are a prefix of the returned ones.
+* `sanitize_alias_table_distinct`: the returned positions are pairwise distinct, the
+  diagnostics passed in are a prefix of the returned ones, and at most one diagnostic per
+  definition and per member is added.
 * `sanitize_alias_table_sorted`: if no diagnostic was added, the abstracted table is a
   permutation of the definitions with unique names in which every referenced alias is defined
   earlier (`SudoersSpec.Sorted`).
@@ -588,6 +589,7 @@ def RootsSpec (loop : core.iter.adapters.enumerate.Enumerate (core.slice.iter.It
     (∀ k, k ∈ dupe ↔ k ∈ (defs.val.take e.iter.i).map defName) →
     OnReturn (loop e back seen defs order diags dupe) fun r =>
       (∃ seen', Inv defs.val seen' r.1.val) ∧ diags.val <+: r.2.val ∧
+      r.2.val.length ≤ diags.val.length + pot defs.val seen + (defs.val.length - e.iter.i) ∧
       (r.2.val = diags.val →
         (Closed defs.val order.val → Closed defs.val r.1.val) ∧
         (((defs.val.take e.iter.i).map defName).Nodup → (defs.val.map defName).Nodup) ∧
@@ -604,7 +606,8 @@ theorem roots_spec : RootsSpec (@sanitize_alias_table_loop T) := by
     · rw [enumerate_next_nil e (by rw [hsl]; exact hrem)]
       simp only [Std.bind_ok, uncurry_apply_pair, hback]
       have hge : defs.val.length ≤ e.iter.i := List.drop_eq_nil_iff.1 hrem
-      refine OnReturn.pure ⟨⟨seen, hinv⟩, List.prefix_refl _, fun _ => ⟨id, ?_, ?_⟩⟩
+      refine OnReturn.pure ⟨⟨seen, hinv⟩, List.prefix_refl _, by simp only; omega,
+        fun _ => ⟨id, ?_, ?_⟩⟩
       · rw [List.take_of_length_le hge]; exact id
       · intro h j hj; exact h j (by omega)
     · have hlt : e.iter.i < defs.val.length := by
@@ -638,9 +641,11 @@ theorem roots_spec : RootsSpec (@sanitize_alias_table_loop T) := by
           · rintro (hk | rfl)
             · exact hk
             · exact (hdupe _).1 hn
-        · rintro r ⟨hinvr, hpre, -⟩
+        · rintro r ⟨hinvr, hpre, hbound, -⟩
+          have hlen1 : diags1.val.length = diags.val.length + 1 := by simp [he]
+          simp only at hbound
           refine ⟨hinvr, (he ▸ List.prefix_append _ _ : diags.val <+: diags1.val).trans hpre,
-            fun heq => ?_⟩
+            by omega, fun heq => ?_⟩
           have := hpre.length_le
           rw [heq, he] at this
           simp at this
@@ -658,8 +663,10 @@ theorem roots_spec : RootsSpec (@sanitize_alias_table_loop T) := by
         · intro k
           rw [List.mem_cons, hdupe, htake, List.mem_append, List.mem_singleton]
           exact Or.comm
-        · rintro r ⟨hinvr, hpre, hclean⟩
-          refine ⟨hinvr, hpost1.diag_prefix.trans hpre, fun heq => ?_⟩
+        · rintro r ⟨hinvr, hpre, hbound, hclean⟩
+          have hpot1 := hpost1.pot
+          simp only at hbound hpot1
+          refine ⟨hinvr, hpost1.diag_prefix.trans hpre, by omega, fun heq => ?_⟩
           have he1 := prefix_eq_of_eq hpost1.diag_prefix hpre heq
           obtain ⟨hpos1, hcl1⟩ := hpost1.clean he1
           obtain ⟨hcl2, hnd2, hall2⟩ := hclean (heq.trans he1.symm)
@@ -675,15 +682,29 @@ theorem roots_spec : RootsSpec (@sanitize_alias_table_loop T) := by
               exact ⟨q, hpost1.order_sub q hq, hqj⟩
             · exact ⟨e.count, hpos1, hcnt⟩
 
+theorem pot_nil (D : List (RDef T)) : pot D [] = (D.map fun d => (defItems d).length).sum := by
+  simp only [pot, List.map_nil, List.not_mem_nil, ↓reduceIte]
+  induction D with
+  | nil => simp
+  | cons x D ih =>
+    rw [List.length_cons, Finset.sum_range_succ', List.map_cons, List.sum_cons]
+    simp only [memCount, List.getElem?_cons_succ, List.getElem?_cons_zero, Option.map_some,
+      Option.getD_some] at ih ⊢
+    rw [ih]
+    omega
+
 /-- Everything a successful return of `sanitize_alias_table` guarantees about the order:
 distinct valid positions, diagnostics only appended, and, if no diagnostic was added, every
-position once, unique names, and every reference resolved to an earlier position. -/
+position once, unique names, and every reference resolved to an earlier position. At most
+one diagnostic per definition and per member is added. -/
 theorem sanitize_facts (defs : Vec (RDef T)) (diags : Diags) {order : Vec Usize}
     {diags' : Diags} (h : sanitize_alias_table defs diags = ok (order, diags')) :
     order.val.Nodup ∧ TableWF (order, defs) ∧ diags.val <+: diags'.val ∧
     (diags'.val.length = diags.val.length →
       Closed defs.val order.val ∧ (defs.val.map defName).Nodup ∧
-      ∀ j < defs.val.length, ∃ q ∈ order.val, q.val = j) := by
+      ∀ j < defs.val.length, ∃ q ∈ order.val, q.val = j) ∧
+    diags'.val.length ≤
+      diags.val.length + defs.val.length + (defs.val.map fun d => (defItems d).length).sum := by
   unfold sanitize_alias_table at h
   simp only [std.collections.hash.set.HashSetTRandomStateGlobal.new, core.slice.Slice.iter,
     core.iter.traits.iterator.Iterator.enumerate.trait_default,
@@ -691,10 +712,11 @@ theorem sanitize_facts (defs : Vec (RDef T)) (diags : Diags) {order : Vec Usize}
   have hinv0 : Inv defs.val [] (alloc.vec.Vec.with_capacity Usize (alloc.vec.Vec.len defs)).val :=
     ⟨by simp [alloc.vec.Vec.with_capacity, alloc.vec.Vec.new],
       by simp [alloc.vec.Vec.with_capacity, alloc.vec.Vec.new], by simp, List.nodup_nil⟩
-  obtain ⟨⟨seen', hinv'⟩, hpre, hclean⟩ :=
+  obtain ⟨⟨seen', hinv'⟩, hpre, hbound, hclean⟩ :=
     roots_spec _ _ [] defs _ diags [] (fun _ => rfl) (by simp) (by simp) hinv0 (by simp) _ h
+  simp only [pot_nil, Nat.sub_zero] at hbound
   refine ⟨hinv'.order_nodup, fun q hq => hinv'.seen_lt q (hinv'.order_sub q hq), hpre,
-    fun hlen => ?_⟩
+    fun hlen => ?_, by omega⟩
   obtain ⟨hcl, hnd, hall⟩ := hclean (hpre.eq_of_length hlen.symm).symm
   refine ⟨hcl ?_, hnd (by simp), hall (by simp)⟩
   simpa [alloc.vec.Vec.with_capacity, alloc.vec.Vec.new] using Closed.nil defs.val
@@ -767,14 +789,17 @@ theorem Closed.sorted {β : Type} (f : T → β) {defs : Vec (RDef T)} {order : 
 end Sanitize
 
 open Sanitize in
-/-- **Positions are distinct** in every successfully returned order, and the diagnostics
-passed in are kept as a prefix. No premise on diagnostics. -/
+/-- **Positions are distinct** in every successfully returned order, the diagnostics passed
+in are kept as a prefix, and at most one diagnostic per definition and per member is added.
+No premise on diagnostics. -/
 theorem sanitize_alias_table_distinct {T : Type} (defs : Vec (RDef T)) (diags : Vec sudoers.Error)
     {order : Vec Usize} {diags' : Vec sudoers.Error}
     (h : sanitize_alias_table defs diags = ok (order, diags')) :
-    order.val.Nodup ∧ diags.val <+: diags'.val :=
+    order.val.Nodup ∧ diags.val <+: diags'.val ∧
+    diags'.val.length ≤
+      diags.val.length + defs.val.length + (defs.val.map fun d => d.2.val.length).sum :=
   let hf := sanitize_facts defs diags h
-  ⟨hf.1, hf.2.2.1⟩
+  ⟨hf.1, hf.2.2.1, hf.2.2.2.2⟩
 
 open Sanitize in
 /-- **Order soundness.** If `sanitize_alias_table` returns without adding a diagnostic, the
@@ -788,7 +813,7 @@ theorem sanitize_alias_table_sorted {T β : Type} (f : T → β) (defs : Vec (RD
     (defs.val.map (absDef f)).Perm (absTable f (order, defs)) ∧
     (SudoersSpec.names (absTable f (order, defs))).Nodup ∧
     SudoersSpec.Sorted (absTable f (order, defs)) := by
-  obtain ⟨hnd, hwf, -, hc⟩ := sanitize_facts defs diags h
+  obtain ⟨hnd, hwf, -, hc, -⟩ := sanitize_facts defs diags h
   obtain ⟨hcl, hnames, hall⟩ := hc hclean
   have hperm := tableDefs_perm hnd hwf hall
   refine ⟨(hperm.map (absDef f)).symm, ?_, hcl.sorted f⟩

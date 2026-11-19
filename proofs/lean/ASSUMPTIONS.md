@@ -86,10 +86,11 @@ The theorems in `SudoRsProofs/` take these hypotheses instead of axioms:
 |---|---|---|
 | `hp : ∀ x, Good x → inst.call pred x = ok (p (f x))` with `ItemsGood Good items` / `TableGood Good table` | `item_verdict`, `find_item(_after)`, `get_aliases` | The predicate is a generic Rust closure (`Fn(&T) -> bool`); the theorems hold for every closure that is pure and total on the items the lists name directly (`Meta::Only`). `Good` is that domain: the concrete matchers deref names and so are total only on names that fit in memory. |
 | `FoundFits v` (`∀ (k, _) ∈ v, Fits k`) | `FoundAliases::get`, `item_verdict`, `find_item(_after)` | `get` calls `String::as_str` on every stored name; `Fits` holds for every Rust `String` (see `strOfString`). `get_aliases` establishes it for its result. |
-| `Fits k` for alias names (`ItemsFit items`, `TableFits table`) | `item_verdict`, `find_item(_after)`, `get_aliases` | `item_verdict` derefs the alias name of `Meta::Alias`; same reason. |
+| `Fits k` for alias names (`ItemsFit items`, `TableFits table`) | `item_verdict`, `find_item(_after)`, `get_aliases`, `sanitize_alias_table(s)_returns` | `item_verdict` derefs the alias name of `Meta::Alias`; same reason. The sanitizer derefs definition names and undefined alias names to build diagnostics. |
 | `a.val = stringBytes k` | `FoundAliases::get` | Links the `&str` argument to the alias name `k` of the abstract map. |
 | `v.val.length < Usize.max` | `FoundAliases::insert` | `Vec::push` fails on capacity overflow. Inside `get_aliases` this is discharged (the set grows by at most one entry per alias). |
 | `TableWF table` (`∀ i ∈ order, i < defs.len`) | `get_aliases` | `defs[order[i]]` is bounds-checked; the caller must supply this for arbitrary tables. `sanitize_alias_table_tableWF` discharges it for outputs of the extracted producer. |
+| `diags.len + defs.len + Σ members ≤ Usize.max` (summed over the four tables for `sanitize_alias_tables_returns`, `tableSize`) | `sanitize_alias_table(s)_returns` | `alias_diagnostic` pushes onto the diagnostics `Vec`; at most one diagnostic per definition (duplicate, or recursive on revisit) and one per member is added (`sanitize_alias_table_distinct`). Every Rust `Vec<Error>` has far fewer elements than `usize::MAX`; the hypothesis is representability only. |
 | `(lineMods line).length ≤ Usize.max` (with `t.ignored.len + …` for the inner loops) | `apply_modifiers`, `distribute_tags` | `Modifier::Ignored` pushes onto `Tag::ignored`; the total number of modifiers of a line, all of which are in memory, bounds that vector. |
 | `SettingsInRange s` (`s.passwd_tries ≤ u16::MAX`, `s.umask ≤ u32::MAX`) | `authorization_eq`, `authorization_permission_flags_*` (`to_auth_eq` takes only the first) | `authorization` converts these `u64` Defaults with `try_into().unwrap()` / `.expect(..)`; out of range it panics (`authorization_panics_of_passwd_tries`, `authorization_panics_of_umask`). **Not proved from the Defaults DSL** (its modifiers are boxed closures): `Settings` fields are private to `crate::defaults` and change only through `Settings::default`, `negate` and `set` (`src/defaults/settings_dsl.rs`). `passwd_tries = 3 [0..=1000]`: initial 3, `set` keeps values in `0..=1000`, `negate` rejects it (no `!=` clause, not a flag or list). `umask = 0o022 (!= 0o777) {octal_mode}`: initial `0o22`, negation `0o777`, `set` stores `octal_mode`, a parsed `libc::mode_t` widened to `u64`; `mode_t` is `u32` on Linux (the extraction platform). |
 
@@ -101,7 +102,7 @@ from the extracted `sanitize_alias_table`. It does not rely on any returned hash
 membership flag, the outcome of dependency lookup, or the contents of diagnostics.
 `AliasTableOK.of_sanitize` combines four such return equations with the caller's
 `TableFits` and `TableGood` premises. It does not prove that parsing or `analyze`
-establish these premises or even that the sanitizer returns.
+establish these premises.
 
 The order theorems of `SudoRsProofs/SanitizeOrder.lean` (`sanitize_alias_table_distinct`,
 `sanitize_alias_table_sorted`, `sanitize_alias_table_demonstration`,
@@ -118,6 +119,12 @@ the order a sorted permutation; it is not discharged for any concrete sudoers fi
 its diagnostics-prefix conjunct comes from `sanitize_alias_table_distinct` and has the same
 reliance as the order theorems. `sanitize_alias_tables_sorted` takes the clean premise on the
 whole call. Parsing and the rest of `analyze` are not covered.
+
+`SudoRsProofs/SanitizeTotal.lean` proves termination and absence of panics:
+`sanitize_alias_table_returns` and `sanitize_alias_tables_returns` give `∃ r, … = ok r` under
+`TableFits`-style name conditions and the diagnostics-length bound above, nothing else. They
+use the same models as the order theorems (the termination measure counts `seen`, which
+relies on the `HashSet` model) and `alias_diagnostic` failing only through `Vec::push`.
 
 ## Hypotheses of the top-level theorems
 

@@ -72,9 +72,9 @@ theorem sanitize_alias_tables_tableWF {t t' : AliasTable} {diags diags' : Vec su
   · have := sanitize_alias_table_tableWF _ _ h2; rwa [← eh] at this
   · have := sanitize_alias_table_tableWF _ _ h3; rwa [← ec] at this
   · have := sanitize_alias_table_tableWF _ _ h4; rwa [← er] at this
-  · exact (sanitize_alias_table_distinct _ _ h1).2.trans <|
-      (sanitize_alias_table_distinct _ _ h2).2.trans <|
-      (sanitize_alias_table_distinct _ _ h3).2.trans (sanitize_alias_table_distinct _ _ h4).2
+  · exact (sanitize_alias_table_distinct _ _ h1).2.1.trans <|
+      (sanitize_alias_table_distinct _ _ h2).2.1.trans <|
+      (sanitize_alias_table_distinct _ _ h3).2.1.trans (sanitize_alias_table_distinct _ _ h4).2.1
 
 /-- `AliasTableOK` for the output of a successful `sanitize_alias_tables`, given the name and
 element conditions on the input definitions. -/
@@ -101,10 +101,10 @@ theorem sanitize_alias_tables_sorted {t t' : AliasTable} {diags diags' : Vec sud
     (hclean : diags'.val.length = diags.val.length) :
     SortedTable t'.user ∧ SortedTable t'.host ∧ SortedTable t'.cmnd ∧ SortedTable t'.runas := by
   obtain ⟨d1, d2, d3, h1, h2, h3, h4, eu, eh, ec, er⟩ := sanitize_alias_tables_ok h
-  have p1 := (sanitize_alias_table_distinct _ _ h1).2.length_le
-  have p2 := (sanitize_alias_table_distinct _ _ h2).2.length_le
-  have p3 := (sanitize_alias_table_distinct _ _ h3).2.length_le
-  have p4 := (sanitize_alias_table_distinct _ _ h4).2.length_le
+  have p1 := (sanitize_alias_table_distinct _ _ h1).2.1.length_le
+  have p2 := (sanitize_alias_table_distinct _ _ h2).2.1.length_le
+  have p3 := (sanitize_alias_table_distinct _ _ h3).2.1.length_le
+  have p4 := (sanitize_alias_table_distinct _ _ h4).2.1.length_le
   refine ⟨fun β f => ?_, fun β f => ?_, fun β f => ?_, fun β f => ?_⟩
   · have := sanitize_alias_table_sorted f _ _ h1 (by omega)
     rwa [← eu] at this
