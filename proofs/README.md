@@ -14,6 +14,11 @@ lookup, aliases, matchers, tag accumulation, and the pre-adjustment decision
 `check_permission_eq`. The spec separately proves default-deny and last-match
 properties.
 
+The [proof witnesses](lean/SudoRsProofs/NonVacuity.lean) apply the theorem to a
+synthetic policy that permits one user with explicit tags and denies another.
+They retain the glob-interface assumption. A separate spec-level negative
+control proves that an always-deny decision does not refine the spec.
+
 The theorem assumes well-formed policy data (including alias order and modifier
 invariants), representable string and modifier lengths, and agreement of the
 identity and command-matching interfaces with their oracles. Host matching is
@@ -78,8 +83,9 @@ nix develop -c proofs/check.sh extract   # independently regenerate the Lean and
 ```
 
 The [Verification workflow](../.github/workflows/verification.yml) runs the default
-gate on relevant pushes and pull requests. The extraction check has a separate
-schedule and manual trigger. The differential and compliance runs are opt-in.
+gate on relevant pushes and pull requests. The extraction check is separate:
+run it locally as above while the workflow is not on the fork's default branch.
+The differential and compliance runs are opt-in.
 
 ### 1. Extract
 
