@@ -15,15 +15,15 @@ open sudo_rs sudo_rs.sudoers
 namespace SudoRsProofs
 
 /-- Unlike `WP.dspec`, this predicate constrains neither failure nor divergence. -/
-private def OnReturn (r : Result α) (post : α → Prop) : Prop :=
+def OnReturn (r : Result α) (post : α → Prop) : Prop :=
   ∀ x, r = ok x → post x
 
-private theorem OnReturn.pure {post : α → Prop} {x : α} (h : post x) :
+theorem OnReturn.pure {post : α → Prop} {x : α} (h : post x) :
     OnReturn (ok x) post := by
   intro y hy
   simpa only [← Result.ok_injective hy] using h
 
-private theorem OnReturn.bind {r : Result α} {k : α → Result β} {post : β → Prop}
+theorem OnReturn.bind {r : Result α} {k : α → Result β} {post : β → Prop}
     (h : ∀ x, r = ok x → OnReturn (k x) post) : OnReturn (r >>= k) post := by
   cases r using Result.cases with
   | ret x => simpa only [bind_tc_ok] using h x rfl
@@ -33,14 +33,14 @@ private theorem OnReturn.bind {r : Result α} {k : α → Result β} {post : β 
 section
 unseal Result
 
-private theorem OnReturn.admissible (post : α → Prop) :
+theorem OnReturn.admissible (post : α → Prop) :
     admissible (fun r : Result α => OnReturn r post) := by
   intro c chain hAll x hx
   exact hAll (ok x) (Data.Coinductive.ITree.csup_ret_mem (E := RustEffect) (c := c) chain hx) x rfl
 
 end
 
-private theorem index_lt_of_ok {α : Type} {defs : Vec α} {i : Usize} {x : α}
+theorem index_lt_of_ok {α : Type} {defs : Vec α} {i : Usize} {x : α}
     (h : alloc.vec.Vec.index (core.slice.index.SliceIndexUsizeSlice α) defs i = ok x) :
     i.val < defs.val.length := by
   rw [alloc.vec.Vec.index_slice_index, alloc.vec.Vec.index_usize] at h
@@ -62,12 +62,12 @@ private theorem push_preserves {T : Type} {defs : Vec (RDef T)} {order order' : 
     · exact hi
   · simp at hpush
 
-private abbrev AliasVisitor := sanitize_alias_table.Visitor
-private abbrev HashKeys (T : Type) :=
+abbrev AliasVisitor := sanitize_alias_table.Visitor
+abbrev HashKeys (T : Type) :=
   std.collections.hash.set.HashSet T std.hash.random.RandomState alloc.alloc.Global
-private abbrev Diags := Vec sudoers.Error
-private abbrev VisitResult (T : Type) := AliasVisitor T × (AliasVisitor T → AliasVisitor T)
-private abbrev MembersResult (T : Type) :=
+abbrev Diags := Vec sudoers.Error
+abbrev VisitResult (T : Type) := AliasVisitor T × (AliasVisitor T → AliasVisitor T)
+abbrev MembersResult (T : Type) :=
   HashKeys Usize × Vec (RDef T) × Vec Usize × Diags × (Diags → Diags)
 
 private def MembersPreserve {T : Type}
@@ -86,7 +86,7 @@ private def VisitPreserves {T : Type}
 
 -- Function suprema are pointwise. A successful return of the supremum must then
 -- be a successful return of one chain member, at those same arguments.
-local macro "prove_return_admissible" hAll:ident : tactic =>
+scoped macro "prove_return_admissible" hAll:ident : tactic =>
   `(tactic| (
     simp only [← fun_csup_eq, fun_csup]
     refine OnReturn.admissible _ _ _ ?_

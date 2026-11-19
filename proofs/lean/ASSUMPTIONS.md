@@ -66,9 +66,9 @@ Helpers: `sudo_rs.stringBytes s` = the UTF-8 bytes of `s` as `U8`s; `sudo_rs.str
 | `common.string.SudoString.Insts.CoreOpsDerefDerefStr.deref` | `strOfString s.str` | The text without the trailing NUL. |
 | `common.string.SudoString.Insts.CoreCmpPartialEqStr.eq` | `deref` then `str ==` | Rust: `let s: &str = self; s == other`. |
 | `sudoers.warn_ignored` | `ok ()` | Opaque for Charon; its only effect is a log line. |
-| `std.collections.hash.set.HashSetTRandomStateGlobal.new`, `std.collections.hash.set.HashSet.insert` | empty set; test key equality and insert if absent | `usize` and `&String` have lawful equality and hashing; buckets and hashing affect neither membership nor the insertion flag. |
+| `std.collections.hash.set.HashSetTRandomStateGlobal.new`, `std.collections.hash.set.HashSet.insert` | empty set; test key equality and insert if absent | `usize` and `&String` have lawful equality and hashing; buckets and hashing affect neither membership nor the insertion flag. Relied on by the order theorems of `SanitizeOrder.lean` (the insertion flag is `key ∉ set`, the set grows by the key). |
 | `Usize.Insts.CoreHashHash.hash`, `alloc.string.String.Insts.CoreHashHash.hash`, `Shared0T.Insts.CoreHashHash.hash`, `std.hash.random.*.Insts.CoreHash*.{finish,write,build_hasher}` | hash state and seeding operations opaque; reference hashing delegates to the referent | These operations only populate trait dictionaries ignored by the extensional set model. |
-| `sudoers.alias_diagnostic` | append the corresponding message with no source or location | Opaque for Charon to isolate formatting. The input `&str` borrows a definition or dependency name and is valid UTF-8. |
+| `sudoers.alias_diagnostic` | append the corresponding message with no source or location | Opaque for Charon to isolate formatting. The input `&str` borrows a definition or dependency name and is valid UTF-8. Relied on by the order theorems of `SanitizeOrder.lean`: each call appends exactly one error, so "no diagnostic added" means no undefined, recursive or duplicate alias was met. |
 | `sudo_rs.stringOfStr` (helper) | `String.fromUTF8Lossy` of the bytes | The text of a `&str`. A Rust `&str` is valid UTF-8, so the decoding is lossless on every value with a Rust counterpart. Used to read `Box<str>` Defaults (`runcwd`, `secure_path`) in `absDefaults`/`absRestrictions` and by `String::from(&str)`. |
 | `alloc.string.String.Insts.CoreConvertFromShared0Str.from` | `ok (stringOfStr s)` | `String::from(&str)` copies the bytes. |
 | `U16.Insts.CoreConvertTryFromU64TryFromIntError.try_from`, `U32.Insts.CoreConvertTryFromU64TryFromIntError.try_from` | `core.num.tryFromUScalar` (Aeneas library): `Ok` with the same value iff it fits, else `Err ()` | `TryFrom<u64>` for `u16`/`u32` (`core/src/convert/num.rs`); same model as the library's `TryFrom<usize> for u32`. |
@@ -102,6 +102,14 @@ membership flag, the outcome of dependency lookup, or the contents of diagnostic
 `AliasTableOK.of_sanitize` combines four such return equations with the caller's
 `TableFits` and `TableGood` premises. It does not prove that parsing or `analyze`
 establish these premises or even that the sanitizer returns.
+
+The order theorems of `SudoRsProofs/SanitizeOrder.lean` (`sanitize_alias_table_distinct`,
+`sanitize_alias_table_sorted`, `sanitize_alias_table_demonstration`,
+`sanitize_find_item_expanded`) also assume only a successful return, but they rely on the
+`HashSet` model (membership flag of `insert`), on `Slice::contains` and `String ==` as
+modelled by Aeneas and above, and on `alias_diagnostic` appending exactly one error. The
+"clean" premise `diags'.val.length = diags.val.length` (no diagnostic added) is what makes
+the order a sorted permutation; it is not discharged for any concrete sudoers file.
 
 ## Hypotheses of the top-level theorems
 
