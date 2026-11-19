@@ -3,7 +3,9 @@
 **Result.** Lean proves that the extracted `sudoers::check_permission` and
 `sudoers::permission_flags` return the same decision and tags as the hand-written spec.
 The latter includes the root/self password-tag adjustment from `Sudoers::check`.
-The same is proved for the tags behind `sudo -v` and `sudo -l` (`validate_flags`, `list_flags`).
+The same is proved for the tags behind `sudo -v` and `sudo -l` (`validate_flags`, `list_flags`)
+and for the mapping from a decision and the Defaults in force to the terms of execution
+(`Judgement::authorization`).
 The proofs start with a parsed policy and a resolved request, not an invocation of `sudo`.
 
 ## Verification boundary
@@ -23,6 +25,16 @@ reads as `list` (`ListPath`); `sudo -v` and listing one's own entries need neith
 The Defaults handling in `check_validate_permission` and `check_list_permission` and
 the `sudo -l` printing code are not verified.
 
+[`authorization_eq`](lean/SudoRsProofs/Authorization.lean) proves that the extracted
+`Judgement::authorization`, with `Settings::to_auth`, returns `ok` and equals
+`SudoersSpec.authorization`: the mapping from the decision and the Defaults values to
+`Authorization::{Allowed(Authentication, Restrictions), Forbidden}`. It assumes
+`SettingsInRange` (`passwd_tries` fits `u16`, `umask` fits `u32`); two further theorems
+show that the function panics outside that range. The Defaults parser appears to keep
+both values in range, but that is not proved. `authorization_permission_flags_eq`
+composes the result with `permission_flags_eq`. `ChDir::construct`, used for `runcwd`,
+is a hand-written model, and the `apparmor` restriction is not covered.
+
 The [proof witnesses](lean/SudoRsProofs/NonVacuity.lean) apply the theorem to a
 synthetic policy that permits one user with explicit tags and denies another.
 They retain the glob-interface assumption. A separate spec-level negative
@@ -39,10 +51,10 @@ faithfulness of hand-written models.
 [The alias producer proof](lean/SudoRsProofs/SanitizeAliases.lean) discharges the
 index premise for successfully returned orders. It does not establish sanitizer
 termination, diagnostic correctness, or that the output is topologically sorted.
-The rest of the parser and alias preprocessing, real OS identity lookup, glob
-matching, credential changes, authentication, command execution, rustc, and the
-deployed binary are outside the verified boundary. The Quint lifecycle model is a
-separate abstraction, not a proof about the Rust execution path.
+The rest of the parser and alias preprocessing, Defaults parsing and scoping, real OS
+identity lookup, glob matching, credential changes, authentication, command execution,
+rustc, and the deployed binary are outside the verified boundary. The Quint lifecycle
+model is a separate abstraction, not a proof about the Rust execution path.
 
 The fork changes alias-membership storage from a hash table to a linear list for
 extraction. Resolving many dependent aliases can therefore be quadratic. Treat
@@ -179,6 +191,8 @@ Upstream code at `81dff9a1`, one `--start-from` per function:
 | `check_permission` | fatal, no output: `dyn` in `CommandSpec`, `CustomiserTable`, `SudoLogger`; `str::rsplitn` / `core::str::pattern::Pattern` unimplemented (reached via `tokens.rs` `Token::construct` impls); bodies of `matching_user_specs`, `get_aliases`, `distribute_tags` fail |
 | whole `crate::sudoers` | fatal, no output |
 
-These are baseline experiments. The committed `lean/SudoRs/` is now generated
-from `permission_flags` and `sanitize_alias_table`. Run the extraction drift check
-above to compare it with the current source.
+These are baseline experiments. The committed `lean/SudoRs/` is now generated from the
+roots listed in `Cargo.toml` under `[package.metadata.charon]`. Run the extraction drift
+check above to compare it with the current source. `Judgement::authorization` extracted
+on the fork once `ChDir::construct` was made opaque: its `str::contains` reaches the
+`Pattern` trait, which Aeneas does not translate.
