@@ -9,6 +9,18 @@ it, so a theorem that depends on its behaviour has to take that behaviour as a h
 `SudoRsProofs/Axioms.lean` checks that every main theorem depends only on `propext`,
 `Classical.choice` and `Quot.sound`.
 
+## What the translation itself assumes
+
+The generated code is a pure function into Aeneas's `Result` type. Every trait method and
+external function is therefore a deterministic function of its arguments, whatever a theorem
+assumes on top: the model cannot express a call that has a side effect or that answers
+differently the second time. Aeneas uses this. Two calls of the same function on the same
+arguments are emitted as one call whose result is reused; a scratch extraction of
+`let a = u.is_root(); … if u.is_root() { … }` produced a single `is_root u`, and `list_flags`
+below shows the same. The number and order of such calls in the Rust source is not part of the
+model. For the real `system::User`, `in_group_by_name` performs a group database lookup on each
+call, so the proofs describe a run in which those lookups give consistent answers.
+
 ## External types (`SudoRs/TypesExternal.lean`)
 
 | Lean name | Model | Justification |
