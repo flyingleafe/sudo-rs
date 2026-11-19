@@ -102,17 +102,32 @@ A scratch test called the real `parse_lines::<Sudo>`:
 | `alice ALL = /bin/a, /bin/b \`⏎`bob ALL = (ALL) ALL`⏎ | one rule |
 | `alice ALL = ALL` (no final newline) | **rule**, fatal "missing line terminator" |
 | `alice ALL = ALL ) junk`⏎`bob ALL = ALL`⏎ | **rule**, fatal "garbage at end of line", comment, rule |
+| `alice ALL = ALL, !/usr/bin/su`⏎ | one rule: `ALL`, then the exclusion |
+| `alice ALL = ALL !/usr/bin/su`⏎ (comma missing) | **rule with `ALL` only**, fatal "garbage at end of line" |
+| `alice ALL = ALL, !sha224:x`⏎ (error inside the exclusion) | fatal, no rule |
 
 Two properties follow and the specification must state them:
 
-1. **Prefix acceptance.** A line whose tail does not parse still contributes its longest valid
-   prefix as a rule, with a diagnostic for the rest.
+1. **Prefix acceptance.** When the grammar can end a rule before the end of the line, the rule
+   is kept and the rest of the line is reported as garbage. An error inside a list element
+   drops the whole line instead.
 2. **Physical-line resynchronisation.** After a fatal error the parser skips to the next
    newline character, not to the end of the logical line. The rest of a continued line is then
    parsed as lines of its own; in the first row it becomes a rule for `bob`.
 
-`sudo` prints the diagnostics and continues (`src/sudo/pipeline.rs`). Whether C sudo discards
-the whole logical line in these cases has to be measured in stage P0; it is not established here.
+`sudo` prints the diagnostics and continues (`src/sudo/pipeline.rs`).
+
+C sudo 1.9.18 was run on three of these inputs through `testsudoers`, which lists the entries
+its parser kept:
+
+| Input | sudo-rs keeps | C sudo keeps |
+|---|---|---|
+| `alice ALL = ALL !/usr/bin/su`⏎ | `alice ALL = ALL` | nothing; syntax error at 1:17 |
+| `alice ALL = ALL ) junk`⏎`bob ALL = ALL`⏎ | both rules | only the rule for `bob` |
+| `alice ALL = /bin/a, sha224:x \`⏎`bob ALL = (ALL) ALL`⏎ | a rule for `bob` | nothing; syntax error at 2:1 |
+
+On these inputs C sudo discards the whole logical line. Only `testsudoers` was run, not the
+`sudo` front end, and only these inputs; stage P0 has to compare systematically.
 
 ## 4. Target theorems
 
@@ -235,8 +250,8 @@ Decisions for the project owner:
 
 | Id | Observation | Basis |
 |---|---|---|
-| F-P1 | Prefix acceptance (3.3) | observed |
-| F-P2 | Physical-line resynchronisation (3.3) | observed |
+| F-P1 | Prefix acceptance (3.3) | observed; differs from C sudo 1.9.18 on the inputs tried |
+| F-P2 | Physical-line resynchronisation (3.3) | observed; differs from C sudo 1.9.18 on the input tried |
 | F-P3 | `UserSpecifier::parse` can return `Reject` after consuming a quoted token whose content is not a user (`"@x"`), contrary to the contract documented on `Parse`. Every caller appears to end in a fatal error | reading the code; not tested |
 | F-P4 | `Sudo::parse` treats any failure of `Identifier` after `#`, fatal ones included, as "not a user id" and retries the line as an include or comment | reading the code; not tested |
 | F-P5 | A command path is canonicalized at parse time if it exists, so the same text can yield different ASTs on different hosts | reading the code |
