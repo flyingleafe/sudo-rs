@@ -29,6 +29,7 @@ listed under *Findings* below.
 | `SudoersSpec/Authorize.lean` | `checkPermission` and `authorize` in structural form (b) and declarative form (a), proved equal. |
 | `SudoersSpec/Theorems.lean` | Meta-theorems. |
 | `SudoersSpec/Examples.lean` | 99 `#guard`s, most mirroring `pass!`/`FAIL!` cases of `src/sudoers/test/mod.rs` `permission_test`, the rest pinning down the findings below; 6 kernel-checked `example ... := by decide`. |
+| `SudoersSpec/ListValidate.lean` | The flags of `sudo -v` and `sudo -l` (`mod.rs` `validate_flags`, `list_flags`): `maxByKey` (`Iterator::max_by_key` with a `Bool` key), `entryTags`/`applicableEntries`, `validateFlags`, `listFlags`; their meta-theorems; 11 `#guard`s for the findings below. |
 | `SudoersSpec/Axioms.lean` | `#print axioms` audit. |
 
 ## What the spec covers
@@ -60,10 +61,13 @@ listed under *Findings* below.
   processing order (the iteration order of the `VecOrd` produced by `sanitize_alias_table`);
   the topological sort, duplicate and cycle detection are outside the spec. Tag modifiers,
   boxed closures in Rust, are first-order data (`Modifier`) with `Modifier.apply` as meaning.
+* The flags of `sudo -v` and `sudo -l` (`validate_flags`, `list_flags`), see
+  `ListValidate.lean`; for `sudo -l -U` the primary group of the inspected user
+  (`UnixUser::group`) is a parameter `grp : User → Group`.
 * Out of scope: `Defaults` and settings (`specify_host_user_runas`, `specify_command` only
-  change `Judgement.settings`, never the flags), `check_list_permission`,
-  `check_validate_permission`, include directives, command path resolution, the numeric width
-  of ids (`u32` in Rust, `Nat` here).
+  change `Judgement.settings`, never the flags; the `Authentication` that
+  `check_list_permission` / `check_validate_permission` build from the flags), include
+  directives, command path resolution, the numeric width of ids (`u32` in Rust, `Nat` here).
 
 ## Theorems
 
@@ -94,6 +98,11 @@ listed under *Findings* below.
 | `authorize_congr` | Policies with equal alias tables and equal candidate lists decide alike. |
 | `inapplicable_line_irrelevant` | Deleting a line whose user list does not accept the invoking user changes nothing: negation in a user list cannot revoke another line's grant. |
 | `allow_all_setenv` | If the deciding entry is a literal `ALL`, the result is its tag and that tag has `SETENV` or `NOSETENV`. |
+| `maxByKey_eq` | `Iterator::max_by_key` with a `Bool` key returns the last element whose key is `true`, otherwise the last element. |
+| `entryTags_eq`, `applicableEntries_eq_nil_iff` | The tags `sudo -v`/`sudo -l` choose from are those of `applicableEntries`: every entry of every applicable host group of every applicable line (runas, command and negation are not consulted); there is none iff every such group is empty. |
+| `validateFlags_eq`, `validateFlags_eq_none_iff`, `validateFlags_needsPasswd`, `validateFlags_of_entry` | `sudo -v`: the last applicable entry that needs a password, else the last one; refused iff no entry applies; a password is needed iff the invoker is not root and some applicable entry needs one. |
+| `listFlags_other`, `listFlags_other_of_not_root`, `listFlags_other_root` | `sudo -l -U other`: `authorize` of the request to run `list` (no arguments) as `other` with `grp other`; if denied, root still gets the default tag with NOPASSWD. |
+| `listFlags_self_eq_none_iff`, `listFlags_self_needsPasswd`, `listFlags_self_of_entry` | `sudo -l` (own entries): refused iff no entry applies; a password is needed iff `skip_passwd` (root, or `-u` self with one of one's groups) fails and every applicable entry needs one. |
 
 Differences from the Why3 development: the alias table is a function `String → Option Bool`
 instead of an abstract hash map; "sorted" is one hypothesis (`Sorted`: every reference points
@@ -183,3 +192,43 @@ numbers refer to upstream commit 81dff9a1.
     `src/sudo/pipeline.rs` 46-58 prints them and continues with the rest of the policy. Man 560
     ("you may lock yourself out") does not describe this. The spec's `demonstration` theorem
     covers exactly the well-formed tables.
+
+### `sudo -v` and `sudo -l` (`ListValidate.lean`)
+
+Man = `docs/man/sudoers.5.md` and `docs/man/sudo.8.md` at the fork's head; code =
+`list_flags`, `validate_flags`, `Sudoers::check_list_permission`,
+`Sudoers::check_validate_permission` in `src/sudoers/mod.rs`.
+
+18. **The `list` privilege needs a Runas_Spec for the inspected user.** sudoers.5 158-159:
+    "A user with the “list” privilege is able to list another user's privileges even if they
+    don't have permission to run commands as that user." In code `sudo -l -U bob` is the
+    decision for running the command `list` as bob with bob's primary group
+    (`listFlags_other`), so the entry's runas spec must accept bob: `alice ALL = list` (no
+    Runas_Spec) lets alice list only root's privileges, `alice ALL = (bob) list` lets her list
+    bob's.
+19. **Running any command as root does not grant `-U`.** sudoers.5 159-160: by default "root
+    or a user with the ability to run any command as either root or the specified user on the
+    current host may use the -U option". In code `alice ALL = (root) ALL` does not let alice run
+    `sudo -l -U bob`; only entries whose runas spec accepts bob and whose command matches `list`
+    (`ALL` or `list`) do. Root may always, even against `root ALL = (bob) !list`
+    (`listFlags_other_root`).
+20. **Password for `sudo -l -U`.** sudoers.5 293 ("if the NOPASSWD tag is applied to any of a
+    user's entries for the current host, the user will be able to run “sudo -l” without a
+    password") holds for listing one's own entries (`listFlags_self_needsPasswd`). For
+    `sudo -l -U other` the tag of the deciding `list` entry counts instead (`listFlags_other`),
+    and for one's own entries `sudo -l -u self -g own-group` needs no password either (the
+    `skip_passwd` exception of `Sudoers::check`); the man page mentions neither.
+21. **All entries count, including negated ones and any runas spec.** For `sudo -v` and own
+    `sudo -l` an "entry for the current host" (sudoers.5 293) is any command entry of an
+    applicable host group of an applicable line: `alice ALL = !ALL` lets alice run `sudo -v`
+    and `sudo -l`, with a password (`validateFlags_eq_none_iff`, `listFlags_self_eq_none_iff`).
+22. **Root and its own entries.** Root without an applicable entry is refused `sudo -l` for its
+    own entries (and `sudo -v`), while `sudo -l -U other` is always granted to root. The man pages
+    do not say.
+23. **Defaults for `sudo -l` (Rust, not in the spec).** `check_list_permission` applies user-,
+    host- and runas-specific Defaults (and `Defaults!list`) only for `-U` with another user;
+    listing one's own entries uses the global Defaults only, so `Defaults:alice passwd_tries=4`
+    or `Defaults:alice rootpw` affect alice's `sudo -v` and `sudo -l -U bob` but not her
+    `sudo -l` (unit test `list_and_validate_apply_defaults_then_decide`). `sudo -v` applies
+    user- and host-specific Defaults but no runas-specific ones, and its decision takes no
+    target user, although sudo.8 13 lists `-u`/`-g` for `sudo -v`.
