@@ -69,19 +69,14 @@ theorem EnvironmentControl.eq_spec (a b : sudo_rs.sudoers.ast.EnvironmentControl
 `ignored` vector (by one), which is where the `push` can overflow. -/
 @[step]
 theorem Modifier.apply_spec (m : sudo_rs.sudoers.ast.Modifier) (t : sudo_rs.sudoers.ast.Tag)
-    (hwf : ModifierWF m) (h : t.ignored.val.length < Usize.max) :
+    (h : t.ignored.val.length < Usize.max) :
     sudo_rs.sudoers.ast.Modifier.apply m t ⦃ t' =>
       absTag t' = (absModifier m).apply (absTag t) ∧
       t'.ignored.val.length ≤ t.ignored.val.length + 1 ⦄ := by
   unfold sudo_rs.sudoers.ast.Modifier.apply
   cases m with
-  | Authenticate a =>
-    cases a <;> simp_all [ModifierWF, absModifier, SudoersSpec.Modifier.apply, absTag,
-      absAuthenticate]
-  | Env e =>
-    cases e <;> simp_all [ModifierWF, absModifier, SudoersSpec.Modifier.apply, absTag, absEnv]
-  | Exec x =>
-    cases x <;> simp_all [ModifierWF, absModifier, SudoersSpec.Modifier.apply, absTag, absExec]
+  | Passwd | Nopasswd | Setenv | Nosetenv | Exec | Noexec =>
+    simp [absModifier, SudoersSpec.Modifier.apply, absTag, absAuthenticate, absEnv, absExec]
   | Cwd d =>
     step as ⟨d', hd'⟩
     simp [hd', absModifier, SudoersSpec.Modifier.apply, absTag]
@@ -94,7 +89,7 @@ theorem Modifier.apply_spec (m : sudo_rs.sudoers.ast.Modifier) (t : sudo_rs.sudo
   | NoOp => simp [absModifier, SudoersSpec.Modifier.apply]
 
 theorem apply_modifiers_loop_spec (mods : Slice sudo_rs.sudoers.ast.Modifier)
-    (t : sudo_rs.sudoers.ast.Tag) (i : Usize) (hwf : ∀ m ∈ mods.val, ModifierWF m)
+    (t : sudo_rs.sudoers.ast.Tag) (i : Usize)
     (h : t.ignored.val.length + (mods.val.length - i.val) ≤ Usize.max) :
     sudo_rs.sudoers.apply_modifiers_loop mods t i ⦃ t' =>
       absTag t' = SudoersSpec.applyMods ((mods.val.drop i.val).map absModifier) (absTag t) ∧
@@ -105,10 +100,9 @@ theorem apply_modifiers_loop_spec (mods : Slice sudo_rs.sudoers.ast.Modifier)
   · have hlt : i.val < mods.val.length := by scalar_tac
     have hdrop := List.drop_eq_getElem_cons hlt
     step as ⟨m, hm⟩
-    have hmw : ModifierWF m := hwf m (by rw [hm]; exact List.getElem_mem hlt)
-    step with Modifier.apply_spec m t hmw (by omega) as ⟨t1, ht1, hl1⟩
+    step with Modifier.apply_spec m t (by omega) as ⟨t1, ht1, hl1⟩
     step as ⟨i2, hi2⟩
-    step with apply_modifiers_loop_spec mods t1 i2 hwf (by omega) as ⟨t2, ht2, hl2⟩
+    step with apply_modifiers_loop_spec mods t1 i2 (by omega) as ⟨t2, ht2, hl2⟩
     refine ⟨?_, by omega⟩
     rw [ht2, ht1, hdrop, hi2, List.map_cons, ← hm]
     rfl
@@ -120,12 +114,12 @@ decreasing_by all_goals (simp_all; scalar_tac)
 /-- **`apply_modifiers` is `SudoersSpec.applyMods`.** -/
 @[step]
 theorem apply_modifiers_spec (mods : Slice sudo_rs.sudoers.ast.Modifier)
-    (t : sudo_rs.sudoers.ast.Tag) (hwf : ∀ m ∈ mods.val, ModifierWF m)
+    (t : sudo_rs.sudoers.ast.Tag)
     (h : t.ignored.val.length + mods.val.length ≤ Usize.max) :
     sudo_rs.sudoers.apply_modifiers mods t ⦃ t' =>
       absTag t' = SudoersSpec.applyMods (mods.val.map absModifier) (absTag t) ∧
       t'.ignored.val.length ≤ t.ignored.val.length + mods.val.length ⦄ := by
-  simpa using apply_modifiers_loop_spec mods t 0#usize hwf (by simpa using h)
+  simpa using apply_modifiers_loop_spec mods t 0#usize (by simpa using h)
 
 /-! ## `command_tag` -/
 
@@ -175,7 +169,7 @@ theorem lineMods_cons (e : REntry) (l : List REntry) :
 theorem distribute_tags_loop_spec (fr : sudo_rs.sudoers.ast.RunAs → SudoersSpec.RunAs)
     (fc : RCommand → SudoersSpec.Command) (l : Slice REntry) (lr : Option Usize)
     (t : sudo_rs.sudoers.ast.Tag) (res : alloc.vec.Vec (Option Usize × sudo_rs.sudoers.ast.Tag))
-    (i : Usize) (hwf : LineWF l.val) (hres : res.val.length = i.val)
+    (i : Usize) (hres : res.val.length = i.val)
     (hlr : ∀ j, lr = some j → j.val < i.val ∧ (l.val[j.val]?.bind (·.1)).isSome)
     (hig : t.ignored.val.length + (lineMods (l.val.drop i.val)).length ≤ Usize.max) :
     sudo_rs.sudoers.distribute_tags_loop l lr t res i ⦃ r =>
@@ -193,10 +187,6 @@ theorem distribute_tags_loop_spec (fr : sudo_rs.sudoers.ast.RunAs → SudoersSpe
     apply WP.spec_bind (Slice.index_usize_spec l i hlt)
     rintro ⟨runas, ⟨mods, cmd⟩⟩ hq
     simp only [uncurry]
-    have hmem := List.getElem_mem hlt (l := l.val)
-    have hmwf : ∀ m ∈ (alloc.vec.Vec.deref mods).val, ModifierWF m := by
-      have := hwf _ hmem
-      simpa [← hq, csMods] using this
     rw [hdrop, ← hq, lineMods_cons] at hig
     simp only [csMods, List.length_append] at hig
     -- everything after `last_runas` is computed
@@ -216,7 +206,7 @@ theorem distribute_tags_loop_spec (fr : sudo_rs.sudoers.ast.RunAs → SudoersSpe
           ∀ k (hk : k < ys.length), ∀ j, (ys[k]).1 = some j →
             j.val ≤ i.val + k ∧ (l.val[j.val]?.bind (·.1)).isSome ⦄ := by
       intro lr1 hres1 hlr1
-      step with apply_modifiers_spec (alloc.vec.Vec.deref mods) t hmwf
+      step with apply_modifiers_spec (alloc.vec.Vec.deref mods) t
         (by simp only [Vec.deref_val]; omega)
         as ⟨t1, ht1, hl1⟩
       step with command_tag_spec fc t1 cmd as ⟨t2, ht2, _⟩
@@ -230,7 +220,7 @@ theorem distribute_tags_loop_spec (fr : sudo_rs.sudoers.ast.RunAs → SudoersSpe
       have hig2 : t1.ignored.val.length + (lineMods (l.val.drop i2.val)).length ≤ Usize.max := by
         simp only [Vec.deref_val] at hl1
         rw [hi2]; omega
-      step with distribute_tags_loop_spec fr fc l lr1 t1 res1 i2 hwf
+      step with distribute_tags_loop_spec fr fc l lr1 t1 res1 i2
         (by simp [hres1v, hres, hi2]) hlr2 hig2 as ⟨r, ys, hr, hlen, hzip, hpos⟩
       refine ⟨(lr1, t2) :: ys, by simp [hr, hres1v], by simp [hlen, hi2]; omega, ?_, ?_⟩
       · rw [hdrop, ← hq, List.zipWith_cons_cons, ← hi2, hzip]
@@ -273,11 +263,11 @@ decreasing_by all_goals scalar_decr_tac
 per command of the line; entry `k` holds the position `j ≤ k` of the runas spec in effect (an
 entry of the same line with an explicit runas spec) and the distributed tag. Reading each
 position against the line (`resolveEntry`) gives exactly the spec's distributed list.
-Hypotheses: the modifiers are parser-produced (`LineWF`) and their total number fits in `usize`
-(bounds the `ignored` vector that `Modifier::Ignored` pushes to). -/
+The total number of modifiers must fit in `usize` (bounds the `ignored` vector that
+`Modifier::Ignored` pushes to). -/
 @[step]
 theorem distribute_tags_spec (fr : sudo_rs.sudoers.ast.RunAs → SudoersSpec.RunAs)
-    (fc : RCommand → SudoersSpec.Command) (l : Slice REntry) (hwf : LineWF l.val)
+    (fc : RCommand → SudoersSpec.Command) (l : Slice REntry)
     (hig : (lineMods l.val).length ≤ Usize.max) :
     sudo_rs.sudoers.distribute_tags l ⦃ r =>
       r.val.length = l.val.length ∧
@@ -287,7 +277,7 @@ theorem distribute_tags_spec (fr : sudo_rs.sudoers.ast.RunAs → SudoersSpec.Run
         j.val ≤ k ∧ (l.val[j.val]?.bind (·.1)).isSome ⦄ := by
   unfold sudo_rs.sudoers.distribute_tags
   step as ⟨t, ht, hti⟩
-  step with distribute_tags_loop_spec fr fc l none t (alloc.vec.Vec.new _) 0#usize hwf
+  step with distribute_tags_loop_spec fr fc l none t (alloc.vec.Vec.new _) 0#usize
     (by simp) (by simp) (by simpa [hti] using hig) as ⟨r, ys, hr, hlen, hzip, hpos⟩
   simp only [alloc.vec.Vec.new] at hr
   refine ⟨?_, ?_, ?_⟩

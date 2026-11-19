@@ -142,13 +142,16 @@ inductive sudoers.tokens.Args where
 | Exact : Slice std.ffi.os_str.OsString → sudoers.tokens.Args
 
 /-- [sudo_rs::sudoers::ast::Modifier]
-    Source: 'src/sudoers/ast.rs', lines 335:0-343:1
+    Source: 'src/sudoers/ast.rs', lines 335:0-346:1
     Visibility: public -/
 @[discriminant isize]
 inductive sudoers.ast.Modifier where
-| Authenticate : sudoers.ast.Authenticate → sudoers.ast.Modifier
-| Env : sudoers.ast.EnvironmentControl → sudoers.ast.Modifier
-| Exec : sudoers.ast.ExecControl → sudoers.ast.Modifier
+| Passwd : sudoers.ast.Modifier
+| Nopasswd : sudoers.ast.Modifier
+| Setenv : sudoers.ast.Modifier
+| Nosetenv : sudoers.ast.Modifier
+| Exec : sudoers.ast.Modifier
+| Noexec : sudoers.ast.Modifier
 | Cwd : sudoers.tokens.ChDir → sudoers.ast.Modifier
 | AppArmorProfile : String → sudoers.ast.Modifier
 | Ignored : sudoers.basic_parser.Span → sudoers.ast.Modifier

@@ -333,9 +333,12 @@ struct MetaOrTag(Meta<Modifier>);
 
 /// A `Modifier` is something that updates the `Tag`.
 pub enum Modifier {
-    Authenticate(Authenticate),
-    Env(EnvironmentControl),
-    Exec(ExecControl),
+    Passwd,
+    Nopasswd,
+    Setenv,
+    Nosetenv,
+    Exec,
+    Noexec,
     Cwd(ChDir),
     AppArmorProfile(String),
     Ignored(Span),
@@ -345,9 +348,12 @@ pub enum Modifier {
 impl Modifier {
     pub fn apply(&self, tag: &mut Tag) {
         match self {
-            Modifier::Authenticate(authenticate) => tag.authenticate = *authenticate,
-            Modifier::Env(env) => tag.env = *env,
-            Modifier::Exec(noexec) => tag.noexec = *noexec,
+            Modifier::Passwd => tag.authenticate = Authenticate::Passwd,
+            Modifier::Nopasswd => tag.authenticate = Authenticate::Nopasswd,
+            Modifier::Setenv => tag.env = EnvironmentControl::Setenv,
+            Modifier::Nosetenv => tag.env = EnvironmentControl::Nosetenv,
+            Modifier::Exec => tag.noexec = ExecControl::Exec,
+            Modifier::Noexec => tag.noexec = ExecControl::Noexec,
             Modifier::Cwd(path) => tag.cwd = Some(path.clone()),
             Modifier::AppArmorProfile(profile) => tag.apparmor_profile = Some(profile.clone()),
             Modifier::Ignored(span) => tag.ignored.push(*span),
@@ -373,13 +379,13 @@ impl Parse for MetaOrTag {
         };
 
         let result: Modifier = match keyword.as_str() {
-            "EXEC" => switch(Modifier::Exec(ExecControl::Exec))?,
-            "NOEXEC" => switch(Modifier::Exec(ExecControl::Noexec))?,
+            "EXEC" => switch(Modifier::Exec)?,
+            "NOEXEC" => switch(Modifier::Noexec)?,
 
-            "SETENV" => switch(Modifier::Env(EnvironmentControl::Setenv))?,
-            "NOSETENV" => switch(Modifier::Env(EnvironmentControl::Nosetenv))?,
-            "PASSWD" => switch(Modifier::Authenticate(Authenticate::Passwd))?,
-            "NOPASSWD" => switch(Modifier::Authenticate(Authenticate::Nopasswd))?,
+            "SETENV" => switch(Modifier::Setenv)?,
+            "NOSETENV" => switch(Modifier::Nosetenv)?,
+            "PASSWD" => switch(Modifier::Passwd)?,
+            "NOPASSWD" => switch(Modifier::Nopasswd)?,
 
             "CWD" => {
                 expect_syntax('=', stream)?;

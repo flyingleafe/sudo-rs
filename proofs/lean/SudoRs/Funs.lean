@@ -239,17 +239,25 @@ def sudoers.ast.Tag.Insts.CoreCloneClone.clone
     }
 
 /-- [sudo_rs::sudoers::ast::{sudo_rs::sudoers::ast::Modifier}::apply]:
-    Source: 'src/sudoers/ast.rs', lines 346:4-356:5
+    Source: 'src/sudoers/ast.rs', lines 349:4-362:5
     Visibility: public -/
 def sudoers.ast.Modifier.apply
   (self : sudoers.ast.Modifier) (tag : sudoers.ast.Tag) :
   Result sudoers.ast.Tag
   := do
   match self with
-  | sudoers.ast.Modifier.Authenticate authenticate =>
-    ok { tag with authenticate }
-  | sudoers.ast.Modifier.Env env => ok { tag with env }
-  | sudoers.ast.Modifier.Exec noexec => ok { tag with noexec }
+  | sudoers.ast.Modifier.Passwd =>
+    ok { tag with authenticate := sudoers.ast.Authenticate.Passwd }
+  | sudoers.ast.Modifier.Nopasswd =>
+    ok { tag with authenticate := sudoers.ast.Authenticate.Nopasswd }
+  | sudoers.ast.Modifier.Setenv =>
+    ok { tag with env := sudoers.ast.EnvironmentControl.Setenv }
+  | sudoers.ast.Modifier.Nosetenv =>
+    ok { tag with env := sudoers.ast.EnvironmentControl.Nosetenv }
+  | sudoers.ast.Modifier.Exec =>
+    ok { tag with noexec := sudoers.ast.ExecControl.Exec }
+  | sudoers.ast.Modifier.Noexec =>
+    ok { tag with noexec := sudoers.ast.ExecControl.Noexec }
   | sudoers.ast.Modifier.Cwd path =>
     let cd ← sudoers.tokens.ChDir.Insts.CoreCloneClone.clone path
     ok { tag with cwd := (some cd) }

@@ -7,10 +7,8 @@ Rust `Tag`, `Modifier`, `Authenticate`, `EnvironmentControl`, `ExecControl`, `Ch
 `CommandSpec` and the `(Option<RunAs>, CommandSpec)` entries of a `Cmnd_Spec_List`, abstracted
 to the `SudoersSpec` types.
 
-The spec's `Modifier` has no counterpart for the Rust values `Modifier::Authenticate(None)`,
-`Modifier::Env(Implicit)` and `Modifier::Exec(Implicit)`; the parser never builds them
-(`src/sudoers/ast.rs` `MetaOrTag::parse` only produces `PASSWD`/`NOPASSWD`, `SETENV`/`NOSETENV`,
-`EXEC`/`NOEXEC`). `ModifierWF` excludes them.
+`Modifier` encodes only explicit updates, while the fields of `Tag` also have default states.
+Cwd, AppArmor profile, ignored tags, and the recognized no-op tags are represented directly.
 
 The abstraction of runas specs and commands is a parameter (`fr`, `fc`): the tag layer never
 looks inside them.
@@ -51,22 +49,13 @@ def absTag (t : sudo_rs.sudoers.ast.Tag) : SudoersSpec.Tag where
   noexec := absExec t.noexec
   ignored := t.ignored.val.map absSpan
 
-/-- Modifiers the parser can produce. -/
-def ModifierWF : sudo_rs.sudoers.ast.Modifier → Prop
-  | .Authenticate .None | .Env .Implicit | .Exec .Implicit => False
-  | _ => True
-
-/-- The values excluded by `ModifierWF` are sent to `noop`; no theorem relies on that. -/
 def absModifier : sudo_rs.sudoers.ast.Modifier → SudoersSpec.Modifier
-  | .Authenticate .Passwd => .passwd
-  | .Authenticate .Nopasswd => .nopasswd
-  | .Authenticate .None => .noop
-  | .Env .Setenv => .setenv
-  | .Env .Nosetenv => .nosetenv
-  | .Env .Implicit => .noop
-  | .Exec .Exec => .exec
-  | .Exec .Noexec => .noexec
-  | .Exec .Implicit => .noop
+  | .Passwd => .passwd
+  | .Nopasswd => .nopasswd
+  | .Setenv => .setenv
+  | .Nosetenv => .nosetenv
+  | .Exec => .exec
+  | .Noexec => .noexec
   | .Cwd d => .cwd (absChDir d)
   | .AppArmorProfile p => .apparmorProfile p
   | .Ignored s => .ignored (absSpan s)
@@ -92,9 +81,6 @@ def absCommandSpec (fc : RCommand → SudoersSpec.Command) (cs : sudo_rs.sudoers
 def absLine (fr : sudo_rs.sudoers.ast.RunAs → SudoersSpec.RunAs) (fc : RCommand → SudoersSpec.Command)
     (l : List REntry) : List (Option SudoersSpec.RunAs × SudoersSpec.CommandSpec) :=
   l.map fun e => (e.1.map fr, absCommandSpec fc e.2)
-
-/-- Every modifier on the line is one the parser can produce. -/
-def LineWF (l : List REntry) : Prop := ∀ e ∈ l, ∀ m ∈ csMods e.2, ModifierWF m
 
 /-- All modifiers of a line, in order. -/
 def lineMods (l : List REntry) : List sudo_rs.sudoers.ast.Modifier := l.flatMap fun e => csMods e.2

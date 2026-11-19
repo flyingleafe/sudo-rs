@@ -112,7 +112,7 @@ theorem perm_inner_loop_spec (hO : InstOracle uInst eqInst gInst O) (hG : GlobOr
     rintro ⟨v, v1⟩ hq
     simp only [uncurry]
     obtain ⟨hvi, hvg, hl⟩ := hperms (v, v1) (by rw [hq]; exact List.getElem_mem hlt)
-    obtain ⟨hlwf, hlig, hle⟩ := hl
+    obtain ⟨hlig, hle⟩ := hl
     step with find_item_match_token_spec hH r.host s1 hs1 (alloc.vec.Vec.deref v) HA hHA
       (by simpa using hvi) (by simpa using hvg) as ⟨b, hb⟩
     have hrec : ∀ r1 : Option sudo_rs.sudoers.ast.Tag,
@@ -147,7 +147,7 @@ theorem perm_inner_loop_spec (hO : InstOracle uInst eqInst gInst O) (hG : GlobOr
         RunAsOK CmdOK
         (fun ra cmd hra hcmd =>
           perm_closure_call hO hG r p s hp hs RU RG CA hRU hRG hCA ra hra cmd hcmd)
-        (alloc.vec.Vec.deref v1) (by simpa using hle) (by simpa using hlwf) (by simpa using hlig)
+        (alloc.vec.Vec.deref v1) (by simpa using hle) (by simpa using hlig)
         result as ⟨r1, hr1⟩
       refine hrec r1 ?_
       rw [hseg, hbt, hr1]

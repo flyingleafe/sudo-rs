@@ -7,7 +7,7 @@ import SudoRsProofs.AbsTags
 `absPolicy A rules aliases` is the `SudoersSpec.Policy` of the Rust `rules: &[PermissionSpec]`
 and `aliases: &AliasTable` that `check_permission` takes. `PolicyOK` collects the side
 conditions every lemma below it needs: valid processing orders, names that fit in memory,
-parser-produced modifiers, and modifier counts that fit in `usize`.
+and modifier counts that fit in `usize`.
 -/
 
 open Aeneas Aeneas.Std Result
@@ -45,9 +45,9 @@ def RunAsOK (ra : sudo_rs.sudoers.ast.RunAs) : Prop :=
 /-- A command spec whose alias name (if any) fits in memory. -/
 def CmdOK (cmd : RSpec RCommand) : Prop := ∀ n, aliasName cmd = some n → Fits n
 
-/-- A `Cmnd_Spec_List`: parser-produced modifiers, few enough of them, names that fit. -/
+/-- A `Cmnd_Spec_List`: few enough modifiers and names that fit. -/
 def LineOK (l : List REntry) : Prop :=
-  LineWF l ∧ (lineMods l).length ≤ Usize.max ∧
+  (lineMods l).length ≤ Usize.max ∧
     ∀ e ∈ l, (∀ r, e.1 = some r → RunAsOK r) ∧ CmdOK (csCmd e.2)
 
 /-- A `Host_List = Cmnd_Spec_List` group. -/

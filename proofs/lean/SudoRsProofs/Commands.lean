@@ -149,13 +149,13 @@ theorem check_commands_spec
     (hv : ∀ ra cmd, (∀ r, ra = some r → GoodR r) → GoodC cmd →
       inst.call verdict (ra, cmd) = ok (V (ra.map fr) (absSpec fc cmd)))
     (l : Slice REntry) (hl : ∀ e ∈ l.val, (∀ r, e.1 = some r → GoodR r) ∧ GoodC (csCmd e.2))
-    (hwf : LineWF l.val) (hig : (lineMods l.val).length ≤ Usize.max)
+    (hig : (lineMods l.val).length ≤ Usize.max)
     (result : Option sudo_rs.sudoers.ast.Tag) :
     sudo_rs.sudoers.check_commands inst result l verdict ⦃ r =>
       r.map absTag = checkCommandsSpec V (SudoersSpec.distributeTags (absLine fr fc l.val))
         (result.map absTag) ⦄ := by
   unfold sudo_rs.sudoers.check_commands
-  step with distribute_tags_spec fr fc l hwf hig as ⟨tags, hlen, hzip, hpos⟩
+  step with distribute_tags_spec fr fc l hig as ⟨tags, hlen, hzip, hpos⟩
   step with check_commands_loop_spec inst verdict fr fc V GoodR GoodC hv l hl tags hlen
     (fun k hk j hj => by
       obtain ⟨h1, -⟩ := hpos k hk j hj

@@ -71,7 +71,7 @@ private def aliases : sudoers.AliasTable where
 
 private def entry : REntry :=
   (some ⟨.from [.Allow .All] (fitsUsize (by decide)), .new _⟩,
-   ⟨.from [.Authenticate .Passwd, .Env .Nosetenv] (fitsUsize (by decide)), .Allow .All⟩)
+   ⟨.from [.Passwd, .Nosetenv] (fitsUsize (by decide)), .Allow .All⟩)
 
 private def rule : sudoers.ast.PermissionSpec where
   users := .from [.Allow (.Alias "MEMBERS")] (fitsUsize (by decide))
@@ -93,9 +93,9 @@ private theorem aliasFits : Fits "MEMBERS" := by
 
 private theorem policyOK : PolicyOK rules aliases := by
   simp only [PolicyOK, AliasTableOK, TableWF, TableFits, TableGood, RuleOK, SegOK, LineOK,
-    LineWF, RunAsOK, CmdOK, ItemsFit, ItemsGood, aliases, emptyTable, rules, rule, entry,
+    RunAsOK, CmdOK, ItemsFit, ItemsGood, aliases, emptyTable, rules, rule, entry,
     lineMods, csMods, csCmd, alloc.vec.Vec.from_val, Slice.from_val, List.forall_mem_cons]
-  simp [aliasName, onlyItem, UserSpecFits, IdentFits, ModifierWF, aliasFits,
+  simp [aliasName, onlyItem, UserSpecFits, IdentFits, aliasFits,
     fitsUsize (n := 2) (by decide)]
   refine ⟨by decide, ?_, ?_⟩
   · intro d hd
