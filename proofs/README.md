@@ -48,13 +48,26 @@ See [the assumptions ledger](lean/ASSUMPTIONS.md) for exact hypotheses and exter
 models. The axiom audit does not verify the Charon/Aeneas translation or the
 faithfulness of hand-written models.
 
-[The alias producer proof](lean/SudoRsProofs/SanitizeAliases.lean) discharges the
-index premise for successfully returned orders. It does not establish sanitizer
-termination, diagnostic correctness, or that the output is topologically sorted.
-The rest of the parser and alias preprocessing, Defaults parsing and scoping, real OS
-identity lookup, glob matching, credential changes, authentication, command execution,
-rustc, and the deployed binary are outside the verified boundary. The Quint lifecycle
-model is a separate abstraction, not a proof about the Rust execution path.
+The alias preprocessing proofs
+([`SanitizeAliases`](lean/SudoRsProofs/SanitizeAliases.lean),
+[`SanitizeOrder`](lean/SudoRsProofs/SanitizeOrder.lean),
+[`SanitizeTables`](lean/SudoRsProofs/SanitizeTables.lean),
+[`SanitizeTotal`](lean/SudoRsProofs/SanitizeTotal.lean)) cover `sanitize_alias_table`
+and `sanitize_alias_tables`, the function `analyze` calls for the four alias tables.
+Every returned order has in-range, pairwise distinct indices, which discharges the index
+premise of the decision theorem. If a call adds no diagnostic, its order is a permutation
+of the definitions with unique names in which every referenced alias comes earlier, so
+`SudoersSpec.demonstration` applies: deciding with the precomputed table equals deciding
+on the fully expanded items. Both functions always return, given names that fit in memory
+and room in the diagnostics vector. These proofs rely on the list model of `HashSet` and
+on the model of `alias_diagnostic`. Nothing is proved about which diagnostics are emitted,
+about the order when diagnostics are present beyond those index properties, or that a
+given sudoers text produces none.
+
+The parser, include processing, Defaults parsing and scoping, real OS identity lookup,
+glob matching, credential changes, authentication, command execution, rustc, and the
+deployed binary are outside the verified boundary. The Quint lifecycle model is a
+separate abstraction, not a proof about the Rust execution path.
 
 The fork changes alias-membership storage from a hash table to a linear list for
 extraction. Resolving many dependent aliases can therefore be quadratic. Treat

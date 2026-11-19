@@ -208,8 +208,9 @@ the remaining stages are affordable: the decision core needed about 2,800 lines 
 for an extracted call tree of roughly 300 Rust lines; the parser is five times larger but is
 built from about eight combinators.
 
-Dependencies on work in progress: P4 uses the sanitizer order theorem (no diagnostic implies
-sorted and duplicate-free tables); P5 uses the `Judgement::authorization` refinement.
+Results the later stages build on, proved since this plan was written: P4 uses
+`sanitize_alias_tables_sorted` (no diagnostic implies sorted and duplicate-free tables) and
+`sanitize_alias_tables_returns`; P5 uses `authorization_eq`.
 
 ## 8. Risks and open decisions
 
