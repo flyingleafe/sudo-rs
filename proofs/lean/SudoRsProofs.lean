@@ -7,6 +7,7 @@ import SudoRsProofs.FindItem
 import SudoRsProofs.GetAliases
 import SudoRsProofs.SanitizeAliases
 import SudoRsProofs.SanitizeOrder
+import SudoRsProofs.SanitizeTables
 import SudoRsProofs.AbsMatch
 import SudoRsProofs.Matchers
 import SudoRsProofs.AbsTags

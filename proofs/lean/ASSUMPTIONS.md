@@ -111,6 +111,14 @@ modelled by Aeneas and above, and on `alias_diagnostic` appending exactly one er
 "clean" premise `diags'.val.length = diags.val.length` (no diagnostic added) is what makes
 the order a sorted permutation; it is not discharged for any concrete sudoers file.
 
+`SudoRsProofs/SanitizeTables.lean` lifts both kinds of result to
+`sanitize_alias_tables` (the four calls at the end of `analyze`). In
+`sanitize_alias_tables_tableWF` the `TableWF` conjuncts and therefore
+`AliasTableOK.of_sanitize_alias_tables` need only what `sanitize_alias_table_tableWF` needs;
+its diagnostics-prefix conjunct comes from `sanitize_alias_table_distinct` and has the same
+reliance as the order theorems. `sanitize_alias_tables_sorted` takes the clean premise on the
+whole call. Parsing and the rest of `analyze` are not covered.
+
 ## Hypotheses of the top-level theorems
 
 `check_permission_spec` / `check_permission_eq` (against `SudoersSpec.checkPermission`) and
