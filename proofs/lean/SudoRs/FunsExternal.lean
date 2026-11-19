@@ -109,6 +109,17 @@ equality of the (abstract) values. -/
 noncomputable def std.ffi.os_str.OsString.Insts.CoreCmpPartialEqOsString.eq
   (a b : std.ffi.os_str.OsString) : Result Bool := ok (decide (a = b))
 
+/-- [std::ffi::os_str::{impl core::convert::AsRef<std::ffi::os_str::OsStr> for str}::as_ref]:
+the `OsStr` view of a `&str`. Opaque (no axiom): nothing is known about it. -/
+opaque Str.Insts.CoreConvertAsRefOsStr.as_ref : Str → Result std.ffi.os_str.OsStr
+
+/-- [std::path::{std::path::Path}::new]: `Path` is abstract, so is its constructor. Opaque (no
+axiom): `list_flags` calls it once, as `Path::new("list")`; theorems about that call take its
+result as a hypothesis (`SudoRsProofs.ListPath`). -/
+opaque std.path.Path.new {S : Type _}
+    (coreconvertAsRefSOsStrInst : core.convert.AsRef S std.ffi.os_str.OsStr) :
+    S → Result std.path.Path
+
 /-- [alloc::boxed::{impl core::convert::AsRef<T> for alloc::boxed::Box<T>}::as_ref]: boxes and
 borrows are erased. -/
 def Box.Insts.CoreConvertAsRef.as_ref {T : Type _} (A : Type _) (x : T) : Result T := ok x

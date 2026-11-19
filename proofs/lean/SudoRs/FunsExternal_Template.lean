@@ -114,6 +114,15 @@ axiom std.collections.hash.set.HashSet.insert
 axiom std.ffi.os_str.OsString.Insts.CoreCmpPartialEqOsString.eq
   : std.ffi.os_str.OsString → std.ffi.os_str.OsString → Result Bool
 
+/-- [std::ffi::os_str::{impl core::convert::AsRef<std::ffi::os_str::OsStr> for str}::as_ref]:
+    Source: '/rustc/library/std/src/ffi/os_str.rs', lines 1771:4-1771:30
+    Name pattern: [std::ffi::os_str::{core::convert::AsRef<str, std::ffi::os_str::OsStr>}::as_ref]
+    Visibility: public -/
+@[rust_fun
+  "std::ffi::os_str::{core::convert::AsRef<str, std::ffi::os_str::OsStr>}::as_ref"]
+axiom Str.Insts.CoreConvertAsRefOsStr.as_ref
+  : Str → Result std.ffi.os_str.OsStr
+
 /-- [std::hash::random::{impl core::hash::Hasher for std::hash::random::DefaultHasher}::finish]:
     Source: '/rustc/library/std/src/hash/random.rs', lines 140:4-140:27
     Name pattern: [std::hash::random::{core::hash::Hasher<std::hash::random::DefaultHasher>}::finish]
@@ -143,6 +152,16 @@ axiom std.hash.random.DefaultHasher.Insts.CoreHashHasher.write
 axiom
   std.hash.random.RandomState.Insts.CoreHashBuildHasherDefaultHasher.build_hasher
   : std.hash.random.RandomState → Result std.hash.random.DefaultHasher
+
+/-- [std::path::{std::path::Path}::new]:
+    Source: '/rustc/library/std/src/path.rs', lines 2412:4-2412:70
+    Name pattern: [std::path::{std::path::Path}::new]
+    Visibility: public -/
+@[rust_fun "std::path::{std::path::Path}::new"]
+axiom std.path.Path.new
+  {S : Type _} (coreconvertAsRefSOsStrInst : core.convert.AsRef S
+  std.ffi.os_str.OsStr) :
+  S → Result std.path.Path
 
 /-- [alloc::boxed::{impl core::convert::AsRef<T> for alloc::boxed::Box<T>}::as_ref]:
     Source: '/rustc/library/alloc/src/boxed.rs', lines 2429:4-2429:26
@@ -236,11 +255,11 @@ axiom common.string.SudoString.Insts.CoreCmpPartialEqStr.eq
   : common.string.SudoString → Str → Result Bool
 
 /-- [sudo_rs::sudoers::warn_ignored]:
-    Source: 'src/sudoers/mod.rs', lines 820:0-830:1 -/
+    Source: 'src/sudoers/mod.rs', lines 912:0-922:1 -/
 axiom sudoers.warn_ignored : sudoers.Ignored → Result Unit
 
 /-- [sudo_rs::sudoers::alias_diagnostic]:
-    Source: 'src/sudoers/mod.rs', lines 1201:0-1212:1 -/
+    Source: 'src/sudoers/mod.rs', lines 1293:0-1304:1 -/
 axiom sudoers.alias_diagnostic
   :
   alloc.vec.Vec sudoers.Error → sudoers.AliasDiagnostic → Str → Result

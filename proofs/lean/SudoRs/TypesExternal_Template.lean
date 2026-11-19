@@ -48,6 +48,13 @@ axiom std.hash.random.RandomState : Type
 @[rust_type "std::ffi::os_str::OsString"]
 axiom std.ffi.os_str.OsString : Type
 
+/-- [std::ffi::os_str::OsStr]
+    Source: '/rustc/library/std/src/ffi/os_str.rs', lines 115:0-115:16
+    Name pattern: [std::ffi::os_str::OsStr]
+    Visibility: public -/
+@[rust_type "std::ffi::os_str::OsStr"]
+axiom std.ffi.os_str.OsStr : Type
+
 /-- [std::hash::random::DefaultHasher]
     Source: '/rustc/library/std/src/hash/random.rs', lines 94:0-94:24
     Name pattern: [std::hash::random::DefaultHasher]

@@ -29,6 +29,9 @@ opaque std.hash.random.DefaultHasher : Type
 /-- [std::ffi::os_str::OsString]: abstract. -/
 opaque std.ffi.os_str.OsString : Type
 
+/-- [std::ffi::os_str::OsStr]: abstract (only the argument of `Path::new("list")`). -/
+opaque std.ffi.os_str.OsStr : Type
+
 /-- [std::path::Path]: abstract. -/
 opaque std.path.Path : Type
 

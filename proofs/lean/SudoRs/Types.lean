@@ -213,12 +213,21 @@ structure sudoers.Request (User : Type _) (Group : Type _) (Clause0_Group :
   command : std.path.Path
   arguments : Slice std.ffi.os_str.OsString
 
+/-- [sudo_rs::sudoers::ListRequest]
+    Source: 'src/sudoers/mod.rs', lines 64:0-68:1
+    Visibility: public -/
+structure sudoers.ListRequest (User : Type _) (Group : Type _) (Clause0_Group :
+  Type _) where
+  inspected_user : User
+  target_user : User
+  target_group : Group
+
 /-- [sudo_rs::sudoers::VecOrd]
-    Source: 'src/sudoers/mod.rs', lines 463:0-463:37 -/
+    Source: 'src/sudoers/mod.rs', lines 423:0-423:37 -/
 def sudoers.VecOrd (T : Type _) := alloc.vec.Vec Std.Usize × alloc.vec.Vec T
 
 /-- [sudo_rs::sudoers::AliasTable]
-    Source: 'src/sudoers/mod.rs', lines 449:0-454:1 -/
+    Source: 'src/sudoers/mod.rs', lines 409:0-414:1 -/
 structure sudoers.AliasTable where
   user : sudoers.VecOrd (sudoers.ast.Def sudoers.ast.UserSpecifier)
   host : sudoers.VecOrd (sudoers.ast.Def sudoers.tokens.Hostname)
@@ -263,57 +272,57 @@ structure system.interface.UnixUser (Self : Type _) (Self_Group : Type _) where
   group : Self → Result Self_Group
 
 /-- [sudo_rs::sudoers::FoundAliases]
-    Source: 'src/sudoers/mod.rs', lines 695:0-695:41 -/
+    Source: 'src/sudoers/mod.rs', lines 787:0-787:41 -/
 @[reducible]
 def sudoers.FoundAliases := alloc.vec.Vec (String × Bool)
 
 /-- [sudo_rs::sudoers::match_command::{closure}]
-    Source: 'src/sudoers/mod.rs', lines 841:4-847:5 -/
+    Source: 'src/sudoers/mod.rs', lines 933:4-939:5 -/
 def sudoers.match_command.closure :=
   std.path.Path × glob.MatchOptions × Slice std.ffi.os_str.OsString
 
 /-- [sudo_rs::sudoers::match_token::{closure}]
-    Source: 'src/sudoers/mod.rs', lines 833:4-833:39 -/
+    Source: 'src/sudoers/mod.rs', lines 925:4-925:39 -/
 @[reducible]
 def sudoers.match_token.closure (T : Type _) := Str
 
 /-- [sudo_rs::sudoers::Ignored]
-    Source: 'src/sudoers/mod.rs', lines 813:0-816:1 -/
+    Source: 'src/sudoers/mod.rs', lines 905:0-908:1 -/
 @[discriminant isize]
 inductive sudoers.Ignored where
 | NonunixGroup : sudoers.ast.Identifier → sudoers.Ignored
 | GroupInRunasAlias : sudoers.Ignored
 
 /-- [sudo_rs::sudoers::match_group_alias::{closure}]
-    Source: 'src/sudoers/mod.rs', lines 801:4-809:5 -/
+    Source: 'src/sudoers/mod.rs', lines 893:4-901:5 -/
 @[reducible]
 def sudoers.match_group_alias.closure (T0 : Type _) := T0
 
 /-- [sudo_rs::sudoers::match_group::{closure}::{closure}]
-    Source: 'src/sudoers/mod.rs', lines 796:66-796:79 -/
+    Source: 'src/sudoers/mod.rs', lines 888:66-888:79 -/
 @[reducible]
 def sudoers.match_group.closure.closure (T0 : Type _) :=
   common.string.SudoString
 
 /-- [sudo_rs::sudoers::match_group::{closure}]
-    Source: 'src/sudoers/mod.rs', lines 794:4-797:5 -/
+    Source: 'src/sudoers/mod.rs', lines 886:4-889:5 -/
 @[reducible]
 def sudoers.match_group.closure (T0 : Type _) := T0
 
 /-- [sudo_rs::sudoers::match_user::{closure}]
-    Source: 'src/sudoers/mod.rs', lines 777:4-786:5 -/
+    Source: 'src/sudoers/mod.rs', lines 869:4-878:5 -/
 @[reducible]
 def sudoers.match_user.closure (T0 : Type _) (Clause0_Group : Type _) := T0
 
 /-- [sudo_rs::sudoers::check_permission::{closure}]
-    Source: 'src/sudoers/mod.rs', lines 517:18-538:5 -/
+    Source: 'src/sudoers/mod.rs', lines 609:18-630:5 -/
 def sudoers.check_permission.closure (User : Type _) (Group : Type _)
   (Clause0_Group : Type _) :=
   User × Group × User × sudoers.FoundAliases × sudoers.FoundAliases ×
   sudoers.match_command.closure × sudoers.FoundAliases
 
 /-- [sudo_rs::sudoers::AliasDiagnostic]
-    Source: 'src/sudoers/mod.rs', lines 1195:0-1199:1 -/
+    Source: 'src/sudoers/mod.rs', lines 1287:0-1291:1 -/
 @[discriminant isize]
 inductive sudoers.AliasDiagnostic where
 | Undefined : sudoers.AliasDiagnostic
@@ -321,7 +330,7 @@ inductive sudoers.AliasDiagnostic where
 | Duplicate : sudoers.AliasDiagnostic
 
 /-- [sudo_rs::sudoers::sanitize_alias_table::Visitor]
-    Source: 'src/sudoers/mod.rs', lines 1237:4-1242:5 -/
+    Source: 'src/sudoers/mod.rs', lines 1329:4-1334:5 -/
 structure sudoers.sanitize_alias_table.Visitor (T : Type _) where
   seen : std.collections.hash.set.HashSet Std.Usize std.hash.random.RandomState
     alloc.alloc.Global
