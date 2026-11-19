@@ -26,6 +26,13 @@ set_option maxRecDepth 2048
 @[rust_type "core::ffi::c_str::CStr"]
 axiom core.ffi.c_str.CStr : Type
 
+/-- [core::time::Duration]
+    Source: '/rustc/library/core/src/time.rs', lines 81:0-81:19
+    Name pattern: [core::time::Duration]
+    Visibility: public -/
+@[rust_type "core::time::Duration"]
+axiom core.time.Duration : Type
+
 /-- [std::collections::hash::set::HashSet]
     Source: '/rustc/library/std/src/collections/hash/set.rs', lines 126:0-130:1
     Name pattern: [std::collections::hash::set::HashSet]

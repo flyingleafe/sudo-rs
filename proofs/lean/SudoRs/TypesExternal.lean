@@ -46,3 +46,9 @@ Modelled by the text its `Deref<Target = str>` exposes, i.e. the Rust `inner` fi
 trailing NUL byte. -/
 structure common.string.SudoString where
   str : String
+
+/-- [core::time::Duration]: `{ secs: u64, nanos: Nanoseconds }` (`core/src/time.rs`), with the
+nanoseconds below one billion. -/
+structure core.time.Duration where
+  secs : U64
+  nanos : U32

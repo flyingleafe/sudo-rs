@@ -53,6 +53,16 @@ def Shared0T.Insts.CoreHashHash {T : Type _} (HashInst : core.hash.Hash T) :
     Shared0T.Insts.CoreHashHash.hash HashInst HasherInst
 }
 
+/-- Trait implementation: [core::num::error::{impl core::fmt::Debug for core::num::error::TryFromIntError}]
+    Source: '/rustc/library/core/src/num/error.rs', lines 8:9-8:14
+    Name pattern: [core::fmt::Debug<core::num::error::TryFromIntError>] -/
+@[reducible, rust_trait_impl
+  "core::fmt::Debug<core::num::error::TryFromIntError>"]
+def core.num.error.TryFromIntError.Insts.CoreFmtDebug : core.fmt.Debug
+  core.num.error.TryFromIntError := {
+  fmt := core.num.error.TryFromIntError.Insts.CoreFmtDebug.fmt
+}
+
 /-- Trait implementation: [core::slice::cmp::{impl core::cmp::PartialEq<[U]> for [T]}]
     Source: '/rustc/library/core/src/slice/cmp.rs', lines 14:0-16:28
     Name pattern: [core::cmp::PartialEq<[@T], [@U]>] -/
@@ -174,6 +184,128 @@ impl_def common.string.SudoString.Insts.CoreCmpPartialEqStr :
   ne := core.cmp.PartialEq.ne.trait_default
     common.string.SudoString.Insts.CoreCmpPartialEqStr
 }
+
+/-- [sudo_rs::defaults::{sudo_rs::defaults::Settings}::apparmor_profile]:
+    Source: 'src/defaults/settings_dsl.rs', lines 167:16-169:17; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 30:0-84:1 -/
+def defaults.Settings.impl.apparmor_profile
+  (self : defaults.Settings) : Result (Option Str) := do
+  core.option.Option.as_deref (core.ops.deref.DerefBoxInst Str)
+    self.apparmor_profile
+
+/-- [sudo_rs::defaults::{sudo_rs::defaults::Settings}::use_pty]:
+    Source: 'src/defaults/settings_dsl.rs', lines 167:16-169:17; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 30:0-84:1 -/
+def defaults.Settings.impl.use_pty
+  (self : defaults.Settings) : Result Bool := do
+  ok self.use_pty
+
+/-- [sudo_rs::defaults::{sudo_rs::defaults::Settings}::setenv]:
+    Source: 'src/defaults/settings_dsl.rs', lines 167:16-169:17; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 30:0-84:1 -/
+def defaults.Settings.impl.setenv
+  (self : defaults.Settings) : Result Bool := do
+  ok self.setenv
+
+/-- [sudo_rs::defaults::{sudo_rs::defaults::Settings}::noexec]:
+    Source: 'src/defaults/settings_dsl.rs', lines 167:16-169:17; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 30:0-84:1 -/
+def defaults.Settings.impl.noexec
+  (self : defaults.Settings) : Result Bool := do
+  ok self.noexec
+
+/-- [sudo_rs::defaults::{sudo_rs::defaults::Settings}::env_keep]:
+    Source: 'src/defaults/settings_dsl.rs', lines 167:16-169:17; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 30:0-84:1 -/
+def defaults.Settings.impl.env_keep
+  (self : defaults.Settings) :
+  Result (std.collections.hash.set.HashSet String std.hash.random.RandomState
+    alloc.alloc.Global)
+  := do
+  ok self.env_keep
+
+/-- [sudo_rs::defaults::{sudo_rs::defaults::Settings}::env_check]:
+    Source: 'src/defaults/settings_dsl.rs', lines 167:16-169:17; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 30:0-84:1 -/
+def defaults.Settings.impl.env_check
+  (self : defaults.Settings) :
+  Result (std.collections.hash.set.HashSet String std.hash.random.RandomState
+    alloc.alloc.Global)
+  := do
+  ok self.env_check
+
+/-- [sudo_rs::defaults::{sudo_rs::defaults::Settings}::secure_path]:
+    Source: 'src/defaults/settings_dsl.rs', lines 167:16-169:17; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 30:0-84:1 -/
+def defaults.Settings.impl.secure_path
+  (self : defaults.Settings) : Result (Option Str) := do
+  core.option.Option.as_deref (core.ops.deref.DerefBoxInst Str)
+    self.secure_path
+
+/-- [sudo_rs::defaults::{sudo_rs::defaults::Settings}::umask]:
+    Source: 'src/defaults/settings_dsl.rs', lines 167:16-169:17; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 30:0-84:1 -/
+def defaults.Settings.impl.umask
+  (self : defaults.Settings) : Result Std.U64 := do
+  ok self.umask
+
+/-- [sudo_rs::defaults::{sudo_rs::defaults::Settings}::umask_override]:
+    Source: 'src/defaults/settings_dsl.rs', lines 167:16-169:17; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 30:0-84:1 -/
+def defaults.Settings.impl.umask_override
+  (self : defaults.Settings) : Result Bool := do
+  ok self.umask_override
+
+/-- [sudo_rs::defaults::{sudo_rs::defaults::Settings}::log_allowed]:
+    Source: 'src/defaults/settings_dsl.rs', lines 167:16-169:17; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 30:0-84:1 -/
+def defaults.Settings.impl.log_allowed
+  (self : defaults.Settings) : Result Bool := do
+  ok self.log_allowed
+
+/-- [sudo_rs::defaults::{sudo_rs::defaults::Settings}::passwd_tries]:
+    Source: 'src/defaults/settings_dsl.rs', lines 167:16-169:17; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 30:0-84:1 -/
+def defaults.Settings.impl.passwd_tries
+  (self : defaults.Settings) : Result Std.U64 := do
+  ok self.passwd_tries
+
+/-- [sudo_rs::defaults::{sudo_rs::defaults::Settings}::timestamp_timeout]:
+    Source: 'src/defaults/settings_dsl.rs', lines 167:16-169:17; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 30:0-84:1 -/
+def defaults.Settings.impl.timestamp_timeout
+  (self : defaults.Settings) : Result Std.U64 := do
+  ok self.timestamp_timeout
+
+/-- [sudo_rs::defaults::{sudo_rs::defaults::Settings}::pwfeedback]:
+    Source: 'src/defaults/settings_dsl.rs', lines 167:16-169:17; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 30:0-84:1 -/
+def defaults.Settings.impl.pwfeedback
+  (self : defaults.Settings) : Result Bool := do
+  ok self.pwfeedback
+
+/-- [sudo_rs::defaults::{sudo_rs::defaults::Settings}::passwd_timeout]:
+    Source: 'src/defaults/settings_dsl.rs', lines 167:16-169:17; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 30:0-84:1 -/
+def defaults.Settings.impl.passwd_timeout
+  (self : defaults.Settings) : Result Std.U64 := do
+  ok self.passwd_timeout
+
+/-- [sudo_rs::defaults::{sudo_rs::defaults::Settings}::timestamp_type]:
+    Source: 'src/defaults/settings_dsl.rs', lines 167:16-169:17; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 30:0-84:1 -/
+def defaults.Settings.impl.timestamp_type
+  (self : defaults.Settings) : Result defaults.enums.timestamp_type := do
+  ok self.timestamp_type
+
+/-- [sudo_rs::defaults::{sudo_rs::defaults::Settings}::noninteractive_auth]:
+    Source: 'src/defaults/settings_dsl.rs', lines 167:16-169:17; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 30:0-84:1 -/
+def defaults.Settings.impl.noninteractive_auth
+  (self : defaults.Settings) : Result Bool := do
+  ok self.noninteractive_auth
+
+/-- [sudo_rs::defaults::{sudo_rs::defaults::Settings}::rootpw]:
+    Source: 'src/defaults/settings_dsl.rs', lines 167:16-169:17; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 30:0-84:1 -/
+def defaults.Settings.impl.rootpw
+  (self : defaults.Settings) : Result Bool := do
+  ok self.rootpw
+
+/-- [sudo_rs::defaults::{sudo_rs::defaults::Settings}::targetpw]:
+    Source: 'src/defaults/settings_dsl.rs', lines 167:16-169:17; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 30:0-84:1 -/
+def defaults.Settings.impl.targetpw
+  (self : defaults.Settings) : Result Bool := do
+  ok self.targetpw
+
+/-- [sudo_rs::defaults::{sudo_rs::defaults::Settings}::runcwd]:
+    Source: 'src/defaults/settings_dsl.rs', lines 167:16-169:17; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 30:0-84:1 -/
+def defaults.Settings.impl.runcwd
+  (self : defaults.Settings) : Result (Option Str) := do
+  core.option.Option.as_deref (core.ops.deref.DerefBoxInst Str) self.runcwd
 
 /-- [sudo_rs::sudoers::ast::{impl core::clone::Clone for sudo_rs::sudoers::ast::Authenticate}::clone]:
     Source: 'src/sudoers/ast.rs', lines 81:15-81:20
@@ -2197,5 +2329,213 @@ def sudoers.sanitize_alias_table
       (core.iter.traits.iterator.IteratorSliceIter (sudoers.ast.Def T)) i1
   sudoers.sanitize_alias_table_loop iter (fun v1 => v1) hs table v diagnostics
     dupe
+
+/-- [sudo_rs::sudoers::policy::{sudo_rs::defaults::Settings}::to_auth]:
+    Source: 'src/sudoers/policy.rs', lines 41:4-64:5 -/
+def sudoers.policy.Settings.to_auth
+  (self : defaults.Settings) (tag : sudoers.ast.Tag) :
+  Result sudoers.policy.Authentication
+  := do
+  let b ← sudoers.ast.Tag.needs_passwd tag
+  let i ← defaults.Settings.impl.passwd_tries self
+  let r ← U16.Insts.CoreConvertTryFromU64TryFromIntError.try_from i
+  let i1 ←
+    core.result.Result.unwrap core.num.error.TryFromIntError.Insts.CoreFmtDebug
+      r
+  let i2 ← defaults.Settings.impl.timestamp_timeout self
+  let d ← core.time.Duration.from_secs i2
+  let b1 ← defaults.Settings.impl.pwfeedback self
+  let timeout ← defaults.Settings.impl.passwd_timeout self
+  let o ←
+    match timeout with
+    | 0#uscalar => ok none
+    | _ => do
+           let d1 ← core.time.Duration.from_secs timeout
+           ok (some d1)
+  let tt ← defaults.Settings.impl.timestamp_type self
+  let «as» ←
+    match tt with
+    | defaults.enums.timestamp_type.tty =>
+      ok sudoers.policy.AuthenticationScope.Tty
+    | defaults.enums.timestamp_type.ppid =>
+      ok sudoers.policy.AuthenticationScope.PPid
+  let b2 ← defaults.Settings.impl.noninteractive_auth self
+  let b3 ← defaults.Settings.impl.rootpw self
+  if b3
+  then
+    ok
+      {
+        must_authenticate := b,
+        credential := sudoers.policy.AuthenticatingUser.Root,
+        allowed_attempts := i1,
+        prior_validity := d,
+        pwfeedback := b1,
+        password_timeout := o,
+        noninteractive_auth := b2,
+        scope := «as»
+      }
+  else
+    let b4 ← defaults.Settings.impl.targetpw self
+    if b4
+    then
+      ok
+        {
+          must_authenticate := b,
+          credential := sudoers.policy.AuthenticatingUser.TargetUser,
+          allowed_attempts := i1,
+          prior_validity := d,
+          pwfeedback := b1,
+          password_timeout := o,
+          noninteractive_auth := b2,
+          scope := «as»
+        }
+    else
+      ok
+        {
+          must_authenticate := b,
+          credential := sudoers.policy.AuthenticatingUser.InvokingUser,
+          allowed_attempts := i1,
+          prior_validity := d,
+          pwfeedback := b1,
+          password_timeout := o,
+          noninteractive_auth := b2,
+          scope := «as»
+        }
+
+/-- [sudo_rs::sudoers::policy::{sudo_rs::sudoers::Judgement}::authorization::{closure}::{impl core::ops::function::FnOnce<(&'_1 str,), core::option::Option<sudo_rs::sudoers::tokens::ChDir>> for sudo_rs::sudoers::policy::{sudo_rs::sudoers::Judgement}::authorization::{closure}::{closure}<'_0, '_1>}::call_once]:
+    Source: 'src/sudoers/policy.rs', lines 143:56-145:25 -/
+def
+  sudoers.policy.Judgement.authorization.closure.closure.Insts.CoreOpsFunctionFnOnceTupleShared1StrOptionChDir.call_once
+  (c : sudoers.policy.Judgement.authorization.closure.closure)
+  (tupled_args : Str) :
+  Result (Option sudoers.tokens.ChDir)
+  := do
+  let s ←
+    alloc.string.String.Insts.CoreConvertFromShared0Str.from tupled_args
+  let r ←
+    sudoers.tokens.ChDir.Insts.Sudo_rsSudoersBasic_parserToken.construct s
+  core.result.Result.ok r
+
+/-- Trait implementation: [sudo_rs::sudoers::policy::{sudo_rs::sudoers::Judgement}::authorization::{closure}::{impl core::ops::function::FnOnce<(&'_1 str,), core::option::Option<sudo_rs::sudoers::tokens::ChDir>> for sudo_rs::sudoers::policy::{sudo_rs::sudoers::Judgement}::authorization::{closure}::{closure}<'_0, '_1>}]
+    Source: 'src/sudoers/policy.rs', lines 143:56-145:25 -/
+@[reducible]
+def
+  sudoers.policy.Judgement.authorization.closure.closure.Insts.CoreOpsFunctionFnOnceTupleShared1StrOptionChDir
+  : core.ops.function.FnOnce
+  sudoers.policy.Judgement.authorization.closure.closure Str (Option
+  sudoers.tokens.ChDir) := {
+  call_once :=
+    sudoers.policy.Judgement.authorization.closure.closure.Insts.CoreOpsFunctionFnOnceTupleShared1StrOptionChDir.call_once
+}
+
+/-- [sudo_rs::sudoers::policy::{sudo_rs::sudoers::Judgement}::authorization::{impl core::ops::function::FnOnce<(), core::option::Option<sudo_rs::sudoers::tokens::ChDir>> for sudo_rs::sudoers::policy::{sudo_rs::sudoers::Judgement}::authorization::{closure}<'_0>}::call_once]:
+    Source: 'src/sudoers/policy.rs', lines 141:57-146:21 -/
+def
+  sudoers.policy.Judgement.authorization.closure.Insts.CoreOpsFunctionFnOnceTupleOptionChDir.call_once
+  (c : sudoers.policy.Judgement.authorization.closure) (_ : Unit) :
+  Result (Option sudoers.tokens.ChDir)
+  := do
+  let o ← defaults.Settings.impl.runcwd c.settings
+  core.option.Option.and_then
+    sudoers.policy.Judgement.authorization.closure.closure.Insts.CoreOpsFunctionFnOnceTupleShared1StrOptionChDir
+    o ()
+
+/-- Trait implementation: [sudo_rs::sudoers::policy::{sudo_rs::sudoers::Judgement}::authorization::{impl core::ops::function::FnOnce<(), core::option::Option<sudo_rs::sudoers::tokens::ChDir>> for sudo_rs::sudoers::policy::{sudo_rs::sudoers::Judgement}::authorization::{closure}<'_0>}]
+    Source: 'src/sudoers/policy.rs', lines 141:57-146:21 -/
+@[reducible]
+def
+  sudoers.policy.Judgement.authorization.closure.Insts.CoreOpsFunctionFnOnceTupleOptionChDir
+  : core.ops.function.FnOnce sudoers.policy.Judgement.authorization.closure
+  Unit (Option sudoers.tokens.ChDir) := {
+  call_once :=
+    sudoers.policy.Judgement.authorization.closure.Insts.CoreOpsFunctionFnOnceTupleOptionChDir.call_once
+}
+
+/-- [sudo_rs::sudoers::policy::{sudo_rs::sudoers::Judgement}::authorization]:
+    Source: 'src/sudoers/policy.rs', lines 118:4-182:5
+    Visibility: public -/
+def sudoers.policy.Judgement.authorization
+  (self : sudoers.Judgement) :
+  Result (sudoers.policy.Authorization sudoers.policy.Restrictions)
+  := do
+  let _ ← defaults.Settings.impl.apparmor_profile self.settings
+  match self.flags with
+  | none => ok sudoers.policy.Authorization.Forbidden
+  | some tag =>
+    let a ← sudoers.policy.Settings.to_auth self.settings tag
+    let b ← defaults.Settings.impl.use_pty self.settings
+    let b1 ←
+      match tag.env with
+      | sudoers.ast.EnvironmentControl.Implicit =>
+        defaults.Settings.impl.setenv self.settings
+      | sudoers.ast.EnvironmentControl.Setenv => ok true
+      | sudoers.ast.EnvironmentControl.Nosetenv => ok false
+    let b2 ←
+      match tag.noexec with
+      | sudoers.ast.ExecControl.Implicit =>
+        defaults.Settings.impl.noexec self.settings
+      | sudoers.ast.ExecControl.Exec => ok false
+      | sudoers.ast.ExecControl.Noexec => ok true
+    let hs ← defaults.Settings.impl.env_keep self.settings
+    let hs1 ← defaults.Settings.impl.env_check self.settings
+    let o ←
+      core.option.Option.Insts.CoreCloneClone.clone
+        sudoers.tokens.ChDir.Insts.CoreCloneClone tag.cwd
+    let o1 ←
+      core.option.Option.or_else
+        sudoers.policy.Judgement.authorization.closure.Insts.CoreOpsFunctionFnOnceTupleOptionChDir
+        o self
+    let dc ←
+      match o1 with
+      | none => ok (sudoers.policy.DirChange.Strict none)
+      | some cd =>
+        match cd with
+        | sudoers.tokens.ChDir.Path path =>
+          ok (sudoers.policy.DirChange.Strict (some path))
+        | sudoers.tokens.ChDir.Any => ok sudoers.policy.DirChange.Any
+    let o2 ← defaults.Settings.impl.secure_path self.settings
+    let i ← defaults.Settings.impl.umask self.settings
+    let r ← U32.Insts.CoreConvertTryFromU64TryFromIntError.try_from i
+    let mask ←
+      core.result.Result.expect
+        core.num.error.TryFromIntError.Insts.CoreFmtDebug r (toStr
+        "the umask parser should have prevented overflow")
+    let u ←
+      if mask = 511#u32
+      then ok exec.Umask.Preserve
+      else
+        do
+        let b3 ← defaults.Settings.impl.umask_override self.settings
+        if b3
+        then ok (exec.Umask.Override mask)
+        else ok (exec.Umask.Extend mask)
+    let b3 ← defaults.Settings.impl.log_allowed self.settings
+    if b3
+    then
+      ok (sudoers.policy.Authorization.Allowed a
+        {
+          use_pty := b,
+          trust_environment := b1,
+          noexec := b2,
+          env_keep := hs,
+          env_check := hs1,
+          chdir := dc,
+          path := o2,
+          umask := u,
+          log := sudoers.policy.Logging.Auth
+        })
+    else
+      ok (sudoers.policy.Authorization.Allowed a
+        {
+          use_pty := b,
+          trust_environment := b1,
+          noexec := b2,
+          env_keep := hs,
+          env_check := hs1,
+          chdir := dc,
+          path := o2,
+          umask := u,
+          log := sudoers.policy.Logging.Disabled
+        })
 
 end sudo_rs

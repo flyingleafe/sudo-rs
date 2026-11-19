@@ -21,6 +21,28 @@ set_option maxHeartbeats 1000000
 set_option maxRecDepth 2048
 open sudo_rs
 
+/-- [core::convert::num::{impl core::convert::TryFrom<u64, core::num::error::TryFromIntError> for u32}::try_from]:
+    Source: '/rustc/library/core/src/convert/num.rs', lines 383:12-383:64; this code is generated from a macro invocation at: '/rustc/library/core/src/convert/num.rs', lines 479:0-479:49
+    Name pattern: [core::convert::num::{core::convert::TryFrom<u32, u64, core::num::error::TryFromIntError>}::try_from]
+    Visibility: public -/
+@[rust_fun
+  "core::convert::num::{core::convert::TryFrom<u32, u64, core::num::error::TryFromIntError>}::try_from"]
+axiom U32.Insts.CoreConvertTryFromU64TryFromIntError.try_from
+  :
+  Std.U64 → Result (core.result.Result Std.U32
+    core.num.error.TryFromIntError)
+
+/-- [core::convert::num::{impl core::convert::TryFrom<u64, core::num::error::TryFromIntError> for u16}::try_from]:
+    Source: '/rustc/library/core/src/convert/num.rs', lines 383:12-383:64; this code is generated from a macro invocation at: '/rustc/library/core/src/convert/num.rs', lines 479:0-479:49
+    Name pattern: [core::convert::num::{core::convert::TryFrom<u16, u64, core::num::error::TryFromIntError>}::try_from]
+    Visibility: public -/
+@[rust_fun
+  "core::convert::num::{core::convert::TryFrom<u16, u64, core::num::error::TryFromIntError>}::try_from"]
+axiom U16.Insts.CoreConvertTryFromU64TryFromIntError.try_from
+  :
+  Std.U64 → Result (core.result.Result Std.U16
+    core.num.error.TryFromIntError)
+
 /-- [core::hash::impls::{impl core::hash::Hash for usize}::hash]:
     Source: '/rustc/library/core/src/hash/mod.rs', lines 813:16-813:56; this code is generated from a macro invocation at: '/rustc/library/core/src/hash/mod.rs', lines 831:4-844:5
     Name pattern: [core::hash::impls::{core::hash::Hash<usize>}::hash]
@@ -39,12 +61,53 @@ axiom Shared0T.Insts.CoreHashHash.hash
   core.hash.Hasher H) :
   T → H → Result H
 
+/-- [core::num::error::{impl core::fmt::Debug for core::num::error::TryFromIntError}::fmt]:
+    Source: '/rustc/library/core/src/num/error.rs', lines 8:9-8:14
+    Name pattern: [core::num::error::{core::fmt::Debug<core::num::error::TryFromIntError>}::fmt]
+    Visibility: public -/
+@[rust_fun
+  "core::num::error::{core::fmt::Debug<core::num::error::TryFromIntError>}::fmt"]
+axiom core.num.error.TryFromIntError.Insts.CoreFmtDebug.fmt
+  :
+  core.num.error.TryFromIntError → core.fmt.Formatter → Result
+    ((core.result.Result Unit core.fmt.Error) × core.fmt.Formatter)
+
 /-- [core::option::{core::option::Option<T>}::as_ref]:
     Source: '/rustc/library/core/src/option.rs', lines 743:4-743:44
     Name pattern: [core::option::{core::option::Option<@T>}::as_ref]
     Visibility: public -/
 @[rust_fun "core::option::{core::option::Option<@T>}::as_ref"]
 axiom core.option.Option.as_ref {T : Type _} : Option T → Result (Option T)
+
+/-- [core::option::{core::option::Option<T>}::as_deref]:
+    Source: '/rustc/library/core/src/option.rs', lines 1388:4-1390:25
+    Name pattern: [core::option::{core::option::Option<@T>}::as_deref]
+    Visibility: public -/
+@[rust_fun "core::option::{core::option::Option<@T>}::as_deref"]
+axiom core.option.Option.as_deref
+  {T : Type _} {Clause0_Target : Type _} (opsderefDerefInst :
+  core.ops.deref.Deref T Clause0_Target) :
+  Option T → Result (Option Clause0_Target)
+
+/-- [core::option::{core::option::Option<T>}::and_then]:
+    Source: '/rustc/library/core/src/option.rs', lines 1539:4-1541:61
+    Name pattern: [core::option::{core::option::Option<@T>}::and_then]
+    Visibility: public -/
+@[rust_fun "core::option::{core::option::Option<@T>}::and_then"]
+axiom core.option.Option.and_then
+  {T : Type _} {U : Type _} {F : Type _} (opsfunctionFnOnceFTupleTOptionInst :
+  core.ops.function.FnOnce F T (Option U)) :
+  Option T → F → Result (Option U)
+
+/-- [core::option::{core::option::Option<T>}::or_else]:
+    Source: '/rustc/library/core/src/option.rs', lines 1645:4-1650:28
+    Name pattern: [core::option::{core::option::Option<@T>}::or_else]
+    Visibility: public -/
+@[rust_fun "core::option::{core::option::Option<@T>}::or_else"]
+axiom core.option.Option.or_else
+  {T : Type _} {F : Type _} (opsfunctionFnOnceFTupleOptionInst :
+  core.ops.function.FnOnce F Unit (Option T)) :
+  Option T → F → Result (Option T)
 
 /-- [core::option::{impl core::clone::Clone for core::option::Option<T>}::clone]:
     Source: '/rustc/library/core/src/option.rs', lines 2278:4-2278:27
@@ -65,6 +128,14 @@ axiom core.option.Option.Insts.CoreCloneClone.clone
 axiom core.option.Option.Insts.CoreDefaultDefault.default
   (T : Type _) : Result (Option T)
 
+/-- [core::result::{core::result::Result<T, E>}::ok]:
+    Source: '/rustc/library/core/src/result.rs', lines 709:4-712:28
+    Name pattern: [core::result::{core::result::Result<@T, @E>}::ok]
+    Visibility: public -/
+@[rust_fun "core::result::{core::result::Result<@T, @E>}::ok"]
+axiom core.result.Result.ok
+  {T : Type _} {E : Type _} : core.result.Result T E → Result (Option T)
+
 /-- [core::slice::{[T]}::starts_with]:
     Source: '/rustc/library/core/src/slice/mod.rs', lines 2632:4-2634:21
     Name pattern: [core::slice::{[@T]}::starts_with]
@@ -80,6 +151,13 @@ axiom core.slice.Slice.starts_with
     Visibility: public -/
 @[rust_fun "core::str::traits::{core::cmp::PartialEq<str, str>}::eq"]
 axiom Str.Insts.CoreCmpPartialEqStr.eq : Str → Str → Result Bool
+
+/-- [core::time::{core::time::Duration}::from_secs]:
+    Source: '/rustc/library/core/src/time.rs', lines 224:4-224:49
+    Name pattern: [core::time::{core::time::Duration}::from_secs]
+    Visibility: public -/
+@[rust_fun "core::time::{core::time::Duration}::from_secs"]
+axiom core.time.Duration.from_secs : Std.U64 → Result core.time.Duration
 
 /-- [std::collections::hash::set::{std::collections::hash::set::HashSet<T, std::hash::random::RandomState, alloc::alloc::Global>}::new]:
     Source: '/rustc/library/std/src/collections/hash/set.rs', lines 149:4-149:43
@@ -212,6 +290,15 @@ axiom alloc.string.String.Insts.CoreHashHash.hash
 axiom alloc.string.String.Insts.CoreOpsDerefDerefStr.deref
   : String → Result Str
 
+/-- [alloc::string::{impl core::convert::From<&'_0 str> for alloc::string::String}::from]:
+    Source: '/rustc/library/alloc/src/string.rs', lines 3185:4-3185:30
+    Name pattern: [alloc::string::{core::convert::From<alloc::string::String, &'0 str>}::from]
+    Visibility: public -/
+@[rust_fun
+  "alloc::string::{core::convert::From<alloc::string::String, &'0 str>}::from"]
+axiom alloc.string.String.Insts.CoreConvertFromShared0Str.from
+  : Str → Result String
+
 /-- [alloc::vec::{impl core::default::Default for alloc::vec::Vec<T>}::default]:
     Source: '/rustc/library/alloc/src/vec/mod.rs', lines 4417:4-4417:26
     Name pattern: [alloc::vec::{core::default::Default<alloc::vec::Vec<@T>>}::default]
@@ -264,4 +351,10 @@ axiom sudoers.alias_diagnostic
   :
   alloc.vec.Vec sudoers.Error → sudoers.AliasDiagnostic → Str → Result
     (alloc.vec.Vec sudoers.Error)
+
+/-- [sudo_rs::sudoers::tokens::{impl sudo_rs::sudoers::basic_parser::Token for sudo_rs::sudoers::tokens::ChDir}::construct]:
+    Source: 'src/sudoers/tokens.rs', lines 440:4-450:5
+    Visibility: public -/
+axiom sudoers.tokens.ChDir.Insts.Sudo_rsSudoersBasic_parserToken.construct
+  : String → Result (core.result.Result sudoers.tokens.ChDir String)
 

@@ -179,3 +179,84 @@ def sudoers.alias_diagnostic (diagnostics : alloc.vec.Vec sudoers.Error)
     | .Recursive => s!"recursive alias: '{aliasName}'"
     | .Duplicate => s!"multiple occurrences of '{aliasName}'"
   diagnostics.push { source := none, location := none, message }
+
+/-! ### Models used by `Judgement::authorization` and `Settings::to_auth` -/
+
+namespace sudo_rs
+
+/-- The text of a `&str`: its bytes decoded as UTF-8. A Rust `&str` is always valid UTF-8, so
+the decoding is lossless on every value that has a Rust counterpart. -/
+def stringOfStr (b : Str) : String :=
+  String.fromUTF8Lossy ⟨(b.val.map fun u => UInt8.ofNat u.val).toArray⟩
+
+/-- The message of `Error::PathValidation(path).to_string()` for a rejected `ChDir` path. Its
+text is not modelled; the only caller in the extracted code discards it (`.ok()`). -/
+opaque chdirPathErrorText : String → String
+
+end sudo_rs
+
+/-- [core::convert::num::{impl core::convert::TryFrom<u64> for u16}::try_from]: `Ok` iff the
+value fits. Same model as the Aeneas library's `TryFrom<usize> for u32`. -/
+def U16.Insts.CoreConvertTryFromU64TryFromIntError.try_from (i : U64) :
+    Result (core.result.Result U16 core.num.error.TryFromIntError) :=
+  core.num.tryFromUScalar .U16 i
+
+/-- [core::convert::num::{impl core::convert::TryFrom<u64> for u32}::try_from]. -/
+def U32.Insts.CoreConvertTryFromU64TryFromIntError.try_from (i : U64) :
+    Result (core.result.Result U32 core.num.error.TryFromIntError) :=
+  core.num.tryFromUScalar .U32 i
+
+/-- [core::num::error::{impl core::fmt::Debug for core::num::error::TryFromIntError}::fmt]: only
+fills the trait dictionary that `unwrap`/`expect` take; their models ignore it. -/
+opaque core.num.error.TryFromIntError.Insts.CoreFmtDebug.fmt :
+  core.num.error.TryFromIntError → core.fmt.Formatter →
+    Result ((core.result.Result Unit core.fmt.Error) × core.fmt.Formatter)
+
+/-- [core::option::{core::option::Option<T>}::as_deref]: `self.as_ref().map(|t| t.deref())`. -/
+def core.option.Option.as_deref {T : Type _} {Target : Type _}
+    (derefInst : core.ops.deref.Deref T Target) : Option T → Result (Option Target)
+  | none => ok none
+  | some x => do
+    let y ← derefInst.deref x
+    ok (some y)
+
+/-- [core::option::{core::option::Option<T>}::and_then]. -/
+def core.option.Option.and_then {T : Type _} {U : Type _} {F : Type _}
+    (fnInst : core.ops.function.FnOnce F T (Option U)) : Option T → F → Result (Option U)
+  | none, _ => ok none
+  | some x, f => fnInst.call_once f x
+
+/-- [core::option::{core::option::Option<T>}::or_else]. -/
+def core.option.Option.or_else {T : Type _} {F : Type _}
+    (fnInst : core.ops.function.FnOnce F Unit (Option T)) : Option T → F → Result (Option T)
+  | some x, _ => ok (some x)
+  | none, f => fnInst.call_once f ()
+
+/-- [core::result::{core::result::Result<T, E>}::ok]. -/
+def core.result.Result.ok {T : Type _} {E : Type _} :
+    core.result.Result T E → Result (Option T)
+  | .Ok x => Aeneas.Std.Result.ok (some x)
+  | .Err _ => Aeneas.Std.Result.ok none
+
+/-- [core::time::{core::time::Duration}::from_secs]: `Duration { secs, nanos: 0 }`; cannot
+panic. -/
+def core.time.Duration.from_secs (secs : U64) : Result core.time.Duration :=
+  ok { secs, nanos := 0#u32 }
+
+/-- [alloc::string::{impl core::convert::From<&str> for alloc::string::String}::from]: copies the
+bytes. -/
+def alloc.string.String.Insts.CoreConvertFromShared0Str.from (s : Str) : Result String :=
+  ok (stringOfStr s)
+
+/-- [sudo_rs::sudoers::tokens::{impl Token for ChDir}::construct] (`src/sudoers/tokens.rs`
+lines 440-450), kept opaque for Charon (it reaches `str::contains`, whose `Pattern` trait Aeneas
+cannot translate). `"*"` is `Any`; any other text with a `*` is rejected; otherwise
+`SudoPath::try_from` (`src/common/path.rs` lines 19-34, 86-92) rejects text with a NUL byte
+(the UTF-8 check cannot fail on a `String`) and keeps the text unchanged. In UTF-8 the bytes
+`*` and NUL only occur as the characters `'*'` and `'\x00'`. -/
+def sudoers.tokens.ChDir.Insts.Sudo_rsSudoersBasic_parserToken.construct (s : String) :
+    Result (core.result.Result sudoers.tokens.ChDir String) :=
+  if s = "*" then ok (.Ok .Any)
+  else if s.toList.contains '*' then ok (.Err "path cannot contain '*'")
+  else if s.toList.contains (Char.ofNat 0) then ok (.Err (chdirPathErrorText s))
+  else ok (.Ok (.Path ⟨s⟩))

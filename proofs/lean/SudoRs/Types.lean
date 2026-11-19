@@ -46,6 +46,81 @@ structure glob.MatchOptions where
 structure common.path.SudoPath where
   inner : String
 
+/-- [sudo_rs::defaults::enums::timestamp_type]
+    Source: 'src/defaults/settings_dsl.rs', lines 154:16-154:62; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 30:0-84:1 -/
+@[discriminant isize]
+inductive defaults.enums.timestamp_type where
+| tty : defaults.enums.timestamp_type
+| ppid : defaults.enums.timestamp_type
+
+/-- [sudo_rs::defaults::enums::verifypw]
+    Source: 'src/defaults/settings_dsl.rs', lines 154:16-154:62; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 30:0-84:1 -/
+@[discriminant isize]
+inductive defaults.enums.verifypw where
+| all : defaults.enums.verifypw
+| always : defaults.enums.verifypw
+| any : defaults.enums.verifypw
+| never : defaults.enums.verifypw
+
+/-- [sudo_rs::defaults::enums::lecture]
+    Source: 'src/defaults/settings_dsl.rs', lines 154:16-154:62; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 30:0-84:1 -/
+@[discriminant isize]
+inductive defaults.enums.lecture where
+| always : defaults.enums.lecture
+| once : defaults.enums.lecture
+| never : defaults.enums.lecture
+
+/-- [sudo_rs::defaults::Settings]
+    Source: 'src/defaults/settings_dsl.rs', lines 159:8-161:9; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 30:0-84:1 -/
+structure defaults.Settings where
+  always_query_group_plugin : Bool
+  always_set_home : Bool
+  env_reset : Bool
+  fqdn : Bool
+  ignore_dot : Bool
+  lecture : defaults.enums.lecture
+  mailerpath : Option Str
+  mail_badpass : Bool
+  match_group_by_gid : Bool
+  use_pty : Bool
+  visiblepw : Bool
+  pwfeedback : Bool
+  rootpw : Bool
+  targetpw : Bool
+  noexec : Bool
+  noninteractive_auth : Bool
+  log_allowed : Bool
+  log_denied : Bool
+  insults : Bool
+  setenv : Bool
+  runcwd : Option Str
+  apparmor_profile : Option Str
+  umask : Std.U64
+  umask_override : Bool
+  passwd_tries : Std.U64
+  secure_path : Option Str
+  verifypw : defaults.enums.verifypw
+  passwd_timeout : Std.U64
+  timestamp_timeout : Std.U64
+  timestamp_type : defaults.enums.timestamp_type
+  editor : Str
+  env_editor : Bool
+  env_keep : std.collections.hash.set.HashSet String
+    std.hash.random.RandomState alloc.alloc.Global
+  env_check : std.collections.hash.set.HashSet String
+    std.hash.random.RandomState alloc.alloc.Global
+  env_delete : std.collections.hash.set.HashSet String
+    std.hash.random.RandomState alloc.alloc.Global
+
+/-- [sudo_rs::exec::Umask]
+    Source: 'src/exec/mod.rs', lines 54:0-61:1
+    Visibility: public -/
+@[discriminant u32 [86649125,181786330,1775640520]]
+inductive exec.Umask where
+| Preserve : exec.Umask
+| Extend : Std.U32 → exec.Umask
+| Override : Std.U32 → exec.Umask
+
 /-- [sudo_rs::sudoers::ast::Qualified]
     Source: 'src/sudoers/ast.rs', lines 15:0-18:1
     Visibility: public -/
@@ -222,6 +297,13 @@ structure sudoers.ListRequest (User : Type _) (Group : Type _) (Clause0_Group :
   target_user : User
   target_group : Group
 
+/-- [sudo_rs::sudoers::Judgement]
+    Source: 'src/sudoers/mod.rs', lines 72:0-75:1
+    Visibility: public -/
+structure sudoers.Judgement where
+  flags : Option sudoers.ast.Tag
+  settings : defaults.Settings
+
 /-- [sudo_rs::sudoers::VecOrd]
     Source: 'src/sudoers/mod.rs', lines 423:0-423:37 -/
 def sudoers.VecOrd (T : Type _) := alloc.vec.Vec Std.Usize × alloc.vec.Vec T
@@ -337,5 +419,88 @@ structure sudoers.sanitize_alias_table.Visitor (T : Type _) where
   table : alloc.vec.Vec (sudoers.ast.Def T)
   order : alloc.vec.Vec Std.Usize
   diagnostics : alloc.vec.Vec sudoers.Error
+
+/-- [sudo_rs::sudoers::policy::AuthenticationScope]
+    Source: 'src/sudoers/policy.rs', lines 112:0-115:1
+    Visibility: public -/
+@[discriminant u32 [86649125,181786330]]
+inductive sudoers.policy.AuthenticationScope where
+| Tty : sudoers.policy.AuthenticationScope
+| PPid : sudoers.policy.AuthenticationScope
+
+/-- [sudo_rs::sudoers::policy::AuthenticatingUser]
+    Source: 'src/sudoers/policy.rs', lines 101:0-105:1
+    Visibility: public -/
+@[discriminant u32 [86649125,181786330,1775640520]]
+inductive sudoers.policy.AuthenticatingUser where
+| InvokingUser : sudoers.policy.AuthenticatingUser
+| Root : sudoers.policy.AuthenticatingUser
+| TargetUser : sudoers.policy.AuthenticatingUser
+
+/-- [sudo_rs::sudoers::policy::Authentication]
+    Source: 'src/sudoers/policy.rs', lines 29:0-38:1
+    Visibility: public -/
+structure sudoers.policy.Authentication where
+  must_authenticate : Bool
+  credential : sudoers.policy.AuthenticatingUser
+  allowed_attempts : Std.U16
+  prior_validity : core.time.Duration
+  pwfeedback : Bool
+  password_timeout : Option core.time.Duration
+  noninteractive_auth : Bool
+  scope : sudoers.policy.AuthenticationScope
+
+/-- [sudo_rs::sudoers::policy::Authorization]
+    Source: 'src/sudoers/policy.rs', lines 22:0-25:1
+    Visibility: public -/
+@[discriminant u32 [86649125,181786330]]
+inductive sudoers.policy.Authorization (T : Type _) where
+| Allowed :
+  sudoers.policy.Authentication →
+  T →
+  sudoers.policy.Authorization T
+| Forbidden : sudoers.policy.Authorization T
+
+/-- [sudo_rs::sudoers::policy::Logging]
+    Source: 'src/sudoers/policy.rs', lines 94:0-97:1
+    Visibility: public -/
+@[discriminant u32 [86649125,181786330]]
+inductive sudoers.policy.Logging where
+| Auth : sudoers.policy.Logging
+| Disabled : sudoers.policy.Logging
+
+/-- [sudo_rs::sudoers::policy::DirChange]
+    Source: 'src/sudoers/policy.rs', lines 86:0-89:1
+    Visibility: public -/
+@[discriminant u32 [86649125,181786330]]
+inductive sudoers.policy.DirChange where
+| Strict : Option common.path.SudoPath → sudoers.policy.DirChange
+| Any : sudoers.policy.DirChange
+
+/-- [sudo_rs::sudoers::policy::Restrictions]
+    Source: 'src/sudoers/policy.rs', lines 69:0-81:1
+    Visibility: public -/
+structure sudoers.policy.Restrictions where
+  use_pty : Bool
+  trust_environment : Bool
+  noexec : Bool
+  env_keep : std.collections.hash.set.HashSet String
+    std.hash.random.RandomState alloc.alloc.Global
+  env_check : std.collections.hash.set.HashSet String
+    std.hash.random.RandomState alloc.alloc.Global
+  chdir : sudoers.policy.DirChange
+  path : Option Str
+  umask : exec.Umask
+  log : sudoers.policy.Logging
+
+/-- [sudo_rs::sudoers::policy::{sudo_rs::sudoers::Judgement}::authorization::{closure}::{closure}]
+    Source: 'src/sudoers/policy.rs', lines 143:56-145:25 -/
+@[reducible]
+def sudoers.policy.Judgement.authorization.closure.closure := Unit
+
+/-- [sudo_rs::sudoers::policy::{sudo_rs::sudoers::Judgement}::authorization::{closure}]
+    Source: 'src/sudoers/policy.rs', lines 141:57-146:21 -/
+@[reducible]
+def sudoers.policy.Judgement.authorization.closure := sudoers.Judgement
 
 end sudo_rs
