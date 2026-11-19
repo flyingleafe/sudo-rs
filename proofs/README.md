@@ -19,18 +19,21 @@ synthetic policy that permits one user with explicit tags and denies another.
 They retain the glob-interface assumption. A separate spec-level negative
 control proves that an always-deny decision does not refine the spec.
 
-The theorem assumes valid alias-order indices, representable string and
-modifier lengths, and agreement of the identity and command-matching
-interfaces with their oracles. Host matching is literal. The Rust modifier
-enum now represents only explicit tag updates, so no separate modifier
-well-formedness hypothesis is required. See [the assumptions ledger](lean/ASSUMPTIONS.md)
-for exact hypotheses and external models. The axiom audit checks the Lean proof terms; it does not
-verify the Charon/Aeneas translation or the faithfulness of hand-written models.
+The decision theorem assumes valid alias-order indices, representable string and
+modifier lengths, and agreement of the identity and command-matching interfaces
+with their oracles. Host matching is literal. Only explicit tag updates are
+representable as Rust modifiers, so no separate modifier invariant is required.
+See [the assumptions ledger](lean/ASSUMPTIONS.md) for exact hypotheses and external
+models. The axiom audit does not verify the Charon/Aeneas translation or the
+faithfulness of hand-written models.
 
-The parser, alias preprocessing, real OS identity lookup, glob matching, credential
-changes, authentication, command execution, rustc, and the deployed binary are
-outside the refinement theorem. The Quint lifecycle model is a separate abstraction;
-its simulation and bounded checks are not proofs about the Rust execution path.
+[The alias producer proof](lean/SudoRsProofs/SanitizeAliases.lean) discharges the
+index premise for successfully returned orders. It does not establish sanitizer
+termination, diagnostic correctness, or that the output is topologically sorted.
+The rest of the parser and alias preprocessing, real OS identity lookup, glob
+matching, credential changes, authentication, command execution, rustc, and the
+deployed binary are outside the verified boundary. The Quint lifecycle model is a
+separate abstraction, not a proof about the Rust execution path.
 
 The fork changes alias-membership storage from a hash table to a linear list for
 extraction. Resolving many dependent aliases can therefore be quadratic. Treat
@@ -166,6 +169,6 @@ Upstream code at `81dff9a1`, one `--start-from` per function:
 | `check_permission` | fatal, no output: `dyn` in `CommandSpec`, `CustomiserTable`, `SudoLogger`; `str::rsplitn` / `core::str::pattern::Pattern` unimplemented (reached via `tokens.rs` `Token::construct` impls); bodies of `matching_user_specs`, `get_aliases`, `distribute_tags` fail |
 | whole `crate::sudoers` | fatal, no output |
 
-These are baseline experiments, not the status of the current extraction. The
-committed `lean/SudoRs/` is generated from the refactored `permission_flags` entry
-point. Run the extraction drift check above to compare it with the current source.
+These are baseline experiments. The committed `lean/SudoRs/` is now generated
+from `permission_flags` and `sanitize_alias_table`. Run the extraction drift check
+above to compare it with the current source.
