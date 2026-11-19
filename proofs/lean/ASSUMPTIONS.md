@@ -15,7 +15,8 @@ it, so a theorem that depends on its behaviour has to take that behaviour as a h
 |---|---|---|
 | `core.ffi.c_str.CStr` | `structure { str : String }` | Only ever produced by `SudoString::as_cstr` in the extracted code; represented by its text without the trailing NUL. |
 | `std.ffi.os_str.OsString` | `opaque` type | Command arguments; only compared for equality. |
-| `std.path.Path` | `opaque` type | Command path; only passed to the glob matcher. |
+| `std.ffi.os_str.OsStr` | `opaque` type | Only the argument of `Path::new("list")` in `list_flags`; never inspected. |
+| `std.path.Path` | `opaque` type | Command path; only passed to the glob matcher (and produced by `Path::new("list")` in `list_flags`). |
 | `std.path.PathBuf` | `opaque` type | The sanitizer's diagnostics have no source path. |
 | `std.collections.hash.set.HashSet` | list of keys | The sanitizer observes only `new` and `insert`, not bucket layout or key order. |
 | `std.hash.random.RandomState`, `std.hash.random.DefaultHasher` | `opaque` types | Hash seeding and hash states are not observed by the extensional set model. |
@@ -46,6 +47,8 @@ Helpers: `sudo_rs.stringBytes s` = the UTF-8 bytes of `s` as `U8`s; `sudo_rs.str
 | `Box.Insts.CoreConvertAsRef.as_ref` | `ok x` | Boxes and borrows are erased. |
 | `glob.MatchOptions.new` | `{ case_sensitive := true, require_literal_separator := false, require_literal_leading_dot := false }` | glob 0.3.4 `src/lib.rs` lines 1102-1108. |
 | `glob.Pattern.matches_path_with` | **`opaque`**, `Pattern → Path → MatchOptions → Result Bool` | Glob semantics is not modelled. A theorem about `match_command` has to assume its behaviour (e.g. `∀ pat path opts, matches_path_with pat path opts = ok (g pat path opts)`). |
+| `Str.Insts.CoreConvertAsRefOsStr.as_ref` | **`opaque`**, `Str → Result OsStr` | `impl AsRef<OsStr> for str`; the trait dictionary `Path::new` receives. Nothing is assumed about it. |
+| `std.path.Path.new` | **`opaque`**, `AsRef S OsStr → S → Result Path` | `Path` is abstract, so is its constructor. Its only call, `Path::new("list")` in `list_flags`, is described by the hypothesis `ListPath A` of `list_flags_spec`. |
 | `common.string.SudoString.as_cstr` | `ok ⟨s.str⟩` | The `unwrap` cannot fail: a `SudoString` has no interior NUL and ends in one. |
 | `common.string.SudoString.Insts.CoreOpsDerefDerefStr.deref` | `strOfString s.str` | The text without the trailing NUL. |
 | `common.string.SudoString.Insts.CoreCmpPartialEqStr.eq` | `deref` then `str ==` | Rust: `let s: &str = self; s == other`. |
@@ -92,6 +95,28 @@ above is discharged inside the proofs.
 | `hH : O.SudoRsHosts` | `O.hostMatches p h = (p == h)`. | sudo-rs (`match_token`) compares host names by string equality; the spec allows any host predicate. |
 | `hpol : PolicyOK rules aliases` (`AbsPolicy.lean`) | Alias tables: valid processing orders (`TableWF`), names that fit (`TableFits`), identifier names that fit (`TableGood`). Rules: user/host lists and runas user/group lists with names that fit (`ItemsFit`, `ItemsGood UserSpecFits / IdentFits / Fits`), command alias names that fit (`CmdOK`), and modifier counts per line that fit in `usize`. | This collects the side conditions required by the decision proof. There is no checked theorem here that parsing and `analyze` establish them. |
 | `hhost : Fits onHost.inner` | The current host name fits in memory. | `Deref<str>` of `system::Hostname`. |
+
+## Hypotheses of the `sudo -v` / `sudo -l` theorems
+
+`validate_flags_spec` / `validate_flags_eq` (against `SudoersSpec.validateFlags`), in
+`SudoRsProofs/ListValidate.lean`, take `hO`, `hH`, `hpol`, `hhost` as above and nothing else;
+`validate_flags` never reaches the glob matcher, so there is no `GlobOracle` (the command
+abstraction `A` only appears through `absPolicy`). `list_flags_self_spec` (listing one's own
+entries, `O.userEq inspected invoking = true`) takes the same four. `list_flags_spec` /
+`list_flags_eq` (against `SudoersSpec.listFlags`) take the hypotheses of `permission_flags_eq`
+plus the two below; `hO` is stated for `gInst := uInst.UnixGroupInst`, i.e. for a `ListRequest`
+whose group type is `User::Group` (the only instantiation in sudo-rs: `system::User`,
+`system::Group`).
+
+| Hypothesis | Meaning | Why it is needed |
+|---|---|---|
+| `hgrp : GroupOracle uInst grp` | `∀ u, uInst.group u = ok (grp u)`: `UnixUser::group` is pure and total; `grp` is the primary group the spec uses for the `list` request. | `list_flags` asks for `request.inspected_user.group()` to build the request `Sudoers::check` decides for `sudo -l -U`. `InstOracle` does not cover `group`. |
+| `hpath : ListPath A` | `∃ p, Path::new("list") = ok p ∧ A.path p = "list"`. | `Path::new` and `Path` are opaque; the spec's `list` request has the command text `"list"`. |
+
+The extracted `list_flags` calls `UnixUser::is_root` once in the other-user branch, where the
+Rust calls it twice (for `skip_passwd` and for the root fallback): the translation shares the two
+calls. Under `InstOracle` (`is_root` is a function of the user) this changes nothing, but it is a
+point where the model is not a literal transcription of the source.
 
 The theorems quantify over the oracle `O`, the abstraction `A`, the instances and all inputs, so
 they hold for every OS user database and glob semantics consistent with the hypotheses.

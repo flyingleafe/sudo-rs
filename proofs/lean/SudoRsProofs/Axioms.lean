@@ -1,6 +1,7 @@
 import SudoRsProofs.GetAliases
 import SudoRsProofs.SanitizeAliases
 import SudoRsProofs.Permission
+import SudoRsProofs.ListValidate
 import SudoRsProofs.NonVacuity
 
 /-!
@@ -39,3 +40,14 @@ of `SudoRs/{Types,Funs}External.lean` are definitions or `opaque` constants, nev
 #print axioms SudoRsProofs.NonVacuity.permits_member
 #print axioms SudoRsProofs.NonVacuity.denies_excluded_member
 #print axioms SudoRsProofs.NonVacuity.deny_only_not_refinement
+#print axioms SudoRsProofs.selRules_eq
+#print axioms SudoRsProofs.select_commands_spec
+#print axioms SudoRsProofs.select_tag_spec
+#print axioms SudoRsProofs.validate_flags_spec
+#print axioms SudoRsProofs.validate_flags_eq
+#print axioms SudoRsProofs.list_flags_self_spec
+#print axioms SudoRsProofs.list_flags_spec
+#print axioms SudoRsProofs.list_flags_eq
+#print axioms SudoRsProofs.NonVacuity.validate_member
+#print axioms SudoRsProofs.NonVacuity.validate_excluded
+#print axioms SudoRsProofs.NonVacuity.list_self_member

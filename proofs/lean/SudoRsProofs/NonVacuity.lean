@@ -1,4 +1,4 @@
-import SudoRsProofs.Permission
+import SudoRsProofs.ListValidate
 
 /-! Two synthetic requests for the same policy and host. Identity comes from a finite
 fixture, not NSS. The command path and the glob interface remain abstract: this is a
@@ -152,5 +152,55 @@ theorem deny_only_not_refinement (g : String → String → Bool) :
     ∃ (p : SudoersSpec.Policy) (r : SudoersSpec.Request Bool Unit),
       (none : Option SudoersSpec.Tag) ≠ SudoersSpec.authorize (oracle g) p r := by
   exact ⟨specPolicy, specRequest true "/fixture", by simp [spec_allows]⟩
+
+/-! `sudo -v` and `sudo -l` (own entries) on the same fixture. Neither reaches the glob matcher,
+`UnixUser::group` or `Path::new`, so these witnesses are unconditional. -/
+
+/-- Command abstraction for the fixture: no command pattern of the fixture is read. -/
+private def noGlob : GlobAbs := ⟨fun _ => "", fun _ => "", fun _ => ""⟩
+
+private def listRequest (u : Bool) : sudoers.ListRequest Bool Unit Unit := ⟨u, true, ()⟩
+
+/-- `sudo -v` by the member: granted with the line's tag, which needs a password. -/
+theorem validate_member :
+    ∃ t, sudoers.validate_flags userInst rules aliases true host = ok (some t) ∧
+      absTag t = expectedTag := by
+  obtain ⟨r, hr, habs⟩ := validate_flags_eq (A := noGlob) (instOracle fun _ _ => false)
+    (fun _ _ => rfl) rules aliases policyOK true host hostFits
+  change r.map absTag = SudoersSpec.validateFlags (oracle fun _ _ => false) specPolicy true
+    host.inner at habs
+  have : SudoersSpec.validateFlags (oracle fun _ _ => false) specPolicy true host.inner =
+    some expectedTag := rfl
+  rw [this] at habs
+  cases r <;> simp_all
+
+/-- `sudo -v` by the excluded user: refused. -/
+theorem validate_excluded :
+    sudoers.validate_flags userInst rules aliases false host = ok none := by
+  obtain ⟨r, hr, habs⟩ := validate_flags_eq (A := noGlob) (instOracle fun _ _ => false)
+    (fun _ _ => rfl) rules aliases policyOK false host hostFits
+  change r.map absTag = SudoersSpec.validateFlags (oracle fun _ _ => false) specPolicy false
+    host.inner at habs
+  have : SudoersSpec.validateFlags (oracle fun _ _ => false) specPolicy false host.inner =
+    none := rfl
+  rw [this] at habs
+  cases r <;> simp_all
+
+/-- `sudo -l` by the member for its own entries (target: itself with its group): granted
+without a password. -/
+theorem list_self_member :
+    ∃ t, sudoers.list_flags userInst eqInst userInst.UnixGroupInst rules aliases true host
+      (listRequest true) =
+      ok (some t) ∧ absTag t = { expectedTag with authenticate := .nopasswd } := by
+  obtain ⟨r, hr, habs⟩ := exists_eq_ok_of_spec (list_flags_self_spec (A := noGlob)
+    (instOracle fun _ _ => false) (fun _ _ => rfl) (fun _ => ()) rules aliases policyOK true host
+    hostFits (listRequest true) rfl)
+  change r.map absTag = SudoersSpec.listFlags (oracle fun _ _ => false) (fun _ => ()) specPolicy
+    ⟨true, host.inner, true, true, ()⟩ at habs
+  have : SudoersSpec.listFlags (oracle fun _ _ => false) (fun _ => ()) specPolicy
+      ⟨true, host.inner, true, true, ()⟩ = some { expectedTag with authenticate := .nopasswd } :=
+    rfl
+  rw [this] at habs
+  cases r <;> simp_all
 
 end SudoRsProofs.NonVacuity
