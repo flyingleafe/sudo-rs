@@ -206,6 +206,20 @@ compatibility differences, not findings about exploitability in deployed configu
 | F4 | For a same-user group request where the user belongs to the group, the implementations differ on an unmatched, nonempty runas user list. | Rust `src/sudoers/mod.rs`; C `match.c` |
 | F5 | For a same-user group request where the user is not a member of the requested group, the implementations differ on whether they consult the runas user list. | Rust `src/sudoers/mod.rs`; C `match.c` |
 
+### Upstream status of the differences
+
+Looked up on 2026-11-19 in the sudo-rs documentation, tests and issue tracker (upstream `main`
+equals the merge-base `81dff9a1`). Nothing was filed upstream. "None found" means a search
+found nothing, not that nothing exists.
+
+| Finding | Status in sudo-rs upstream | Evidence |
+|---|---|---|
+| F1 | Intended and documented. | `docs/man/sudoers.5.md`: `*` as the final argument means "zero or more subsequent arguments"; issue #1455; PR #1463. |
+| F2 | No test or discussion found. The man page says a rule without a Runas_Spec allows "only" root and that names are matched as strings. | `docs/man/sudoers.5.md` lines 128 and 222. |
+| F3 | The target user's own groups are accepted by design. The effect on an explicitly negated group is not discussed. | Issue #210, closed as not planned. |
+| F4 | No documentation, test or discussion found for the case where the user is already in the group. | Related: issue #403, PR #501. |
+| F5 | The case where the user list merely omits the invoker is intended. The case where it excludes the invoker is not discussed. | Issue #403, PR #501, issue #1561 (closed as invalid). |
+
 ### Parts where the engines agree
 
 Because the C model differs from the spec only in F1-F5 and matches `testsudoers` on every
