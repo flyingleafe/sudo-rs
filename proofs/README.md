@@ -19,11 +19,12 @@ synthetic policy that permits one user with explicit tags and denies another.
 They retain the glob-interface assumption. A separate spec-level negative
 control proves that an always-deny decision does not refine the spec.
 
-The theorem assumes well-formed policy data (including alias order and modifier
-invariants), representable string and modifier lengths, and agreement of the
-identity and command-matching interfaces with their oracles. Host matching is
-literal. See [the assumptions ledger](lean/ASSUMPTIONS.md) for exact hypotheses
-and external models. The axiom audit checks the Lean proof terms; it does not
+The theorem assumes valid alias-order indices, representable string and
+modifier lengths, and agreement of the identity and command-matching
+interfaces with their oracles. Host matching is literal. The Rust modifier
+enum now represents only explicit tag updates, so no separate modifier
+well-formedness hypothesis is required. See [the assumptions ledger](lean/ASSUMPTIONS.md)
+for exact hypotheses and external models. The axiom audit checks the Lean proof terms; it does not
 verify the Charon/Aeneas translation or the faithfulness of hand-written models.
 
 The parser, alias preprocessing, real OS identity lookup, glob matching, credential
