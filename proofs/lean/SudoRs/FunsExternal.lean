@@ -64,6 +64,45 @@ def core.slice.Slice.starts_with
 /-- [core::str::traits::{impl core::cmp::PartialEq<str> for str}::eq]: byte equality. -/
 def Str.Insts.CoreCmpPartialEqStr.eq (a b : Str) : Result Bool := ok (decide (a = b))
 
+def alloc.string.String.Insts.CoreCmpPartialEqString.eq (a b : String) : Result Bool :=
+  ok (a == b)
+
+opaque Usize.Insts.CoreHashHash.hash
+  {H : Type} (hasher : core.hash.Hasher H) : Usize → H → Result H
+
+def Shared0T.Insts.CoreHashHash.hash
+  {T H : Type} (hash : core.hash.Hash T) (hasher : core.hash.Hasher H) :
+  T → H → Result H := hash.hash hasher
+
+opaque alloc.string.String.Insts.CoreHashHash.hash
+  {H : Type} (hasher : core.hash.Hasher H) : String → H → Result H
+
+opaque std.hash.random.DefaultHasher.Insts.CoreHashHasher.finish :
+  std.hash.random.DefaultHasher → Result U64
+
+opaque std.hash.random.DefaultHasher.Insts.CoreHashHasher.write :
+  std.hash.random.DefaultHasher → Slice U8 → Result std.hash.random.DefaultHasher
+
+opaque std.hash.random.RandomState.Insts.CoreHashBuildHasherDefaultHasher.build_hasher :
+  std.hash.random.RandomState → Result std.hash.random.DefaultHasher
+
+def std.collections.hash.set.HashSetTRandomStateGlobal.new (T : Type) :
+    Result (std.collections.hash.set.HashSet T std.hash.random.RandomState alloc.alloc.Global) :=
+  ok []
+
+/-- Extensional insertion for the lawful key types used here (`usize` and `&String`).
+No caller observes the ordering of these keys. -/
+def std.collections.hash.set.HashSet.insert
+    {T S A H : Type} (eq : core.cmp.Eq T) (_ : core.hash.Hash T)
+    (_ : sudo_rs.core.hash.BuildHasher S H)
+    (keys : std.collections.hash.set.HashSet T S A) (key : T) :
+    Result (Bool × std.collections.hash.set.HashSet T S A) := do
+  let found ← keys.anyM (eq.partialEqInst.eq key)
+  if found then
+    ok (false, keys)
+  else
+    ok (true, key :: keys)
+
 open Classical in
 /-- [std::ffi::os_str::{impl core::cmp::PartialEq<std::ffi::os_str::OsString> for std::ffi::os_str::OsString}::eq]:
 equality of the (abstract) values. -/
@@ -118,3 +157,14 @@ def common.string.SudoString.Insts.CoreCmpPartialEqStr.eq (s : common.string.Sud
 
 /-- [sudo_rs::sudoers::warn_ignored]: only writes a diagnostic to the log. -/
 def sudoers.warn_ignored (_ : sudoers.Ignored) : Result Unit := ok ()
+
+/-- The opaque Rust formatting leaf only appends a diagnostic. `name` comes from
+a Rust `String`, so decoding its bytes is lossless on these calls. -/
+def sudoers.alias_diagnostic (diagnostics : alloc.vec.Vec sudoers.Error)
+    (kind : sudoers.AliasDiagnostic) (aliasBytes : Str) : Result (alloc.vec.Vec sudoers.Error) :=
+  let aliasName := String.fromUTF8Lossy ⟨(aliasBytes.val.map fun b => UInt8.ofNat b.val).toArray⟩
+  let message := match kind with
+    | .Undefined => s!"undefined alias: '{aliasName}'"
+    | .Recursive => s!"recursive alias: '{aliasName}'"
+    | .Duplicate => s!"multiple occurrences of '{aliasName}'"
+  diagnostics.push { source := none, location := none, message }

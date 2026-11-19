@@ -16,6 +16,9 @@ it, so a theorem that depends on its behaviour has to take that behaviour as a h
 | `core.ffi.c_str.CStr` | `structure { str : String }` | Only ever produced by `SudoString::as_cstr` in the extracted code; represented by its text without the trailing NUL. |
 | `std.ffi.os_str.OsString` | `opaque` type | Command arguments; only compared for equality. |
 | `std.path.Path` | `opaque` type | Command path; only passed to the glob matcher. |
+| `std.path.PathBuf` | `opaque` type | The sanitizer's diagnostics have no source path. |
+| `std.collections.hash.set.HashSet` | list of keys | The sanitizer observes only `new` and `insert`, not bucket layout or key order. |
+| `std.hash.random.RandomState`, `std.hash.random.DefaultHasher` | `opaque` types | Hash seeding and hash states are not observed by the extensional set model. |
 | `glob.Pattern` | `opaque` type | Glob semantics is not modelled. |
 | `common.string.SudoString` | `structure { str : String }` | Opaque for Charon; Rust `struct SudoString { inner: String }` where `inner` = text + NUL; modelled by the text its `Deref<Target = str>` exposes. |
 
@@ -33,6 +36,7 @@ Helpers: `sudo_rs.stringBytes s` = the UTF-8 bytes of `s` as `U8`s; `sudo_rs.str
 | `alloc.string.String.Insts.CoreOpsDerefDerefStr.deref` | `strOfString` | Same as `as_str`. |
 | `alloc.string.String.Insts.CoreCloneClone.clone` | `ok s` | Clone of plain data. |
 | `Str.Insts.CoreCmpPartialEqStr.eq` | `ok (decide (a = b))` | `str ==` is byte equality. |
+| `alloc.string.String.Insts.CoreCmpPartialEqString.eq` | `ok (a == b)` | Rust `String` equality compares the text. |
 | `core.option.Option.as_ref` | `ok x` | Borrows are erased. |
 | `core.option.Option.Insts.CoreCloneClone.clone` | clone the payload with the given `Clone` instance | `#[derive(Clone)]` semantics. |
 | `core.option.Option.Insts.CoreDefaultDefault.default` | `ok none` | `Option::default() = None`. |
@@ -46,6 +50,9 @@ Helpers: `sudo_rs.stringBytes s` = the UTF-8 bytes of `s` as `U8`s; `sudo_rs.str
 | `common.string.SudoString.Insts.CoreOpsDerefDerefStr.deref` | `strOfString s.str` | The text without the trailing NUL. |
 | `common.string.SudoString.Insts.CoreCmpPartialEqStr.eq` | `deref` then `str ==` | Rust: `let s: &str = self; s == other`. |
 | `sudoers.warn_ignored` | `ok ()` | Opaque for Charon; its only effect is a log line. |
+| `std.collections.hash.set.HashSetTRandomStateGlobal.new`, `std.collections.hash.set.HashSet.insert` | empty set; test key equality and insert if absent | `usize` and `&String` have lawful equality and hashing; buckets and hashing affect neither membership nor the insertion flag. |
+| `Usize.Insts.CoreHashHash.hash`, `alloc.string.String.Insts.CoreHashHash.hash`, `Shared0T.Insts.CoreHashHash.hash`, `std.hash.random.*.Insts.CoreHash*.{finish,write,build_hasher}` | hash state and seeding operations opaque; reference hashing delegates to the referent | These operations only populate trait dictionaries ignored by the extensional set model. |
+| `sudoers.alias_diagnostic` | append the corresponding message with no source or location | Opaque for Charon to isolate formatting. The input `&str` borrows a definition or dependency name and is valid UTF-8. |
 
 ## Hypotheses of the theorems
 
@@ -58,11 +65,18 @@ The theorems in `SudoRsProofs/` take these hypotheses instead of axioms:
 | `Fits k` for alias names (`ItemsFit items`, `TableFits table`) | `item_verdict`, `find_item(_after)`, `get_aliases` | `item_verdict` derefs the alias name of `Meta::Alias`; same reason. |
 | `a.val = stringBytes k` | `FoundAliases::get` | Links the `&str` argument to the alias name `k` of the abstract map. |
 | `v.val.length < Usize.max` | `FoundAliases::insert` | `Vec::push` fails on capacity overflow. Inside `get_aliases` this is discharged (the set grows by at most one entry per alias). |
-| `TableWF table` (`∀ i ∈ order, i < defs.len`) | `get_aliases` | `defs[order[i]]` is bounds-checked; `sanitize_alias_table` only stores valid positions. |
+| `TableWF table` (`∀ i ∈ order, i < defs.len`) | `get_aliases` | `defs[order[i]]` is bounds-checked; the caller must supply this for arbitrary tables. `sanitize_alias_table_tableWF` discharges it for outputs of the extracted producer. |
 | `(lineMods line).length ≤ Usize.max` (with `t.ignored.len + …` for the inner loops) | `apply_modifiers`, `distribute_tags` | `Modifier::Ignored` pushes onto `Tag::ignored`; the total number of modifiers of a line, all of which are in memory, bounds that vector. |
 
 The tag layer is generic in the abstraction of runas specs and commands (`fr`, `fc` in
 `SudoRsProofs/AbsTags.lean`): `distribute_tags` never looks inside them.
+
+The producer theorem `sanitize_alias_table_tableWF` only assumes a successful return
+from the extracted `sanitize_alias_table`. It does not rely on any returned hash-set
+membership flag, the outcome of dependency lookup, or the contents of diagnostics.
+`AliasTableOK.of_sanitize` combines four such return equations with the caller's
+`TableFits` and `TableGood` premises. It does not prove that parsing or `analyze`
+establish these premises or even that the sanitizer returns.
 
 ## Hypotheses of the top-level theorems
 

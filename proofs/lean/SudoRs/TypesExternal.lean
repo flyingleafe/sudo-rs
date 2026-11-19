@@ -19,11 +19,21 @@ set_option linter.internalConstructors false
 structure core.ffi.c_str.CStr where
   str : String
 
+/-- The sanitizer only inserts into its sets: model their keys, not hash buckets. -/
+abbrev std.collections.hash.set.HashSet (T : Type) (_S _A : Type) := List T
+
+/-- Hash seeding and hashing internals are not observed by the sanitizer. -/
+opaque std.hash.random.RandomState : Type
+opaque std.hash.random.DefaultHasher : Type
+
 /-- [std::ffi::os_str::OsString]: abstract. -/
 opaque std.ffi.os_str.OsString : Type
 
 /-- [std::path::Path]: abstract. -/
 opaque std.path.Path : Type
+
+/-- Abstract: sanitizer diagnostics never carry a source path. -/
+opaque std.path.PathBuf : Type
 
 /-- [glob::Pattern]: abstract. -/
 opaque glob.Pattern : Type

@@ -1,4 +1,5 @@
 import SudoRsProofs.GetAliases
+import SudoRsProofs.SanitizeAliases
 import SudoRsProofs.Permission
 import SudoRsProofs.NonVacuity
 
@@ -19,6 +20,8 @@ of `SudoRs/{Types,Funs}External.lean` are definitions or `opaque` constants, nev
 #print axioms SudoRsProofs.find_item_eq
 #print axioms SudoRsProofs.get_aliases_spec
 #print axioms SudoRsProofs.get_aliases_eq
+#print axioms SudoRsProofs.sanitize_alias_table_tableWF
+#print axioms SudoRsProofs.AliasTableOK.of_sanitize
 #print axioms SudoRsProofs.Tag.clone_spec
 #print axioms SudoRsProofs.Tag.default_spec
 #print axioms SudoRsProofs.Modifier.apply_spec

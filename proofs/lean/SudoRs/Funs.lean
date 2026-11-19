@@ -25,6 +25,34 @@ noncomputable section
 
 namespace sudo_rs
 
+/-- Trait implementation: [core::cmp::impls::{impl core::cmp::Eq for &'_0 A}]
+    Source: '/rustc/library/core/src/cmp.rs', lines 2525:4-2525:61
+    Name pattern: [core::cmp::Eq<&'0 @A>] -/
+@[reducible, rust_trait_impl "core::cmp::Eq<&'0 @A>"]
+def Shared0A.Insts.CoreCmpEq {A : Type _} (EqInst : core.cmp.Eq A) :
+  core.cmp.Eq A := {
+  partialEqInst := core.cmp.PartialEqShared EqInst.partialEqInst
+}
+
+/-- Trait implementation: [core::hash::impls::{impl core::hash::Hash for usize}]
+    Source: '/rustc/library/core/src/hash/mod.rs', lines 811:12-811:29; this code is generated from a macro invocation at: '/rustc/library/core/src/hash/mod.rs', lines 831:4-844:5
+    Name pattern: [core::hash::Hash<usize>] -/
+@[reducible, rust_trait_impl "core::hash::Hash<usize>"]
+def Usize.Insts.CoreHashHash : core.hash.Hash Std.Usize := {
+  hash := fun {H : Type} (HasherInst : core.hash.Hasher H) =>
+    Usize.Insts.CoreHashHash.hash HasherInst
+}
+
+/-- Trait implementation: [core::hash::impls::{impl core::hash::Hash for &'_0 T}]
+    Source: '/rustc/library/core/src/hash/mod.rs', lines 941:4-941:61
+    Name pattern: [core::hash::Hash<&'0 @T>] -/
+@[reducible, rust_trait_impl "core::hash::Hash<&'0 @T>"]
+def Shared0T.Insts.CoreHashHash {T : Type _} (HashInst : core.hash.Hash T) :
+  core.hash.Hash T := {
+  hash := fun {H : Type} (HasherInst : core.hash.Hasher H) =>
+    Shared0T.Insts.CoreHashHash.hash HashInst HasherInst
+}
+
 /-- Trait implementation: [core::slice::cmp::{impl core::cmp::PartialEq<[U]> for [T]}]
     Source: '/rustc/library/core/src/slice/cmp.rs', lines 14:0-16:28
     Name pattern: [core::cmp::PartialEq<[@T], [@U]>] -/
@@ -58,12 +86,65 @@ impl_def std.ffi.os_str.OsString.Insts.CoreCmpPartialEqOsString :
     std.ffi.os_str.OsString.Insts.CoreCmpPartialEqOsString
 }
 
+/-- Trait implementation: [std::hash::random::{impl core::hash::Hasher for std::hash::random::DefaultHasher}]
+    Source: '/rustc/library/std/src/hash/random.rs', lines 125:0-125:29
+    Name pattern: [core::hash::Hasher<std::hash::random::DefaultHasher>] -/
+@[reducible, rust_trait_impl
+  "core::hash::Hasher<std::hash::random::DefaultHasher>"]
+def std.hash.random.DefaultHasher.Insts.CoreHashHasher : core.hash.Hasher
+  std.hash.random.DefaultHasher := {
+  finish := std.hash.random.DefaultHasher.Insts.CoreHashHasher.finish
+  write := std.hash.random.DefaultHasher.Insts.CoreHashHasher.write
+}
+
+/-- Trait implementation: [std::hash::random::{impl core::hash::BuildHasher<std::hash::random::DefaultHasher> for std::hash::random::RandomState}]
+    Source: '/rustc/library/std/src/hash/random.rs', lines 80:0-80:32
+    Name pattern: [core::hash::BuildHasher<std::hash::random::RandomState, std::hash::random::DefaultHasher>] -/
+@[reducible, rust_trait_impl
+  "core::hash::BuildHasher<std::hash::random::RandomState, std::hash::random::DefaultHasher>"]
+def std.hash.random.RandomState.Insts.CoreHashBuildHasherDefaultHasher :
+  core.hash.BuildHasher std.hash.random.RandomState
+  std.hash.random.DefaultHasher := {
+  HasherInst := std.hash.random.DefaultHasher.Insts.CoreHashHasher
+  build_hasher :=
+    std.hash.random.RandomState.Insts.CoreHashBuildHasherDefaultHasher.build_hasher
+}
+
+/-- Trait implementation: [alloc::string::{impl core::cmp::PartialEq<alloc::string::String> for alloc::string::String}]
+    Source: '/rustc/library/alloc/src/string.rs', lines 350:9-350:18
+    Name pattern: [core::cmp::PartialEq<alloc::string::String, alloc::string::String>] -/
+@[reducible, rust_trait_impl
+  "core::cmp::PartialEq<alloc::string::String, alloc::string::String>"]
+impl_def alloc.string.String.Insts.CoreCmpPartialEqString : core.cmp.PartialEq
+  String String := {
+  eq := alloc.string.String.Insts.CoreCmpPartialEqString.eq
+  ne := core.cmp.PartialEq.ne.trait_default
+    alloc.string.String.Insts.CoreCmpPartialEqString
+}
+
+/-- Trait implementation: [alloc::string::{impl core::cmp::Eq for alloc::string::String}]
+    Source: '/rustc/library/alloc/src/string.rs', lines 350:32-350:34
+    Name pattern: [core::cmp::Eq<alloc::string::String>] -/
+@[reducible, rust_trait_impl "core::cmp::Eq<alloc::string::String>"]
+def alloc.string.String.Insts.CoreCmpEq : core.cmp.Eq String := {
+  partialEqInst := alloc.string.String.Insts.CoreCmpPartialEqString
+}
+
 /-- Trait implementation: [alloc::string::{impl core::clone::Clone for alloc::string::String}]
     Source: '/rustc/library/alloc/src/string.rs', lines 2424:0-2424:21
     Name pattern: [core::clone::Clone<alloc::string::String>] -/
 @[reducible, rust_trait_impl "core::clone::Clone<alloc::string::String>"]
 def alloc.string.String.Insts.CoreCloneClone : core.clone.Clone String := {
   clone := alloc.string.String.Insts.CoreCloneClone.clone
+}
+
+/-- Trait implementation: [alloc::string::{impl core::hash::Hash for alloc::string::String}]
+    Source: '/rustc/library/alloc/src/string.rs', lines 2799:0-2799:26
+    Name pattern: [core::hash::Hash<alloc::string::String>] -/
+@[reducible, rust_trait_impl "core::hash::Hash<alloc::string::String>"]
+def alloc.string.String.Insts.CoreHashHash : core.hash.Hash String := {
+  hash := fun {H : Type} (corehashHasherInst : core.hash.Hasher H) =>
+    alloc.string.String.Insts.CoreHashHash.hash corehashHasherInst
 }
 
 /-- [sudo_rs::common::path::{impl core::clone::Clone for sudo_rs::common::path::SudoPath}::clone]:
@@ -1651,5 +1732,212 @@ def sudoers.permission_flags
     if skip_passwd
     then ok (some { t with authenticate := sudoers.ast.Authenticate.Nopasswd })
     else ok flags
+
+/-- [sudo_rs::sudoers::sanitize_alias_table::dependency_position]: loop 0:
+    Source: 'src/sudoers/mod.rs', lines 1227:8-1234:5 -/
+@[rust_loop]
+def sudoers.sanitize_alias_table.dependency_position_loop
+  {T : Type _} (table : Slice (sudoers.ast.Def T)) («name» : String)
+  (i : Std.Usize) :
+  Result (Option Std.Usize)
+  := do
+  let i1 := Slice.len table
+  if i < i1
+  then
+    let d ← Slice.index_usize table i
+    let (s, _) := d
+    let b ← alloc.string.String.Insts.CoreCmpPartialEqString.eq s «name»
+    if b
+    then ok (some i)
+    else
+      let i2 ← i + 1#usize
+      sudoers.sanitize_alias_table.dependency_position_loop table «name» i2
+  else ok none
+partial_fixpoint
+
+/-- [sudo_rs::sudoers::sanitize_alias_table::dependency_position]:
+    Source: 'src/sudoers/mod.rs', lines 1225:4-1234:5 -/
+@[reducible]
+def sudoers.sanitize_alias_table.dependency_position
+  {T : Type _} (table : Slice (sudoers.ast.Def T)) («name» : String) :
+  Result (Option Std.Usize)
+  := do
+  sudoers.sanitize_alias_table.dependency_position_loop table «name» 0#usize
+
+/-- [sudo_rs::sudoers::sanitize_alias_table::remqualify]:
+    Source: 'src/sudoers/mod.rs', lines 1218:4-1223:5 -/
+def sudoers.sanitize_alias_table.remqualify
+  {U : Type _} (item : sudoers.ast.Qualified U) : Result U := do
+  match item with
+  | sudoers.ast.Qualified.Allow x => ok x
+  | sudoers.ast.Qualified.Forbid x => ok x
+
+mutual
+
+/-- [sudo_rs::sudoers::sanitize_alias_table::{sudo_rs::sudoers::sanitize_alias_table::Visitor<'_0, T>}::visit]: loop 0:
+    Source: 'src/sudoers/mod.rs', lines 1248:16-1257:17 -/
+@[rust_loop]
+def sudoers.sanitize_alias_table.Visitor.visit_loop
+  {T : Type _}
+  (iter : core.slice.iter.Iter (sudoers.ast.Qualified (sudoers.tokens.Meta T)))
+  (back : alloc.vec.Vec sudoers.Error → alloc.vec.Vec sudoers.Error)
+  (hs : std.collections.hash.set.HashSet Std.Usize std.hash.random.RandomState
+  alloc.alloc.Global) (v : alloc.vec.Vec (sudoers.ast.Def T))
+  (v1 : alloc.vec.Vec Std.Usize) (v2 : alloc.vec.Vec sudoers.Error) :
+  Result ((std.collections.hash.set.HashSet Std.Usize
+    std.hash.random.RandomState alloc.alloc.Global) × (alloc.vec.Vec
+    (sudoers.ast.Def T)) × (alloc.vec.Vec Std.Usize) × (alloc.vec.Vec
+    sudoers.Error) × (alloc.vec.Vec sudoers.Error → alloc.vec.Vec
+    sudoers.Error))
+  := do
+  let (o, iter1) ← core.slice.iter.IteratorSliceIter.next iter
+  match o with
+  | none => ok (hs, v, v1, v2, back)
+  | some elem =>
+    let m ← sudoers.sanitize_alias_table.remqualify elem
+    match m with
+    | sudoers.tokens.Meta.All =>
+      sudoers.sanitize_alias_table.Visitor.visit_loop iter1 back hs v v1 v2
+    | sudoers.tokens.Meta.Only _ =>
+      sudoers.sanitize_alias_table.Visitor.visit_loop iter1 back hs v v1 v2
+    | sudoers.tokens.Meta.Alias «name» =>
+      let s := alloc.vec.Vec.deref v
+      let o1 ← sudoers.sanitize_alias_table.dependency_position s «name»
+      match o1 with
+      | none =>
+        let s1 ←
+          alloc.string.String.Insts.CoreOpsDerefDerefStr.deref «name»
+        let v3 ←
+          sudoers.alias_diagnostic v2 sudoers.AliasDiagnostic.Undefined s1
+        sudoers.sanitize_alias_table.Visitor.visit_loop iter1 back hs v v1 v3
+      | some dependency =>
+        let (self, visit_back) ←
+          sudoers.sanitize_alias_table.Visitor.visit
+            { seen := hs, table := v, order := v1, diagnostics := v2 }
+            dependency
+        sudoers.sanitize_alias_table.Visitor.visit_loop iter1
+          (fun v3 => back
+            (visit_back { self with diagnostics := v3 }).diagnostics) 
+          self.seen self.table self.order self.diagnostics
+partial_fixpoint
+
+/-- [sudo_rs::sudoers::sanitize_alias_table::{sudo_rs::sudoers::sanitize_alias_table::Visitor<'_0, T>}::visit]:
+    Source: 'src/sudoers/mod.rs', lines 1245:8-1263:9 -/
+def sudoers.sanitize_alias_table.Visitor.visit
+  {T : Type _} (self : sudoers.sanitize_alias_table.Visitor T)
+  (pos : Std.Usize) :
+  Result ((sudoers.sanitize_alias_table.Visitor T) ×
+    (sudoers.sanitize_alias_table.Visitor T →
+    sudoers.sanitize_alias_table.Visitor T))
+  := do
+  let (b, hs) ←
+    std.collections.hash.set.HashSet.insert core.cmp.EqUsize
+      Usize.Insts.CoreHashHash
+      std.hash.random.RandomState.Insts.CoreHashBuildHasherDefaultHasher
+      self.seen pos
+  if b
+  then
+    let d ←
+      alloc.vec.Vec.index (core.slice.index.SliceIndexUsizeSlice
+        (sudoers.ast.Def T)) self.table pos
+    let (_, members) := d
+    let s := alloc.vec.Vec.deref members
+    let iter ← core.slice.Slice.iter s
+    let (hs1, v, v1, v2, back) ←
+      sudoers.sanitize_alias_table.Visitor.visit_loop iter (fun v3 => v3) hs
+        self.table self.order self.diagnostics
+    let v3 ← alloc.vec.Vec.push v1 pos
+    let back1 :=
+      fun self1 =>
+        let v4 := back self1.diagnostics
+        { self with diagnostics := v4 }
+    ok ({ seen := hs1, table := v, order := v3, diagnostics := v2 }, back1)
+  else
+    let s := alloc.vec.Vec.deref self.order
+    let b1 ← core.slice.Slice.contains core.cmp.PartialEqUsize s pos
+    if b1
+    then
+      let back := fun self1 => { self with diagnostics := self1.diagnostics }
+      ok ({ self with seen := hs }, back)
+    else
+      let d ←
+        alloc.vec.Vec.index (core.slice.index.SliceIndexUsizeSlice
+          (sudoers.ast.Def T)) self.table pos
+      let (id, _) := d
+      let s1 ← alloc.string.String.Insts.CoreOpsDerefDerefStr.deref id
+      let v ←
+        sudoers.alias_diagnostic self.diagnostics
+          sudoers.AliasDiagnostic.Recursive s1
+      let back := fun self1 => { self with diagnostics := self1.diagnostics }
+      ok ({ self with seen := hs, diagnostics := v }, back)
+partial_fixpoint
+
+end
+
+/-- [sudo_rs::sudoers::sanitize_alias_table]: loop 0:
+    Source: 'src/sudoers/mod.rs', lines 1274:4-1280:5 -/
+@[rust_loop]
+def sudoers.sanitize_alias_table_loop
+  {T : Type _}
+  (iter : core.iter.adapters.enumerate.Enumerate (core.slice.iter.Iter
+  (sudoers.ast.Def T)))
+  (back : alloc.vec.Vec sudoers.Error → alloc.vec.Vec sudoers.Error)
+  (hs : std.collections.hash.set.HashSet Std.Usize std.hash.random.RandomState
+  alloc.alloc.Global) (table : alloc.vec.Vec (sudoers.ast.Def T))
+  (v : alloc.vec.Vec Std.Usize) (diagnostics : alloc.vec.Vec sudoers.Error)
+  (dupe : std.collections.hash.set.HashSet String std.hash.random.RandomState
+  alloc.alloc.Global) :
+  Result ((alloc.vec.Vec Std.Usize) × (alloc.vec.Vec sudoers.Error))
+  := do
+  let (o, iter1) ←
+    core.iter.adapters.enumerate.IteratorEnumerate.next
+      (core.iter.traits.iterator.IteratorSliceIter (sudoers.ast.Def T)) iter
+  match o with
+  | none => ok (v, back diagnostics)
+  | some p =>
+    let (i, d) := p
+    let («name», _) := d
+    let (b, dupe1) ←
+      std.collections.hash.set.HashSet.insert (Shared0A.Insts.CoreCmpEq
+        alloc.string.String.Insts.CoreCmpEq) (Shared0T.Insts.CoreHashHash
+        alloc.string.String.Insts.CoreHashHash)
+        std.hash.random.RandomState.Insts.CoreHashBuildHasherDefaultHasher dupe
+        «name»
+    if b
+    then
+      let (visitor, visit_back) ←
+        sudoers.sanitize_alias_table.Visitor.visit
+          { seen := hs, table, order := v, diagnostics } i
+      sudoers.sanitize_alias_table_loop iter1
+        (fun v1 => back
+          (visit_back { visitor with diagnostics := v1 }).diagnostics)
+        visitor.seen visitor.table visitor.order visitor.diagnostics dupe1
+    else
+      let s ← alloc.string.String.Insts.CoreOpsDerefDerefStr.deref «name»
+      let diagnostics1 ←
+        sudoers.alias_diagnostic diagnostics sudoers.AliasDiagnostic.Duplicate
+          s
+      sudoers.sanitize_alias_table_loop iter1 back hs table v diagnostics1
+        dupe1
+partial_fixpoint
+
+/-- [sudo_rs::sudoers::sanitize_alias_table]:
+    Source: 'src/sudoers/mod.rs', lines 1217:0-1283:1 -/
+def sudoers.sanitize_alias_table
+  {T : Type _} (table : alloc.vec.Vec (sudoers.ast.Def T))
+  (diagnostics : alloc.vec.Vec sudoers.Error) :
+  Result ((alloc.vec.Vec Std.Usize) × (alloc.vec.Vec sudoers.Error))
+  := do
+  let hs ← std.collections.hash.set.HashSetTRandomStateGlobal.new Std.Usize
+  let i := alloc.vec.Vec.len table
+  let v := alloc.vec.Vec.with_capacity Std.Usize i
+  let dupe ← std.collections.hash.set.HashSetTRandomStateGlobal.new String
+  let s := alloc.vec.Vec.deref table
+  let i1 ← core.slice.Slice.iter s
+  let iter ←
+    core.iter.traits.iterator.Iterator.enumerate.trait_default
+      (core.iter.traits.iterator.IteratorSliceIter (sudoers.ast.Def T)) i1
+  sudoers.sanitize_alias_table_loop iter (fun v1 => v1) hs table v diagnostics
+    dupe
 
 end sudo_rs

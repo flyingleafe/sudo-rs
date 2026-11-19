@@ -56,7 +56,7 @@ undocumented_unsafe_blocks = "warn"
 uninlined_format_args = "warn"
 
 # Options for Charon (https://github.com/AeneasVerif/charon), which extracts the sudoers
-# authorization decision for its formal verification with Aeneas (see `proofs/`)
+# authorization decision and alias order producer for formal verification (see `proofs/`).
 [package.metadata.charon]
-start_from = ["crate::sudoers::permission_flags"]
-opaque = ["crate::common::string", "crate::sudoers::warn_ignored"]
+start_from = ["crate::sudoers::permission_flags", "crate::sudoers::sanitize_alias_table"]
+opaque = ["crate::common::string", "crate::sudoers::warn_ignored", "crate::sudoers::alias_diagnostic"]

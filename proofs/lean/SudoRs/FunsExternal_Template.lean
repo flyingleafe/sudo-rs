@@ -21,6 +21,24 @@ set_option maxHeartbeats 1000000
 set_option maxRecDepth 2048
 open sudo_rs
 
+/-- [core::hash::impls::{impl core::hash::Hash for usize}::hash]:
+    Source: '/rustc/library/core/src/hash/mod.rs', lines 813:16-813:56; this code is generated from a macro invocation at: '/rustc/library/core/src/hash/mod.rs', lines 831:4-844:5
+    Name pattern: [core::hash::impls::{core::hash::Hash<usize>}::hash]
+    Visibility: public -/
+@[rust_fun "core::hash::impls::{core::hash::Hash<usize>}::hash"]
+axiom Usize.Insts.CoreHashHash.hash
+  {H : Type _} (HasherInst : core.hash.Hasher H) : Std.Usize → H → Result H
+
+/-- [core::hash::impls::{impl core::hash::Hash for &'_0 T}::hash]:
+    Source: '/rustc/library/core/src/hash/mod.rs', lines 943:8-943:48
+    Name pattern: [core::hash::impls::{core::hash::Hash<&'0 @T>}::hash]
+    Visibility: public -/
+@[rust_fun "core::hash::impls::{core::hash::Hash<&'0 @T>}::hash"]
+axiom Shared0T.Insts.CoreHashHash.hash
+  {T : Type _} {H : Type _} (HashInst : core.hash.Hash T) (HasherInst :
+  core.hash.Hasher H) :
+  T → H → Result H
+
 /-- [core::option::{core::option::Option<T>}::as_ref]:
     Source: '/rustc/library/core/src/option.rs', lines 743:4-743:44
     Name pattern: [core::option::{core::option::Option<@T>}::as_ref]
@@ -63,6 +81,30 @@ axiom core.slice.Slice.starts_with
 @[rust_fun "core::str::traits::{core::cmp::PartialEq<str, str>}::eq"]
 axiom Str.Insts.CoreCmpPartialEqStr.eq : Str → Str → Result Bool
 
+/-- [std::collections::hash::set::{std::collections::hash::set::HashSet<T, std::hash::random::RandomState, alloc::alloc::Global>}::new]:
+    Source: '/rustc/library/std/src/collections/hash/set.rs', lines 149:4-149:43
+    Name pattern: [std::collections::hash::set::{std::collections::hash::set::HashSet<@T, std::hash::random::RandomState, alloc::alloc::Global>}::new]
+    Visibility: public -/
+@[rust_fun
+  "std::collections::hash::set::{std::collections::hash::set::HashSet<@T, std::hash::random::RandomState, alloc::alloc::Global>}::new"]
+axiom std.collections.hash.set.HashSetTRandomStateGlobal.new
+  (T : Type _) :
+  Result (std.collections.hash.set.HashSet T std.hash.random.RandomState
+    alloc.alloc.Global)
+
+/-- [std::collections::hash::set::{std::collections::hash::set::HashSet<T, S, A>}::insert]:
+    Source: '/rustc/library/std/src/collections/hash/set.rs', lines 1034:4-1034:46
+    Name pattern: [std::collections::hash::set::{std::collections::hash::set::HashSet<@T, @S, @A>}::insert]
+    Visibility: public -/
+@[rust_fun
+  "std::collections::hash::set::{std::collections::hash::set::HashSet<@T, @S, @A>}::insert"]
+axiom std.collections.hash.set.HashSet.insert
+  {T : Type _} {S : Type _} {A : Type _} {Clause2_Hasher : Type _}
+  (corecmpEqInst : core.cmp.Eq T) (corehashHashInst : core.hash.Hash T)
+  (corehashBuildHasherInst : core.hash.BuildHasher S Clause2_Hasher) :
+  std.collections.hash.set.HashSet T S A → T → Result (Bool ×
+    (std.collections.hash.set.HashSet T S A))
+
 /-- [std::ffi::os_str::{impl core::cmp::PartialEq<std::ffi::os_str::OsString> for std::ffi::os_str::OsString}::eq]:
     Source: '/rustc/library/std/src/ffi/os_str.rs', lines 721:4-721:42
     Name pattern: [std::ffi::os_str::{core::cmp::PartialEq<std::ffi::os_str::OsString, std::ffi::os_str::OsString>}::eq]
@@ -72,6 +114,36 @@ axiom Str.Insts.CoreCmpPartialEqStr.eq : Str → Str → Result Bool
 axiom std.ffi.os_str.OsString.Insts.CoreCmpPartialEqOsString.eq
   : std.ffi.os_str.OsString → std.ffi.os_str.OsString → Result Bool
 
+/-- [std::hash::random::{impl core::hash::Hasher for std::hash::random::DefaultHasher}::finish]:
+    Source: '/rustc/library/std/src/hash/random.rs', lines 140:4-140:27
+    Name pattern: [std::hash::random::{core::hash::Hasher<std::hash::random::DefaultHasher>}::finish]
+    Visibility: public -/
+@[rust_fun
+  "std::hash::random::{core::hash::Hasher<std::hash::random::DefaultHasher>}::finish"]
+axiom std.hash.random.DefaultHasher.Insts.CoreHashHasher.finish
+  : std.hash.random.DefaultHasher → Result Std.U64
+
+/-- [std::hash::random::{impl core::hash::Hasher for std::hash::random::DefaultHasher}::write]:
+    Source: '/rustc/library/std/src/hash/random.rs', lines 130:4-130:35
+    Name pattern: [std::hash::random::{core::hash::Hasher<std::hash::random::DefaultHasher>}::write]
+    Visibility: public -/
+@[rust_fun
+  "std::hash::random::{core::hash::Hasher<std::hash::random::DefaultHasher>}::write"]
+axiom std.hash.random.DefaultHasher.Insts.CoreHashHasher.write
+  :
+  std.hash.random.DefaultHasher → Slice Std.U8 → Result
+    std.hash.random.DefaultHasher
+
+/-- [std::hash::random::{impl core::hash::BuildHasher<std::hash::random::DefaultHasher> for std::hash::random::RandomState}::build_hasher]:
+    Source: '/rustc/library/std/src/hash/random.rs', lines 83:4-83:43
+    Name pattern: [std::hash::random::{core::hash::BuildHasher<std::hash::random::RandomState, std::hash::random::DefaultHasher>}::build_hasher]
+    Visibility: public -/
+@[rust_fun
+  "std::hash::random::{core::hash::BuildHasher<std::hash::random::RandomState, std::hash::random::DefaultHasher>}::build_hasher"]
+axiom
+  std.hash.random.RandomState.Insts.CoreHashBuildHasherDefaultHasher.build_hasher
+  : std.hash.random.RandomState → Result std.hash.random.DefaultHasher
+
 /-- [alloc::boxed::{impl core::convert::AsRef<T> for alloc::boxed::Box<T>}::as_ref]:
     Source: '/rustc/library/alloc/src/boxed.rs', lines 2429:4-2429:26
     Name pattern: [alloc::boxed::{core::convert::AsRef<Box<@T>, @T>}::as_ref]
@@ -79,6 +151,15 @@ axiom std.ffi.os_str.OsString.Insts.CoreCmpPartialEqOsString.eq
 @[rust_fun "alloc::boxed::{core::convert::AsRef<Box<@T>, @T>}::as_ref"]
 axiom Box.Insts.CoreConvertAsRef.as_ref
   {T : Type _} (A : Type _) : T → Result T
+
+/-- [alloc::string::{impl core::cmp::PartialEq<alloc::string::String> for alloc::string::String}::eq]:
+    Source: '/rustc/library/alloc/src/string.rs', lines 350:9-350:18
+    Name pattern: [alloc::string::{core::cmp::PartialEq<alloc::string::String, alloc::string::String>}::eq]
+    Visibility: public -/
+@[rust_fun
+  "alloc::string::{core::cmp::PartialEq<alloc::string::String, alloc::string::String>}::eq"]
+axiom alloc.string.String.Insts.CoreCmpPartialEqString.eq
+  : String → String → Result Bool
 
 /-- [alloc::string::{alloc::string::String}::as_str]:
     Source: '/rustc/library/alloc/src/string.rs', lines 1073:4-1073:38
@@ -93,6 +174,15 @@ axiom alloc.string.String.as_str : String → Result Str
     Visibility: public -/
 @[rust_fun "alloc::string::{core::clone::Clone<alloc::string::String>}::clone"]
 axiom alloc.string.String.Insts.CoreCloneClone.clone : String → Result String
+
+/-- [alloc::string::{impl core::hash::Hash for alloc::string::String}::hash]:
+    Source: '/rustc/library/alloc/src/string.rs', lines 2801:4-2801:51
+    Name pattern: [alloc::string::{core::hash::Hash<alloc::string::String>}::hash]
+    Visibility: public -/
+@[rust_fun "alloc::string::{core::hash::Hash<alloc::string::String>}::hash"]
+axiom alloc.string.String.Insts.CoreHashHash.hash
+  {H : Type _} (corehashHasherInst : core.hash.Hasher H) :
+  String → H → Result H
 
 /-- [alloc::string::{impl core::ops::deref::Deref<str> for alloc::string::String}::deref]:
     Source: '/rustc/library/alloc/src/string.rs', lines 2896:4-2896:27
@@ -148,4 +238,11 @@ axiom common.string.SudoString.Insts.CoreCmpPartialEqStr.eq
 /-- [sudo_rs::sudoers::warn_ignored]:
     Source: 'src/sudoers/mod.rs', lines 820:0-830:1 -/
 axiom sudoers.warn_ignored : sudoers.Ignored → Result Unit
+
+/-- [sudo_rs::sudoers::alias_diagnostic]:
+    Source: 'src/sudoers/mod.rs', lines 1201:0-1212:1 -/
+axiom sudoers.alias_diagnostic
+  :
+  alloc.vec.Vec sudoers.Error → sudoers.AliasDiagnostic → Str → Result
+    (alloc.vec.Vec sudoers.Error)
 

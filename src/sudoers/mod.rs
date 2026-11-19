@@ -1192,6 +1192,25 @@ fn analyze(
     (result, diagnostics)
 }
 
+enum AliasDiagnostic {
+    Undefined,
+    Recursive,
+    Duplicate,
+}
+
+fn alias_diagnostic(diagnostics: &mut Vec<Error>, kind: AliasDiagnostic, name: &str) {
+    let message = match kind {
+        AliasDiagnostic::Undefined => format!("undefined alias: '{name}'"),
+        AliasDiagnostic::Recursive => format!("recursive alias: '{name}'"),
+        AliasDiagnostic::Duplicate => format!("multiple occurrences of '{name}'"),
+    };
+    diagnostics.push(Error {
+        source: None,
+        location: None,
+        message,
+    });
+}
+
 /// Alias definition inin a Sudoers file can come in any order; and aliases can refer to other aliases, etc.
 /// It is much easier if they are presented in a "definitional order" (i.e. aliases that use other aliases occur later)
 /// At the same time, this is a good place to detect problems in the aliases, such as unknown aliases and cycles.
@@ -1203,6 +1222,17 @@ fn sanitize_alias_table<T>(table: &Vec<Def<T>>, diagnostics: &mut Vec<Error>) ->
         }
     }
 
+    fn dependency_position<T>(table: &[Def<T>], name: &String) -> Option<usize> {
+        let mut i = 0;
+        while i < table.len() {
+            if &table[i].0 == name {
+                return Some(i);
+            }
+            i += 1;
+        }
+        None
+    }
+
     // perform a topological sort (hattip david@tweedegolf.com) to produce a derangement
     struct Visitor<'a, T> {
         seen: HashSet<usize>,
@@ -1212,24 +1242,15 @@ fn sanitize_alias_table<T>(table: &Vec<Def<T>>, diagnostics: &mut Vec<Error>) ->
     }
 
     impl<T> Visitor<'_, T> {
-        fn complain(&mut self, text: String) {
-            self.diagnostics.push(Error {
-                source: None,
-                location: None,
-                message: text,
-            })
-        }
-
         fn visit(&mut self, pos: usize) {
             if self.seen.insert(pos) {
                 let Def(_, members) = &self.table[pos];
-                for elem in members {
+                for elem in members.iter() {
                     let Meta::Alias(name) = remqualify(elem) else {
                         continue;
                     };
-                    let Some(dependency) = self.table.iter().position(|Def(id, _)| id == name)
-                    else {
-                        self.complain(format!("undefined alias: '{name}'"));
+                    let Some(dependency) = dependency_position(self.table, name) else {
+                        alias_diagnostic(self.diagnostics, AliasDiagnostic::Undefined, name);
                         continue;
                     };
                     self.visit(dependency);
@@ -1237,7 +1258,7 @@ fn sanitize_alias_table<T>(table: &Vec<Def<T>>, diagnostics: &mut Vec<Error>) ->
                 self.order.push(pos);
             } else if !self.order.contains(&pos) {
                 let Def(id, _) = &self.table[pos];
-                self.complain(format!("recursive alias: '{id}'"));
+                alias_diagnostic(self.diagnostics, AliasDiagnostic::Recursive, id);
             }
         }
     }
@@ -1252,7 +1273,7 @@ fn sanitize_alias_table<T>(table: &Vec<Def<T>>, diagnostics: &mut Vec<Error>) ->
     let mut dupe = HashSet::new();
     for (i, Def(name, _)) in table.iter().enumerate() {
         if !dupe.insert(name) {
-            visitor.complain(format!("multiple occurrences of '{name}'"));
+            alias_diagnostic(visitor.diagnostics, AliasDiagnostic::Duplicate, name);
         } else {
             visitor.visit(i);
         }

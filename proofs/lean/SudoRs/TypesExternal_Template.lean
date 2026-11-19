@@ -26,12 +26,41 @@ set_option maxRecDepth 2048
 @[rust_type "core::ffi::c_str::CStr"]
 axiom core.ffi.c_str.CStr : Type
 
+/-- [std::collections::hash::set::HashSet]
+    Source: '/rustc/library/std/src/collections/hash/set.rs', lines 126:0-130:1
+    Name pattern: [std::collections::hash::set::HashSet]
+    Visibility: public -/
+@[rust_type "std::collections::hash::set::HashSet"]
+axiom std.collections.hash.set.HashSet (T : Type _) (S : Type _) (A : Type _) :
+  Type
+
+/-- [std::hash::random::RandomState]
+    Source: '/rustc/library/std/src/hash/random.rs', lines 35:0-35:22
+    Name pattern: [std::hash::random::RandomState]
+    Visibility: public -/
+@[rust_type "std::hash::random::RandomState"]
+axiom std.hash.random.RandomState : Type
+
 /-- [std::ffi::os_str::OsString]
     Source: '/rustc/library/std/src/ffi/os_str.rs', lines 93:0-93:19
     Name pattern: [std::ffi::os_str::OsString]
     Visibility: public -/
 @[rust_type "std::ffi::os_str::OsString"]
 axiom std.ffi.os_str.OsString : Type
+
+/-- [std::hash::random::DefaultHasher]
+    Source: '/rustc/library/std/src/hash/random.rs', lines 94:0-94:24
+    Name pattern: [std::hash::random::DefaultHasher]
+    Visibility: public -/
+@[rust_type "std::hash::random::DefaultHasher"]
+axiom std.hash.random.DefaultHasher : Type
+
+/-- [std::path::PathBuf]
+    Source: '/rustc/library/std/src/path.rs', lines 1214:0-1214:18
+    Name pattern: [std::path::PathBuf]
+    Visibility: public -/
+@[rust_type "std::path::PathBuf"]
+axiom std.path.PathBuf : Type
 
 /-- [std::path::Path]
     Source: '/rustc/library/std/src/path.rs', lines 2356:0-2356:15

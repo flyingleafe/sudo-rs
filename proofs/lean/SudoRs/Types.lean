@@ -21,6 +21,15 @@ set_option maxRecDepth 2048
 
 namespace sudo_rs
 
+/-- Trait declaration: [core::hash::BuildHasher]
+    Source: '/rustc/library/core/src/hash/mod.rs', lines 637:0-637:21
+    Name pattern: [core::hash::BuildHasher]
+    Visibility: public -/
+@[rust_trait "core::hash::BuildHasher" (parentClauses := ["HasherInst"])]
+structure core.hash.BuildHasher (Self : Type _) (Self_Hasher : Type _) where
+  HasherInst : core.hash.Hasher Self_Hasher
+  build_hasher : Self → Result Self_Hasher
+
 /-- [glob::MatchOptions]
     Source: '/cargo/registry/src/index.crates.io-1949cf8c6b5b557f/glob-0.3.4/src/lib.rs', lines 1063:0-1063:23
     Name pattern: [glob::MatchOptions]
@@ -186,6 +195,14 @@ structure sudoers.ast.PermissionSpec where
 def sudoers.ast.Def (T : Type _) :=
   String × alloc.vec.Vec (sudoers.ast.Qualified (sudoers.tokens.Meta T))
 
+/-- [sudo_rs::sudoers::Error]
+    Source: 'src/sudoers/mod.rs', lines 34:0-38:1
+    Visibility: public -/
+structure sudoers.Error where
+  source : Option std.path.PathBuf
+  location : Option sudoers.basic_parser.Span
+  message : String
+
 /-- [sudo_rs::sudoers::Request]
     Source: 'src/sudoers/mod.rs', lines 57:0-62:1
     Visibility: public -/
@@ -294,5 +311,22 @@ def sudoers.check_permission.closure (User : Type _) (Group : Type _)
   (Clause0_Group : Type _) :=
   User × Group × User × sudoers.FoundAliases × sudoers.FoundAliases ×
   sudoers.match_command.closure × sudoers.FoundAliases
+
+/-- [sudo_rs::sudoers::AliasDiagnostic]
+    Source: 'src/sudoers/mod.rs', lines 1195:0-1199:1 -/
+@[discriminant isize]
+inductive sudoers.AliasDiagnostic where
+| Undefined : sudoers.AliasDiagnostic
+| Recursive : sudoers.AliasDiagnostic
+| Duplicate : sudoers.AliasDiagnostic
+
+/-- [sudo_rs::sudoers::sanitize_alias_table::Visitor]
+    Source: 'src/sudoers/mod.rs', lines 1237:4-1242:5 -/
+structure sudoers.sanitize_alias_table.Visitor (T : Type _) where
+  seen : std.collections.hash.set.HashSet Std.Usize std.hash.random.RandomState
+    alloc.alloc.Global
+  table : alloc.vec.Vec (sudoers.ast.Def T)
+  order : alloc.vec.Vec Std.Usize
+  diagnostics : alloc.vec.Vec sudoers.Error
 
 end sudo_rs
