@@ -1275,13 +1275,18 @@ fn analyze(
         &mut IncludeState::Allowed(0),
     );
 
-    let alias = &mut result.aliases;
-    alias.user.0 = sanitize_alias_table(&alias.user.1, &mut diagnostics);
-    alias.host.0 = sanitize_alias_table(&alias.host.1, &mut diagnostics);
-    alias.cmnd.0 = sanitize_alias_table(&alias.cmnd.1, &mut diagnostics);
-    alias.runas.0 = sanitize_alias_table(&alias.runas.1, &mut diagnostics);
+    sanitize_alias_tables(&mut result.aliases, &mut diagnostics);
 
     (result, diagnostics)
+}
+
+/// Compute the processing order of every alias table, in the order user, host, command, runas
+/// (see [sanitize_alias_table]); diagnostics are appended in that order.
+fn sanitize_alias_tables(alias: &mut AliasTable, diagnostics: &mut Vec<Error>) {
+    alias.user.0 = sanitize_alias_table(&alias.user.1, diagnostics);
+    alias.host.0 = sanitize_alias_table(&alias.host.1, diagnostics);
+    alias.cmnd.0 = sanitize_alias_table(&alias.cmnd.1, diagnostics);
+    alias.runas.0 = sanitize_alias_table(&alias.runas.1, diagnostics);
 }
 
 enum AliasDiagnostic {

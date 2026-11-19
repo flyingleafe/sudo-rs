@@ -770,6 +770,35 @@ fn regression_check_recursion() {
     assert!(!error.is_empty());
 }
 
+#[test]
+fn alias_tables_sanitized_in_table_order() {
+    let (sudoers, errs) = analyze(
+        Path::new("/etc/fakesudoers"),
+        sudoer![
+            "Runas_Alias RB = RA",
+            "Runas_Alias RA = root",
+            "Cmnd_Alias CMD = /bin/true",
+            "Cmnd_Alias CMD = /bin/false",
+            "Host_Alias HOSTS = UNDEFINED",
+            "User_Alias USERS = USERS"
+        ],
+    );
+    let messages = errs.iter().map(|e| e.message.as_str()).collect::<Vec<_>>();
+    assert_eq!(
+        messages,
+        [
+            "recursive alias: 'USERS'",
+            "undefined alias: 'UNDEFINED'",
+            "multiple occurrences of 'CMD'"
+        ]
+    );
+    let aliases = &sudoers.aliases;
+    assert_eq!(aliases.user.0, [0]);
+    assert_eq!(aliases.host.0, [0]);
+    assert_eq!(aliases.cmnd.0, [0]);
+    assert_eq!(aliases.runas.0, [1, 0]);
+}
+
 #[cfg(feature = "unstable-remote-sudoers")]
 fn assert_remote_failure(line: &str, expected_msg: &str) {
     let [Err(Status::Fatal(_, msg)), ..] = &parse_lines::<Sudo>(&mut CharStream::new(line))[..]
