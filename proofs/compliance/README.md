@@ -54,6 +54,21 @@ Each run differed in exactly one test, and in both cases it was a timing flake u
 Neither test reaches policy-dependent behaviour: both use a `ALL ALL=(ALL:ALL) NOPASSWD: ALL`-style sudoers.
 Excluding these two flaky tests, the per-test outcome sets of A and B are identical (827 pass, 36 ignored).
 
+### Run 3: after the list/validate, authorization and alias-table refactors
+
+Later commits changed `src/sudoers/` again: typed tag modifiers, the alias-order helpers, the
+pure functions behind `sudo -l` and `sudo -v`, the `runcwd` conversion in `policy.rs`, and
+`sanitize_alias_tables`. Only tree B was run, with 8 test threads, and compared with the
+stored results above (the test framework is unchanged, so the 863 tests are the same).
+
+| Run | Tree | passed | failed | ignored |
+|---|---|---|---|---|
+| 3 | B `495048ed` | 827 | 0 | 36 |
+| 3 | B `82589e95` | 827 | 0 | 36 |
+
+Both outcome sets equal run 2 B test for test. Against run 2 A they differ only in
+`sudo::flag_background::stdin_pipe`, the upstream flake described above.
+
 ### `warn_ignored` ordering
 
 Between `ccf4489e` and `46d955a1` the two `warn_ignored` warnings ("non-unix group ... was ignored",
