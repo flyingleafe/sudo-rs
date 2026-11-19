@@ -140,9 +140,9 @@ impl Judgement {
                     env_check: self.settings.env_check(),
                     chdir: match tag.cwd.clone().or_else(|| {
                         // a `runcwd` default acts as the working directory when no explicit CWD was set
-                        self.settings
-                            .runcwd()
-                            .and_then(|s| super::basic_parser::Token::construct(s.to_string()).ok())
+                        self.settings.runcwd().and_then(|s| {
+                            super::basic_parser::Token::construct(String::from(s)).ok()
+                        })
                     }) {
                         None => DirChange::Strict(None),
                         Some(super::ChDir::Any) => DirChange::Any,
@@ -280,5 +280,122 @@ mod test {
         assert_eq!(chdir(&mut judge), (DirChange::Strict(Some("/usr".into()))));
         judge.mod_flag(|tag| tag.cwd = Some(ChDir::Path("/bin".into())));
         assert_eq!(chdir(&mut judge), (DirChange::Strict(Some("/bin".into()))));
+    }
+
+    fn set_text(judge: &mut Judgement, name: &str, value: &str) {
+        let Some(crate::defaults::SettingKind::Text(f)) = crate::defaults::set(name) else {
+            panic!()
+        };
+        f(value).unwrap()(&mut judge.settings);
+    }
+
+    fn set_integer(judge: &mut Judgement, name: &str, value: &str) {
+        let Some(crate::defaults::SettingKind::Integer(f)) = crate::defaults::set(name) else {
+            panic!()
+        };
+        f(value).unwrap()(&mut judge.settings);
+    }
+
+    fn set_flag(judge: &mut Judgement, name: &str) {
+        let Some(crate::defaults::SettingKind::Flag(f)) = crate::defaults::set(name) else {
+            panic!()
+        };
+        f(&mut judge.settings);
+    }
+
+    fn negate(judge: &mut Judgement, name: &str) {
+        crate::defaults::negate(name).unwrap()(&mut judge.settings);
+    }
+
+    #[test]
+    fn runcwd_test() {
+        let mut judge = Judgement {
+            flags: Some(Tag::default()),
+            ..Default::default()
+        };
+        fn chdir(judge: &Judgement) -> DirChange {
+            let Authorization::Allowed(_, ctl) = judge.authorization() else {
+                panic!()
+            };
+            ctl.chdir
+        }
+        set_text(&mut judge, "runcwd", "*");
+        assert_eq!(chdir(&judge), DirChange::Any);
+        set_text(&mut judge, "runcwd", "/tmp");
+        assert_eq!(chdir(&judge), DirChange::Strict(Some("/tmp".into())));
+        set_text(&mut judge, "runcwd", "~");
+        assert_eq!(chdir(&judge), DirChange::Strict(Some("~".into())));
+        // unlike a CWD= tag, the default is not checked by the token parser (first character)
+        set_text(&mut judge, "runcwd", "relative");
+        assert_eq!(chdir(&judge), DirChange::Strict(Some("relative".into())));
+        // a value containing '*' other than "*" itself is dropped
+        set_text(&mut judge, "runcwd", "/tmp/*");
+        assert_eq!(chdir(&judge), DirChange::Strict(None));
+        // so is a value with a NUL character
+        set_text(&mut judge, "runcwd", "/tmp\0");
+        assert_eq!(chdir(&judge), DirChange::Strict(None));
+        // an explicit CWD tag wins over the default
+        set_text(&mut judge, "runcwd", "/tmp");
+        judge.mod_flag(|tag| tag.cwd = Some(ChDir::Path("/usr".into())));
+        assert_eq!(chdir(&judge), DirChange::Strict(Some("/usr".into())));
+        judge.mod_flag(|tag| tag.cwd = Some(ChDir::Any));
+        assert_eq!(chdir(&judge), DirChange::Any);
+        judge.mod_flag(|tag| tag.cwd = None);
+        negate(&mut judge, "runcwd");
+        assert_eq!(chdir(&judge), DirChange::Strict(None));
+    }
+
+    #[test]
+    fn restrictions_test() {
+        let mut judge = Judgement {
+            flags: Some(Tag::default()),
+            ..Default::default()
+        };
+        fn get(judge: &Judgement) -> (Authentication, bool, bool, Umask, Logging) {
+            let Authorization::Allowed(auth, ctl) = judge.authorization() else {
+                panic!()
+            };
+            (auth, ctl.trust_environment, ctl.noexec, ctl.umask, ctl.log)
+        }
+
+        let (auth, setenv, noexec, umask, log) = get(&judge);
+        assert_eq!(auth.credential, AuthenticatingUser::InvokingUser);
+        assert!(!setenv && !noexec);
+        assert_eq!(umask, Umask::Extend(0o022));
+        assert_eq!(log, Logging::Auth);
+
+        set_flag(&mut judge, "setenv");
+        set_flag(&mut judge, "noexec");
+        set_flag(&mut judge, "targetpw");
+        set_integer(&mut judge, "umask", "077");
+        negate(&mut judge, "log_allowed");
+        let (auth, setenv, noexec, umask, log) = get(&judge);
+        assert_eq!(auth.credential, AuthenticatingUser::TargetUser);
+        assert!(setenv && noexec);
+        assert_eq!(umask, Umask::Extend(0o077));
+        assert_eq!(log, Logging::Disabled);
+
+        // explicit tags win over the defaults
+        judge.mod_flag(|tag| {
+            tag.env = EnvironmentControl::Nosetenv;
+            tag.noexec = ExecControl::Exec;
+        });
+        set_flag(&mut judge, "rootpw");
+        set_flag(&mut judge, "umask_override");
+        let (auth, setenv, noexec, umask, _) = get(&judge);
+        assert_eq!(auth.credential, AuthenticatingUser::Root);
+        assert!(!setenv && !noexec);
+        assert_eq!(umask, Umask::Override(0o077));
+
+        negate(&mut judge, "setenv");
+        negate(&mut judge, "noexec");
+        judge.mod_flag(|tag| {
+            tag.env = EnvironmentControl::Setenv;
+            tag.noexec = ExecControl::Noexec;
+        });
+        set_integer(&mut judge, "umask", "0777");
+        let (_, setenv, noexec, umask, _) = get(&judge);
+        assert!(setenv && noexec);
+        assert_eq!(umask, Umask::Preserve);
     }
 }
