@@ -2124,7 +2124,7 @@ def sudoers.validate_flags
     else ok flags
 
 /-- [sudo_rs::sudoers::sanitize_alias_table::dependency_position]: loop 0:
-    Source: 'src/sudoers/mod.rs', lines 1319:8-1326:5 -/
+    Source: 'src/sudoers/mod.rs', lines 1324:8-1331:5 -/
 @[rust_loop]
 def sudoers.sanitize_alias_table.dependency_position_loop
   {T : Type _} (table : Slice (sudoers.ast.Def T)) («name» : String)
@@ -2146,7 +2146,7 @@ def sudoers.sanitize_alias_table.dependency_position_loop
 partial_fixpoint
 
 /-- [sudo_rs::sudoers::sanitize_alias_table::dependency_position]:
-    Source: 'src/sudoers/mod.rs', lines 1317:4-1326:5 -/
+    Source: 'src/sudoers/mod.rs', lines 1322:4-1331:5 -/
 @[reducible]
 def sudoers.sanitize_alias_table.dependency_position
   {T : Type _} (table : Slice (sudoers.ast.Def T)) («name» : String) :
@@ -2155,7 +2155,7 @@ def sudoers.sanitize_alias_table.dependency_position
   sudoers.sanitize_alias_table.dependency_position_loop table «name» 0#usize
 
 /-- [sudo_rs::sudoers::sanitize_alias_table::remqualify]:
-    Source: 'src/sudoers/mod.rs', lines 1310:4-1315:5 -/
+    Source: 'src/sudoers/mod.rs', lines 1315:4-1320:5 -/
 def sudoers.sanitize_alias_table.remqualify
   {U : Type _} (item : sudoers.ast.Qualified U) : Result U := do
   match item with
@@ -2165,7 +2165,7 @@ def sudoers.sanitize_alias_table.remqualify
 mutual
 
 /-- [sudo_rs::sudoers::sanitize_alias_table::{sudo_rs::sudoers::sanitize_alias_table::Visitor<'_0, T>}::visit]: loop 0:
-    Source: 'src/sudoers/mod.rs', lines 1340:16-1349:17 -/
+    Source: 'src/sudoers/mod.rs', lines 1345:16-1354:17 -/
 @[rust_loop]
 def sudoers.sanitize_alias_table.Visitor.visit_loop
   {T : Type _}
@@ -2212,7 +2212,7 @@ def sudoers.sanitize_alias_table.Visitor.visit_loop
 partial_fixpoint
 
 /-- [sudo_rs::sudoers::sanitize_alias_table::{sudo_rs::sudoers::sanitize_alias_table::Visitor<'_0, T>}::visit]:
-    Source: 'src/sudoers/mod.rs', lines 1337:8-1355:9 -/
+    Source: 'src/sudoers/mod.rs', lines 1342:8-1360:9 -/
 def sudoers.sanitize_alias_table.Visitor.visit
   {T : Type _} (self : sudoers.sanitize_alias_table.Visitor T)
   (pos : Std.Usize) :
@@ -2265,7 +2265,7 @@ partial_fixpoint
 end
 
 /-- [sudo_rs::sudoers::sanitize_alias_table]: loop 0:
-    Source: 'src/sudoers/mod.rs', lines 1366:4-1372:5 -/
+    Source: 'src/sudoers/mod.rs', lines 1371:4-1377:5 -/
 @[rust_loop]
 def sudoers.sanitize_alias_table_loop
   {T : Type _}
@@ -2312,7 +2312,7 @@ def sudoers.sanitize_alias_table_loop
 partial_fixpoint
 
 /-- [sudo_rs::sudoers::sanitize_alias_table]:
-    Source: 'src/sudoers/mod.rs', lines 1309:0-1375:1 -/
+    Source: 'src/sudoers/mod.rs', lines 1314:0-1380:1 -/
 def sudoers.sanitize_alias_table
   {T : Type _} (table : alloc.vec.Vec (sudoers.ast.Def T))
   (diagnostics : alloc.vec.Vec sudoers.Error) :
@@ -2329,6 +2329,25 @@ def sudoers.sanitize_alias_table
       (core.iter.traits.iterator.IteratorSliceIter (sudoers.ast.Def T)) i1
   sudoers.sanitize_alias_table_loop iter (fun v1 => v1) hs table v diagnostics
     dupe
+
+/-- [sudo_rs::sudoers::sanitize_alias_tables]:
+    Source: 'src/sudoers/mod.rs', lines 1285:0-1290:1 -/
+def sudoers.sanitize_alias_tables
+  («alias» : sudoers.AliasTable) (diagnostics : alloc.vec.Vec sudoers.Error)
+  :
+  Result (sudoers.AliasTable × (alloc.vec.Vec sudoers.Error))
+  := do
+  let (_, v) := «alias».user
+  let (v1, diagnostics1) ← sudoers.sanitize_alias_table v diagnostics
+  let (_, v2) := «alias».host
+  let (v3, diagnostics2) ← sudoers.sanitize_alias_table v2 diagnostics1
+  let (_, v4) := «alias».cmnd
+  let (v5, diagnostics3) ← sudoers.sanitize_alias_table v4 diagnostics2
+  let (_, v6) := «alias».runas
+  let (v7, diagnostics4) ← sudoers.sanitize_alias_table v6 diagnostics3
+  ok
+    ({ user := (v1, v), host := (v3, v2), cmnd := (v5, v4), runas := (v7, v6) },
+    diagnostics4)
 
 /-- [sudo_rs::sudoers::policy::{sudo_rs::defaults::Settings}::to_auth]:
     Source: 'src/sudoers/policy.rs', lines 41:4-64:5 -/

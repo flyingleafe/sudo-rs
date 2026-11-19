@@ -346,7 +346,7 @@ axiom common.string.SudoString.Insts.CoreCmpPartialEqStr.eq
 axiom sudoers.warn_ignored : sudoers.Ignored → Result Unit
 
 /-- [sudo_rs::sudoers::alias_diagnostic]:
-    Source: 'src/sudoers/mod.rs', lines 1293:0-1304:1 -/
+    Source: 'src/sudoers/mod.rs', lines 1298:0-1309:1 -/
 axiom sudoers.alias_diagnostic
   :
   alloc.vec.Vec sudoers.Error → sudoers.AliasDiagnostic → Str → Result

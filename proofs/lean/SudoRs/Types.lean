@@ -403,22 +403,22 @@ def sudoers.check_permission.closure (User : Type _) (Group : Type _)
   User × Group × User × sudoers.FoundAliases × sudoers.FoundAliases ×
   sudoers.match_command.closure × sudoers.FoundAliases
 
-/-- [sudo_rs::sudoers::AliasDiagnostic]
-    Source: 'src/sudoers/mod.rs', lines 1287:0-1291:1 -/
-@[discriminant isize]
-inductive sudoers.AliasDiagnostic where
-| Undefined : sudoers.AliasDiagnostic
-| Recursive : sudoers.AliasDiagnostic
-| Duplicate : sudoers.AliasDiagnostic
-
 /-- [sudo_rs::sudoers::sanitize_alias_table::Visitor]
-    Source: 'src/sudoers/mod.rs', lines 1329:4-1334:5 -/
+    Source: 'src/sudoers/mod.rs', lines 1334:4-1339:5 -/
 structure sudoers.sanitize_alias_table.Visitor (T : Type _) where
   seen : std.collections.hash.set.HashSet Std.Usize std.hash.random.RandomState
     alloc.alloc.Global
   table : alloc.vec.Vec (sudoers.ast.Def T)
   order : alloc.vec.Vec Std.Usize
   diagnostics : alloc.vec.Vec sudoers.Error
+
+/-- [sudo_rs::sudoers::AliasDiagnostic]
+    Source: 'src/sudoers/mod.rs', lines 1292:0-1296:1 -/
+@[discriminant isize]
+inductive sudoers.AliasDiagnostic where
+| Undefined : sudoers.AliasDiagnostic
+| Recursive : sudoers.AliasDiagnostic
+| Duplicate : sudoers.AliasDiagnostic
 
 /-- [sudo_rs::sudoers::policy::AuthenticationScope]
     Source: 'src/sudoers/policy.rs', lines 112:0-115:1
