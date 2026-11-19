@@ -1,6 +1,36 @@
 # Formal verification of sudo-rs
 
-This directory holds the verification artefacts of sudo-rs:
+**Result.** Lean proves that the extracted `sudoers::check_permission` and
+`sudoers::permission_flags` return the same decision and tags as the hand-written spec.
+The latter includes the root/self password-tag adjustment from `Sudoers::check`.
+The proof starts with a parsed policy and a resolved request, not an invocation of `sudo`.
+
+## Verification boundary
+
+[`permission_flags_eq`](lean/SudoRsProofs/Permission.lean) says the extracted model
+returns `ok r` (rather than an error or divergence) and that `r.map absTag` equals
+`SudoersSpec.authorize` on the abstracted inputs. Companion proofs cover the rule
+lookup, aliases, matchers, tag accumulation, and the pre-adjustment decision
+`check_permission_eq`. The spec separately proves default-deny and last-match
+properties.
+
+The theorem assumes well-formed policy data (including alias order and modifier
+invariants), representable string and modifier lengths, and agreement of the
+identity and command-matching interfaces with their oracles. Host matching is
+literal. See [the assumptions ledger](lean/ASSUMPTIONS.md) for exact hypotheses
+and external models. The axiom audit checks the Lean proof terms; it does not
+verify the Charon/Aeneas translation or the faithfulness of hand-written models.
+
+The parser, alias preprocessing, real OS identity lookup, glob matching, credential
+changes, authentication, command execution, rustc, and the deployed binary are
+outside the refinement theorem. The Quint lifecycle model is a separate abstraction;
+its simulation and bounded checks are not proofs about the Rust execution path.
+
+The fork changes alias-membership storage from a hash table to a linear list for
+extraction. Resolving many dependent aliases can therefore be quadratic. Treat
+this branch as a verification PoC, not a production performance replacement.
+
+## Artifacts
 
 | Path | Contents |
 |---|---|
@@ -9,6 +39,9 @@ This directory holds the verification artefacts of sudo-rs:
 | `lean/` | Lake project: generated code (`SudoRs`) and proofs (`SudoRsProofs`). |
 | `spec/` | Hand-written Lean specification of the authorization decision. |
 | `quint/` | Quint model of the surrounding lifecycle. |
+| `check.sh` | Local gate for proof builds, axiom audit, model checks, and sudoers unit tests. |
+| `differential/` | Unprivileged comparison of the Lean, Rust and C policy decisions. |
+| `compliance/` | Docker comparison of upstream and refactored sudo-rs. |
 
 ## Prerequisites
 
@@ -36,6 +69,17 @@ user, `/bin/sleep`, `/bin` as a symlink, a zoneinfo database, a non-world-writab
 none is a build or link problem.
 
 ## Workflow
+
+From the repository root:
+
+```sh
+nix develop -c proofs/check.sh
+nix develop -c proofs/check.sh extract   # independently regenerate the Lean and check for drift
+```
+
+The [Verification workflow](../.github/workflows/verification.yml) runs the default
+gate on relevant pushes and pull requests. The extraction check has a separate
+schedule and manual trigger. The differential and compliance runs are opt-in.
 
 ### 1. Extract
 
@@ -68,8 +112,8 @@ Generated modules in `lean/SudoRs/`, all in Lean namespace `sudo_rs`:
 
 `lean/SudoRs/TypesExternal.lean` and `lean/SudoRs/FunsExternal.lean` are **not generated**: they are
 source files owned by whoever writes models for the external (std/dependency) definitions the
-generated code uses. The `axiom`s seeded into them are trusted assumptions; replacing an axiom with a
-definitional model (a `def` with the same name and type) shrinks the trusted base.
+generated code uses. The checked-in files use definitions or opaque constants,
+not axioms. A definition still needs a justification as a model of the external Rust operation.
 
 - Aeneas only writes `*_Template.lean`; `extract.sh` never overwrites `*External.lean`. It seeds a
   missing one from its template (marked "Hand-maintained", without the Aeneas header).
@@ -115,10 +159,6 @@ Upstream code at `81dff9a1`, one `--start-from` per function:
 | `check_permission` | fatal, no output: `dyn` in `CommandSpec`, `CustomiserTable`, `SudoLogger`; `str::rsplitn` / `core::str::pattern::Pattern` unimplemented (reached via `tokens.rs` `Token::construct` impls); bodies of `matching_user_specs`, `get_aliases`, `distribute_tags` fail |
 | whole `crate::sudoers` | fatal, no output |
 
-The committed `lean/SudoRs/` is the `find_item` smoke extraction, reproducible with:
-
-```sh
-git clone https://github.com/trifectatechfoundation/sudo-rs /tmp/fi/src/sudo-rs
-git -C /tmp/fi/src/sudo-rs checkout 81dff9a1
-SUDO_RS_SRC=/tmp/fi/src/sudo-rs nix develop -c proofs/extract.sh --start-from crate::sudoers::find_item
-```
+These are baseline experiments, not the status of the current extraction. The
+committed `lean/SudoRs/` is generated from the refactored `permission_flags` entry
+point. Run the extraction drift check above to compare it with the current source.
