@@ -51,6 +51,7 @@ this branch as a verification PoC, not a production performance replacement.
 | `check.sh` | Local gate for proof builds, axiom audit, model checks, and sudoers unit tests. |
 | `differential/` | Unprivileged comparison of the Lean, Rust and C policy decisions. |
 | `compliance/` | Docker comparison of upstream and refactored sudo-rs. |
+| `parser/PLAN.md` | Plan and feasibility measurements for a parser proof. Nothing proved yet. |
 
 ## Prerequisites
 
