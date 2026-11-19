@@ -184,41 +184,15 @@ impl Sudoers {
         hostname: &system::Hostname,
         request: ListRequest<User, Group>,
     ) -> Authorization {
-        let skip_passwd;
-        let mut flags = if request.inspected_user != invoking_user {
-            skip_passwd = invoking_user.is_root();
+        if request.inspected_user != invoking_user {
+            // the Defaults that `Sudoers::check` applies for the pseudo-command `list`
+            self.specify_host_user_runas(hostname, invoking_user, Some(request.inspected_user));
+            self.specify_command(Path::new("list"), &[]);
+        }
 
-            self.check(
-                invoking_user,
-                hostname,
-                Request {
-                    user: request.inspected_user,
-                    group: &request.inspected_user.group(),
-                    command: Path::new("list"),
-                    arguments: &[],
-                },
-            )
-            .flags
-            .or(invoking_user.is_root().then(Tag::default))
-        } else {
-            skip_passwd = invoking_user.is_root()
-                || (request.target_user == invoking_user
-                    && in_group(invoking_user, request.target_group));
-
-            self.matching_user_specs(invoking_user, hostname)
-                .flatten()
-                .map(|(_, (tag, _))| tag)
-                .max_by_key(|tag| !tag.needs_passwd())
-        };
-
-        if let Some(tag) = flags.as_mut() {
-            if skip_passwd {
-                tag.authenticate = Authenticate::Nopasswd;
-            }
-
-            Authorization::Allowed(self.settings.to_auth(tag), ())
-        } else {
-            Authorization::Forbidden
+        match list_flags(&self.rules, &self.aliases, invoking_user, hostname, request) {
+            Some(tag) => Authorization::Allowed(self.settings.to_auth(&tag), ()),
+            None => Authorization::Forbidden,
         }
     }
 
@@ -229,23 +203,9 @@ impl Sudoers {
     ) -> Authorization {
         self.specify_host_user_runas(hostname, invoking_user, None);
 
-        // exception: if user is root, NOPASSWD is implied
-        let skip_passwd = invoking_user.is_root();
-
-        let mut flags = self
-            .matching_user_specs(invoking_user, hostname)
-            .flatten()
-            .map(|(_, (tag, _))| tag)
-            .max_by_key(|tag| tag.needs_passwd());
-
-        if let Some(tag) = flags.as_mut() {
-            if skip_passwd {
-                tag.authenticate = Authenticate::Nopasswd;
-            }
-
-            Authorization::Allowed(self.settings.to_auth(tag), ())
-        } else {
-            Authorization::Forbidden
+        match validate_flags(&self.rules, &self.aliases, invoking_user, hostname) {
+            Some(tag) => Authorization::Allowed(self.settings.to_auth(&tag), ()),
+            None => Authorization::Forbidden,
         }
     }
 
@@ -494,6 +454,138 @@ fn permission_flags<User: UnixUser + PartialEq<User>, Group: UnixGroup>(
     }
 
     flags
+}
+
+/// The flags of [Sudoers::check_list_permission] (`sudo -l`). Listing the permissions of another
+/// user is the request to run the pseudo-command `list` as that user (which root may always do);
+/// listing one's own permissions takes the tag of a matching command entry, preferring one that
+/// does not need a password ([select_tag]). The password exceptions are those of [permission_flags].
+fn list_flags<User: UnixUser + PartialEq<User>, Group: UnixGroup>(
+    rules: &[PermissionSpec],
+    aliases: &AliasTable,
+    invoking_user: &User,
+    hostname: &system::Hostname,
+    request: ListRequest<User, Group>,
+) -> Option<Tag> {
+    let skip_passwd;
+    let mut flags = if request.inspected_user != invoking_user {
+        skip_passwd = invoking_user.is_root();
+
+        let flags = permission_flags(
+            rules,
+            aliases,
+            invoking_user,
+            hostname,
+            Request {
+                user: request.inspected_user,
+                group: &request.inspected_user.group(),
+                command: Path::new("list"),
+                arguments: &[],
+            },
+        );
+        if flags.is_none() && invoking_user.is_root() {
+            Some(Tag::default())
+        } else {
+            flags
+        }
+    } else {
+        skip_passwd = invoking_user.is_root()
+            || (request.target_user == invoking_user
+                && in_group(invoking_user, request.target_group));
+
+        select_tag(rules, aliases, invoking_user, hostname, false)
+    };
+
+    if let Some(Tag { authenticate, .. }) = &mut flags {
+        if skip_passwd {
+            *authenticate = Authenticate::Nopasswd;
+        }
+    }
+
+    flags
+}
+
+/// The flags of [Sudoers::check_validate_permission] (`sudo -v`): the tag of a matching command
+/// entry, preferring one that needs a password ([select_tag]); if the user is root, NOPASSWD is
+/// implied.
+fn validate_flags<User: UnixUser>(
+    rules: &[PermissionSpec],
+    aliases: &AliasTable,
+    invoking_user: &User,
+    hostname: &system::Hostname,
+) -> Option<Tag> {
+    let skip_passwd = invoking_user.is_root();
+
+    let mut flags = select_tag(rules, aliases, invoking_user, hostname, true);
+    if let Some(Tag { authenticate, .. }) = &mut flags {
+        if skip_passwd {
+            *authenticate = Authenticate::Nopasswd;
+        }
+    }
+
+    flags
+}
+
+/// Of the tags of all command entries of the `User_Spec`s that match `invoking_user` and
+/// `hostname` (in the order of [Sudoers::matching_user_specs]), the last one whose `needs_passwd`
+/// equals `prefer_passwd`, or else the last one; i.e. `Iterator::max_by_key` with the key
+/// `needs_passwd() == prefer_passwd`, which returns the last maximal element.
+fn select_tag<User: UnixUser>(
+    rules: &[PermissionSpec],
+    aliases: &AliasTable,
+    invoking_user: &User,
+    hostname: &system::Hostname,
+    prefer_passwd: bool,
+) -> Option<Tag> {
+    let user_matcher = &match_user(invoking_user);
+    let host_matcher = &match_token(hostname);
+    let user_aliases = get_aliases(&aliases.user, user_matcher);
+    let host_aliases = get_aliases(&aliases.host, host_matcher);
+
+    let mut result = None;
+    let mut i = 0;
+    while i < rules.len() {
+        if find_item(&rules[i].users, user_matcher, &user_aliases) {
+            let permissions = &rules[i].permissions;
+            let mut j = 0;
+            while j < permissions.len() {
+                if find_item(&permissions[j].0, host_matcher, &host_aliases) {
+                    result = select_commands(result, &permissions[j].1, prefer_passwd);
+                }
+                j += 1;
+            }
+        }
+        i += 1;
+    }
+
+    result
+}
+
+/// Continue the search of [select_tag] (where `result` is the outcome so far) through a list of
+/// RunAs + Command specifications
+fn select_commands(
+    mut result: Option<Tag>,
+    runas_cmds: &[(Option<RunAs>, CommandSpec)],
+    prefer_passwd: bool,
+) -> Option<Tag> {
+    let tags = distribute_tags(runas_cmds);
+
+    let mut i = 0;
+    while i < tags.len() {
+        let (_, tag) = &tags[i];
+        let keep = match &result {
+            Some(best) => {
+                best.needs_passwd() == prefer_passwd && tag.needs_passwd() != prefer_passwd
+            }
+            None => false,
+        };
+        if !keep {
+            result = Some(tag.clone());
+        }
+        i += 1;
+    }
+
+    result
 }
 
 /// Check if the user `am_user` is allowed to run `cmdline` on machine `on_host` as the requested

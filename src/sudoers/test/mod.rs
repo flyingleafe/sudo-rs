@@ -987,3 +987,236 @@ fn ignored_specifiers_are_reported_in_sudoers_order() {
     );
     assert_eq!(IGNORED.with_borrow(Vec::clone), ["RUNASBAD", "USERBAD"]);
 }
+
+/// The tag selection of `check_validate_permission` before it became [select_tag]
+fn validate_tag_by_iterator(
+    sudoers: &Sudoers,
+    user: &Named,
+    host: &system::Hostname,
+) -> Option<Tag> {
+    sudoers
+        .matching_user_specs(user, host)
+        .flatten()
+        .map(|(_, (tag, _))| tag)
+        .max_by_key(|tag| tag.needs_passwd())
+}
+
+/// The tag selection of `check_list_permission` (own entries) before it became [select_tag]
+fn list_tag_by_iterator(sudoers: &Sudoers, user: &Named, host: &system::Hostname) -> Option<Tag> {
+    sudoers
+        .matching_user_specs(user, host)
+        .flatten()
+        .map(|(_, (tag, _))| tag)
+        .max_by_key(|tag| !tag.needs_passwd())
+}
+
+#[test]
+fn select_tag_is_the_last_maximum() {
+    let (sudoers, errors) = analyze(
+        Path::new("/etc/fakesudoers"),
+        sudoer![
+            "User_Alias ADMINS = alice, %:BADGROUP",
+            "Host_Alias SERVERS = server, !laptop",
+            "alice ALL = NOPASSWD: CWD=/a /bin/a, PASSWD: CWD=/b /bin/b, CWD=/c /bin/c, \
+             NOPASSWD: CWD=/d /bin/d",
+            "bob server = CWD=/e /bin/e : laptop = NOPASSWD: CWD=/f /bin/f, /bin/g",
+            "ADMINS SERVERS = (root) PASSWD: CWD=/h ALL, NOPASSWD: CWD=/i /bin/i",
+            "carol ALL = NOPASSWD: CWD=/j /bin/j, CWD=/k /bin/k",
+            "dave ALL = CWD=/m /bin/m",
+            "ALL, !alice ALL = CWD=/l /bin/l",
+            "erin laptop = NOPASSWD: /bin/n"
+        ],
+    );
+    assert!(errors.is_empty());
+
+    let cwd = |user: &'static str, host: &str, prefer_passwd: bool| {
+        let host = system::Hostname::fake(host);
+        let tag = select_tag(
+            &sudoers.rules,
+            &sudoers.aliases,
+            &Named(user),
+            &host,
+            prefer_passwd,
+        );
+        tag.map(|tag| tag.cwd)
+    };
+    let path = |p: &str| Some(Some(ChDir::Path(p.into())));
+
+    // validate prefers the last entry that needs a password, list the last one that does not
+    assert_eq!(cwd("alice", "other", true), path("/c"));
+    assert_eq!(cwd("alice", "other", false), path("/d"));
+    assert_eq!(cwd("alice", "server", true), path("/h"));
+    assert_eq!(cwd("alice", "server", false), path("/i"));
+    assert_eq!(cwd("carol", "other", true), path("/l"));
+    assert_eq!(cwd("carol", "other", false), path("/k"));
+    // without a preferred entry, the last entry
+    assert_eq!(cwd("dave", "other", true), path("/l"));
+    assert_eq!(cwd("dave", "other", false), path("/l"));
+    assert_eq!(cwd("bob", "laptop", true), path("/l"));
+    assert_eq!(cwd("bob", "laptop", false), path("/f"));
+    assert_eq!(cwd("erin", "laptop", false), Some(None));
+
+    // and it agrees with the `Iterator::max_by_key` it replaces
+    for user in ["alice", "bob", "carol", "dave", "erin", "root", "nobody"] {
+        for host in ["server", "laptop", "other"] {
+            let fake = system::Hostname::fake(host);
+            assert_eq!(
+                select_tag(&sudoers.rules, &sudoers.aliases, &Named(user), &fake, true),
+                validate_tag_by_iterator(&sudoers, &Named(user), &fake),
+            );
+            assert_eq!(
+                select_tag(&sudoers.rules, &sudoers.aliases, &Named(user), &fake, false),
+                list_tag_by_iterator(&sudoers, &Named(user), &fake),
+            );
+        }
+    }
+}
+
+#[test]
+fn validate_flags_password_rule() {
+    let (sudoers, _) = analyze(
+        Path::new("/etc/fakesudoers"),
+        sudoer![
+            "alice ALL = PASSWD: /bin/a, NOPASSWD: /bin/b",
+            "bob ALL = NOPASSWD: /bin/c",
+            "root ALL = PASSWD: /bin/d",
+            "carol laptop = /bin/e"
+        ],
+    );
+    let needs_passwd = |user: &'static str, host: &str| {
+        validate_flags(
+            &sudoers.rules,
+            &sudoers.aliases,
+            &Named(user),
+            &system::Hostname::fake(host),
+        )
+        .map(|tag| tag.needs_passwd())
+    };
+
+    assert_eq!(needs_passwd("alice", "server"), Some(true));
+    assert_eq!(needs_passwd("bob", "server"), Some(false));
+    // root never needs a password
+    assert_eq!(needs_passwd("root", "server"), Some(false));
+    // no applicable entry
+    assert_eq!(needs_passwd("carol", "server"), None);
+    assert_eq!(needs_passwd("carol", "laptop"), Some(true));
+    assert_eq!(needs_passwd("nobody", "server"), None);
+}
+
+#[test]
+fn list_flags_cases() {
+    let (sudoers, _) = analyze(
+        Path::new("/etc/fakesudoers"),
+        sudoer![
+            "alice ALL = PASSWD: /bin/a, NOPASSWD: /bin/b",
+            "bob ALL = /bin/c",
+            "carol ALL = (bob) list",
+            "dave ALL = (bob) NOPASSWD: list",
+            "root ALL = (bob) !list"
+        ],
+    );
+    let list = |invoking: &'static str, inspected: &'static str, target: &'static str, group| {
+        list_flags(
+            &sudoers.rules,
+            &sudoers.aliases,
+            &Named(invoking),
+            &system::Hostname::fake("server"),
+            ListRequest {
+                inspected_user: &Named(inspected),
+                target_user: &Named(target),
+                target_group: &Named(group),
+            },
+        )
+    };
+    let passwd = |i, s, t, g| list(i, s, t, g).map(|tag| tag.needs_passwd());
+
+    // own entries: a password is needed unless some entry has NOPASSWD
+    assert_eq!(passwd("alice", "alice", "root", "root"), Some(false));
+    assert_eq!(passwd("bob", "bob", "root", "root"), Some(true));
+    // ... or the target is the invoking user with one of their groups
+    assert_eq!(passwd("bob", "bob", "bob", "bob"), Some(false));
+    assert_eq!(passwd("bob", "bob", "bob", "root"), Some(true));
+    assert_eq!(list("nobody", "nobody", "root", "root"), None);
+    // root has an entry (a forbidden one) and needs no password
+    assert_eq!(passwd("root", "root", "root", "root"), Some(false));
+
+    // another user's entries: the pseudo-command `list` as that user
+    assert_eq!(passwd("carol", "bob", "root", "root"), Some(true));
+    assert_eq!(passwd("dave", "bob", "root", "root"), Some(false));
+    assert_eq!(list("carol", "alice", "root", "root"), None);
+    assert_eq!(list("alice", "bob", "root", "root"), None);
+    // root may always, even where `list` is forbidden, with the default tag and NOPASSWD
+    let root_default = Some(Tag {
+        authenticate: Authenticate::Nopasswd,
+        ..Tag::default()
+    });
+    assert_eq!(list("root", "bob", "root", "root"), root_default);
+    assert_eq!(list("root", "alice", "root", "root"), root_default);
+
+    // root without any entry of its own may not list its own entries
+    let (empty, _) = analyze(Path::new("/etc/fakesudoers"), sudoer!["bob ALL = /bin/c"]);
+    let request = ListRequest {
+        inspected_user: &Named("root"),
+        target_user: &Named("root"),
+        target_group: &Named("root"),
+    };
+    let host = system::Hostname::fake("server");
+    assert_eq!(
+        list_flags(&empty.rules, &empty.aliases, &Named("root"), &host, request),
+        None
+    );
+}
+
+/// (`must_authenticate`, `allowed_attempts`) of a granted authorization
+fn granted(authorization: Authorization) -> Option<(bool, u16)> {
+    match authorization {
+        Authorization::Allowed(auth, ()) => Some((auth.must_authenticate, auth.allowed_attempts)),
+        Authorization::Forbidden => None,
+    }
+}
+
+#[test]
+fn list_and_validate_apply_defaults_then_decide() {
+    let sudoers = || {
+        let (sudoers, errors) = analyze(
+            Path::new("/etc/fakesudoers"),
+            sudoer![
+                "Defaults:%:DEFBAD passwd_tries=5",
+                "Defaults:alice passwd_tries=4",
+                "Defaults!list passwd_tries=7",
+                "%:RULEBAD, alice ALL = (bob) list, /bin/a"
+            ],
+        );
+        assert!(errors.is_empty());
+        sudoers
+    };
+    let host = system::Hostname::fake("server");
+    let list_request = |inspected: &'static Named| ListRequest {
+        inspected_user: inspected,
+        target_user: &Named("root"),
+        target_group: &Named("root"),
+    };
+
+    IGNORED.with_borrow_mut(Vec::clear);
+    let auth = sudoers().check_validate_permission(&Named("alice"), &host);
+    assert_eq!(granted(auth), Some((true, 4)));
+    assert_eq!(IGNORED.with_borrow(Vec::clone), ["DEFBAD", "RULEBAD"]);
+
+    // another user: the Defaults of `Sudoers::check` for the command `list`
+    IGNORED.with_borrow_mut(Vec::clear);
+    let auth = sudoers().check_list_permission(&Named("alice"), &host, list_request(&Named("bob")));
+    assert_eq!(granted(auth), Some((true, 7)));
+    assert_eq!(IGNORED.with_borrow(Vec::clone), ["DEFBAD", "RULEBAD"]);
+
+    // own entries: no user-, host- or command-specific Defaults
+    IGNORED.with_borrow_mut(Vec::clear);
+    let auth =
+        sudoers().check_list_permission(&Named("alice"), &host, list_request(&Named("alice")));
+    assert_eq!(granted(auth), Some((true, 3)));
+    assert_eq!(IGNORED.with_borrow(Vec::clone), ["RULEBAD"]);
+
+    let auth = sudoers().check_list_permission(&Named("bob"), &host, list_request(&Named("alice")));
+    assert_eq!(granted(auth), None);
+    let auth = sudoers().check_validate_permission(&Named("bob"), &host);
+    assert_eq!(granted(auth), None);
+}
