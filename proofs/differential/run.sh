@@ -44,6 +44,8 @@ echo "== sudo-rs" >&2
 echo "== testsudoers" >&2
 "$oracle" csudo "$n" "$seed" "$ts" "$scratch/work" "$jobs" > "$scratch/c-sudo.out"
 
+"$oracle" coverage "$n" "$seed"
+
 echo "== comparing" >&2
 rm -rf "$here/disagreements"
 "$oracle" compare "$n" "$seed" "$scratch/sudo-rs.out" "$scratch/c-sudo.out" \

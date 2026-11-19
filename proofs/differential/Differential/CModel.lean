@@ -9,7 +9,7 @@ be replaced by transcriptions of the C sudo 1.9.18 code:
 
 * `cRunas`: whether a command entry's runas spec permits the request, as C's
   `runaslist_matches` (`plugins/sudoers/match.c` 294-331) with `runas_userlist_matches`
-  (146-212) and `runas_grouplist_matches` (219-286) decides it, instead of sudo-rs's
+  (151-214) and `runas_grouplist_matches` (222-284) decides it, instead of sudo-rs's
   `runas_allowed` (`check_permission`, `src/sudoers/mod.rs`);
 * `cArgs`: argument matching as C's `command_args_match` (`match_command.c` 80-112) does it
   with `fnmatch(3)`, instead of `Args::Prefix` / `Args::Exact`.
@@ -44,7 +44,7 @@ def lastSpecified (l : List α) (f : α → Tri) : Tri :=
 /-- The result of a member that matched, honouring its `!`. -/
 def hit (s : Qualified α) : Tri := some (match s with | .allow _ => true | .forbid _ => false)
 
-/-- `rc` of an alias reference, flipped by its `!` (`match.c` 176-184, 247-255). -/
+/-- `rc` of an alias reference, flipped by its `!` (`match.c` 181-189, 240-248). -/
 def viaAlias (s : Qualified α) (rc : Tri) : Tri :=
   match s with | .allow _ => rc | .forbid _ => rc.map (!·)
 
@@ -70,7 +70,7 @@ def userMember (ctx : Ctx) (pw : UserEnt) : UserSpecifier → Bool
   | .group (.id g) => (ctx.db.gidsOf pw).contains g
   | .nonunixGroup _ => false
 
-/-- `runas_userlist_matches` (`match.c` 146-212) over a list of members; `fuel` bounds the
+/-- `runas_userlist_matches` (`match.c` 151-214) over a list of members; `fuel` bounds the
 alias nesting (the generated tables are acyclic). -/
 def runasUserList (ctx : Ctx) (t : List (Def UserSpecifier)) :
     Nat → List (Spec UserSpecifier) → Tri
@@ -83,7 +83,7 @@ def runasUserList (ctx : Ctx) (t : List (Def UserSpecifier)) :
       | none => if ctx.runasPw.name == n then hit s else none
     | .only u => if userMember ctx ctx.runasPw u then hit s else none
 
-/-- The `MYSELF` member of an empty runas user list (`match.c` 196-205). -/
+/-- The `MYSELF` member of an empty runas user list (`match.c` 198-207). -/
 def myself (ctx : Ctx) : Tri :=
   if (!ctx.userSpecified && ctx.groupSpecified) || ctx.invoker.name == ctx.runasPw.name then
     some true else none
@@ -94,7 +94,7 @@ def groupMember (gr : GroupEnt) : UserSpecifier → Bool
   | .user (.id n) => gr.gid == n
   | _ => false
 
-/-- `runas_grouplist_matches` (`match.c` 219-286). `l = none` is a NULL group list. Members of
+/-- `runas_grouplist_matches` (`match.c` 222-284). `l = none` is a NULL group list. Members of
 a group list are `Identifier`s, members of a `Runas_Alias` are `UserSpecifier`s; both are
 handled as `UserSpecifier` (an identifier `i` is `.user i`), and `%group` members of an alias
 are of type `USERGROUP`, which the switch ignores. -/
@@ -111,7 +111,7 @@ def runasGroupList (ctx : Ctx) (gr : GroupEnt) (t : List (Def UserSpecifier)) (u
           | some d => viaAlias s (runasGroupList ctx gr t userMatched fuel (some d.items))
           | none => if gr.name == n then hit s else none
         | .only u => if groupMember gr u then hit s else none
-    -- 266-283: not explicitly matched, but the runas user matched: its own groups qualify
+    -- 263-282: not explicitly matched, but the runas user matched: its own groups qualify
     if explicit.isNone && userMatched == some true then
       if ctx.runasPw.gid == gr.gid || (ctx.db.gidsOf ctx.runasPw).contains gr.gid then some true
       else none
