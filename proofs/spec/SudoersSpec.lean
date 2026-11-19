@@ -5,6 +5,7 @@ import SudoersSpec.Aliases
 import SudoersSpec.Distribute
 import SudoersSpec.Authorize
 import SudoersSpec.Theorems
+import SudoersSpec.Authorization
 import SudoersSpec.Examples
 import SudoersSpec.ListValidate
 import SudoersSpec.Axioms

@@ -1,5 +1,6 @@
 import SudoersSpec.Theorems
 import SudoersSpec.ListValidate
+import SudoersSpec.Authorization
 
 /-! Axiom audit: every main result depends on at most `propext`, `Classical.choice` and
 `Quot.sound`. `lake build` prints the lists. -/
@@ -40,3 +41,17 @@ open SudoersSpec
 #print axioms listFlags_self_eq_none_iff
 #print axioms listFlags_self_needsPasswd
 #print axioms listFlags_self_of_entry
+#print axioms authorization_eq_forbidden_iff
+#print axioms authorization_eq_allowed_iff
+#print axioms authorization_mustAuthenticate
+#print axioms toAuth_mustAuthenticate_eq_false_iff
+#print axioms credentialOf_eq_root_iff
+#print axioms credentialOf_eq_targetUser_iff
+#print axioms credentialOf_eq_invokingUser_iff
+#print axioms restrictionsOf_explicit
+#print axioms restrictionsOf_tag_independent
+#print axioms chdirOf_runcwd
+#print axioms runcwdDir_star
+#print axioms authorization_authorize_forbidden
+#print axioms authorization_authorize_no_auth
+#print axioms authorization_authorize_root

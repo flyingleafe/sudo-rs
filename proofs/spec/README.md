@@ -28,6 +28,7 @@ listed under *Findings* below.
 | `SudoersSpec/Distribute.lean` | `distribute_tags` as a scan (`distributeTags`) and per-prefix (`distributeTagsSpec`), proved equal. |
 | `SudoersSpec/Authorize.lean` | `checkPermission` and `authorize` in structural form (b) and declarative form (a), proved equal. |
 | `SudoersSpec/Theorems.lean` | Meta-theorems. |
+| `SudoersSpec/Authorization.lean` | `authorization`: the decision plus the Defaults in force mapped to `Authorization::{Allowed(Authentication, Restrictions), Forbidden}` (`policy.rs`); meta-theorems (forbidden iff denied, `must_authenticate` = `needsPasswd`, credential rule, explicit tags win, composition with `authorize`). |
 | `SudoersSpec/Examples.lean` | 99 `#guard`s, most mirroring `pass!`/`FAIL!` cases of `src/sudoers/test/mod.rs` `permission_test`, the rest pinning down the findings below; 6 kernel-checked `example ... := by decide`. |
 | `SudoersSpec/ListValidate.lean` | The flags of `sudo -v` and `sudo -l` (`mod.rs` `validate_flags`, `list_flags`): `maxByKey` (`Iterator::max_by_key` with a `Bool` key), `entryTags`/`applicableEntries`, `validateFlags`, `listFlags`; their meta-theorems; 11 `#guard`s for the findings below. |
 | `SudoersSpec/Axioms.lean` | `#print axioms` audit. |
@@ -232,3 +233,23 @@ Man = `docs/man/sudoers.5.md` and `docs/man/sudo.8.md` at the fork's head; code 
     `sudo -l` (unit test `list_and_validate_apply_defaults_then_decide`). `sudo -v` applies
     user- and host-specific Defaults but no runas-specific ones, and its decision takes no
     target user, although sudo.8 13 lists `-u`/`-g` for `sudo -v`.
+
+### From the decision to the terms of execution (`Authorization.lean`)
+
+Man = `docs/man/sudoers.5.md`; code = `Judgement::authorization` and `Settings::to_auth` in
+`src/sudoers/policy.rs`, `ChDir::construct` in `src/sudoers/tokens.rs`.
+
+24. **A `runcwd` value with a `*` is silently ignored.** Sudoers.5 473 gives `*` as the only special
+    value. In code any other value containing `*` (e.g. `/tmp/*`), or containing NUL, is accepted
+    by the parser and then dropped by `.ok()`, leaving `DirChange::Strict(None)`
+    (`runcwdDir_star`, unit test `runcwd_test`).
+25. **`runcwd` skips the `CWD=` token checks.** Only `ChDir::construct` runs on the Defaults text, so
+    `Defaults runcwd=relative` gives `Strict(Some("relative"))`; a `CWD=` tag must start with
+    `~`, `/` or `*` (`accept_1st`). The man page does not say.
+26. **`passwd_tries` is capped at 1000.** Sudoers.5 429-431 gives no maximum; `set` rejects
+    values above 1000, which is what makes the `try_into::<u16>().unwrap()` in `to_auth` safe.
+27. **No unset `umask`.** Sudoers.5 447: "If umask is not set, the umask specified by PAM will take
+    precedence." In code `umask` always has a value (initially `0o022`), and `authorization`
+    yields `Umask::Extend(0o022)` unless it is changed; only `0777` yields `Umask::Preserve`.
+28. **`rootpw` before `targetpw`.** With both set, the root password is asked
+    (`credentialOf_eq_root_iff`); sudoers.5 405-415 do not say which wins.
