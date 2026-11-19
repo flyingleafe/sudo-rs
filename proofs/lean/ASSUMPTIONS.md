@@ -22,6 +22,7 @@ it, so a theorem that depends on its behaviour has to take that behaviour as a h
 | `std.hash.random.RandomState`, `std.hash.random.DefaultHasher` | `opaque` types | Hash seeding and hash states are not observed by the extensional set model. |
 | `glob.Pattern` | `opaque` type | Glob semantics is not modelled. |
 | `common.string.SudoString` | `structure { str : String }` | Opaque for Charon; Rust `struct SudoString { inner: String }` where `inner` = text + NUL; modelled by the text its `Deref<Target = str>` exposes. |
+| `core.time.Duration` | `structure { secs : U64, nanos : U32 }` | Rust `struct Duration { secs: u64, nanos: Nanoseconds }` (`core/src/time.rs`); only built by `Duration::from_secs`. |
 
 `glob.MatchOptions` is a plain struct that Aeneas extracts itself (`SudoRs/Types.lean`).
 
@@ -56,6 +57,14 @@ Helpers: `sudo_rs.stringBytes s` = the UTF-8 bytes of `s` as `U8`s; `sudo_rs.str
 | `std.collections.hash.set.HashSetTRandomStateGlobal.new`, `std.collections.hash.set.HashSet.insert` | empty set; test key equality and insert if absent | `usize` and `&String` have lawful equality and hashing; buckets and hashing affect neither membership nor the insertion flag. |
 | `Usize.Insts.CoreHashHash.hash`, `alloc.string.String.Insts.CoreHashHash.hash`, `Shared0T.Insts.CoreHashHash.hash`, `std.hash.random.*.Insts.CoreHash*.{finish,write,build_hasher}` | hash state and seeding operations opaque; reference hashing delegates to the referent | These operations only populate trait dictionaries ignored by the extensional set model. |
 | `sudoers.alias_diagnostic` | append the corresponding message with no source or location | Opaque for Charon to isolate formatting. The input `&str` borrows a definition or dependency name and is valid UTF-8. |
+| `sudo_rs.stringOfStr` (helper) | `String.fromUTF8Lossy` of the bytes | The text of a `&str`. A Rust `&str` is valid UTF-8, so the decoding is lossless on every value with a Rust counterpart. Used to read `Box<str>` Defaults (`runcwd`, `secure_path`) in `absDefaults`/`absRestrictions` and by `String::from(&str)`. |
+| `alloc.string.String.Insts.CoreConvertFromShared0Str.from` | `ok (stringOfStr s)` | `String::from(&str)` copies the bytes. |
+| `U16.Insts.CoreConvertTryFromU64TryFromIntError.try_from`, `U32.Insts.CoreConvertTryFromU64TryFromIntError.try_from` | `core.num.tryFromUScalar` (Aeneas library): `Ok` with the same value iff it fits, else `Err ()` | `TryFrom<u64>` for `u16`/`u32` (`core/src/convert/num.rs`); same model as the library's `TryFrom<usize> for u32`. |
+| `core.num.error.TryFromIntError.Insts.CoreFmtDebug.fmt` | **`opaque`** | Only fills the `Debug` dictionary of `unwrap`/`expect`, whose library models ignore it (`Err` is a panic). |
+| `core.option.Option.as_deref`, `and_then`, `or_else`, `core.result.Result.ok` | the `core::option` / `core::result` definitions (`as_deref` = `deref` of the payload; `or_else` calls the closure only on `None`; `ok` drops the error) | Plain combinators. |
+| `core.time.Duration.from_secs` | `ok { secs, nanos := 0 }` | `Duration { secs, nanos: Nanoseconds::ZERO }`; cannot panic. |
+| `sudoers.tokens.ChDir.Insts.Sudo_rsSudoersBasic_parserToken.construct` | `"*"` ↦ `Ok(Any)`; text containing `'*'` ↦ `Err("path cannot contain '*'")`; text containing `'\x00'` ↦ `Err(chdirPathErrorText s)`; otherwise `Ok(Path { inner: s })` | Opaque for Charon (`Cargo.toml`): it reaches `str::contains`, whose `Pattern` trait Aeneas cannot translate. **A trusted transcription, not a proof**, of `tokens.rs` lines 440-450 and `SudoPath::try_from`/`SudoPath::new` (`path.rs` lines 19-34, 86-92: reject a NUL byte; the UTF-8 check cannot fail on a `String`; keep the text). In UTF-8 the bytes `*` and NUL occur only as those characters. Pinned by `policy.rs` `runcwd_test`. |
+| `sudo_rs.chdirPathErrorText` | **`opaque`** `String → String` | The text of `Error::PathValidation(..).to_string()`. Its only caller in the extracted code (`runcwd` in `authorization`) discards it with `.ok()`. |
 
 ## Hypotheses of the theorems
 
@@ -70,6 +79,7 @@ The theorems in `SudoRsProofs/` take these hypotheses instead of axioms:
 | `v.val.length < Usize.max` | `FoundAliases::insert` | `Vec::push` fails on capacity overflow. Inside `get_aliases` this is discharged (the set grows by at most one entry per alias). |
 | `TableWF table` (`∀ i ∈ order, i < defs.len`) | `get_aliases` | `defs[order[i]]` is bounds-checked; the caller must supply this for arbitrary tables. `sanitize_alias_table_tableWF` discharges it for outputs of the extracted producer. |
 | `(lineMods line).length ≤ Usize.max` (with `t.ignored.len + …` for the inner loops) | `apply_modifiers`, `distribute_tags` | `Modifier::Ignored` pushes onto `Tag::ignored`; the total number of modifiers of a line, all of which are in memory, bounds that vector. |
+| `SettingsInRange s` (`s.passwd_tries ≤ u16::MAX`, `s.umask ≤ u32::MAX`) | `authorization_eq`, `authorization_permission_flags_*` (`to_auth_eq` takes only the first) | `authorization` converts these `u64` Defaults with `try_into().unwrap()` / `.expect(..)`; out of range it panics (`authorization_panics_of_passwd_tries`, `authorization_panics_of_umask`). **Not proved from the Defaults DSL** (its modifiers are boxed closures): `Settings` fields are private to `crate::defaults` and change only through `Settings::default`, `negate` and `set` (`src/defaults/settings_dsl.rs`). `passwd_tries = 3 [0..=1000]`: initial 3, `set` keeps values in `0..=1000`, `negate` rejects it (no `!=` clause, not a flag or list). `umask = 0o022 (!= 0o777) {octal_mode}`: initial `0o22`, negation `0o777`, `set` stores `octal_mode`, a parsed `libc::mode_t` widened to `u64`; `mode_t` is `u32` on Linux (the extraction platform). |
 
 The tag layer is generic in the abstraction of runas specs and commands (`fr`, `fc` in
 `SudoRsProofs/AbsTags.lean`): `distribute_tags` never looks inside them.
@@ -120,3 +130,10 @@ point where the model is not a literal transcription of the source.
 
 The theorems quantify over the oracle `O`, the abstraction `A`, the instances and all inputs, so
 they hold for every OS user database and glob semantics consistent with the hypotheses.
+
+`authorization_eq` (`SudoRsProofs/Authorization.lean`, against `SudoersSpec.authorization`)
+carries only `SettingsInRange j.settings`, for an arbitrary `Judgement j`.
+`authorization_permission_flags_eq` / `authorization_permission_flags_props` carry the five
+hypotheses above plus `SettingsInRange settings`. The `env_keep`/`env_check` sets are passed
+through and compared in the extensional list model of `HashSet`. The `apparmor` feature is not
+enabled during extraction, so its `apparmor_profile` restriction is not covered.

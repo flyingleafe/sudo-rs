@@ -15,4 +15,5 @@ import SudoRsProofs.PermSpec
 import SudoRsProofs.AbsPolicy
 import SudoRsProofs.Permission
 import SudoRsProofs.ListValidate
+import SudoRsProofs.Authorization
 import SudoRsProofs.Axioms

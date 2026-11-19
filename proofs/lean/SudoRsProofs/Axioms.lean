@@ -3,6 +3,7 @@ import SudoRsProofs.SanitizeAliases
 import SudoRsProofs.Permission
 import SudoRsProofs.ListValidate
 import SudoRsProofs.NonVacuity
+import SudoRsProofs.Authorization
 
 /-!
 # Axiom audit
@@ -51,3 +52,9 @@ of `SudoRs/{Types,Funs}External.lean` are definitions or `opaque` constants, nev
 #print axioms SudoRsProofs.NonVacuity.validate_member
 #print axioms SudoRsProofs.NonVacuity.validate_excluded
 #print axioms SudoRsProofs.NonVacuity.list_self_member
+#print axioms SudoRsProofs.to_auth_eq
+#print axioms SudoRsProofs.authorization_eq
+#print axioms SudoRsProofs.authorization_panics_of_passwd_tries
+#print axioms SudoRsProofs.authorization_panics_of_umask
+#print axioms SudoRsProofs.authorization_permission_flags_eq
+#print axioms SudoRsProofs.authorization_permission_flags_props
