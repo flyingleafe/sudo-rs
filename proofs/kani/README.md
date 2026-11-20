@@ -27,6 +27,9 @@ all on a shared 4-CPU slice with other jobs running.
 |---|---|
 | `common::resolve::canonicalize` | the path unchanged, another path, or an error |
 | `libc::free` (PAM buffer only) | asserts the freed buffer is wiped; does not release it |
+| `system::audit::secure_open_cookie_file` (E1) | checks the path it receives on the bytes, then ends the execution (`kani::assume(false)`); a `kani::cover!` shows it is reached |
+| `system::time::SystemTime::now` (E5) | any normalised time |
+| `system::User::from_uid` (E5 rootpw) | an entry with the requested uid, other fields arbitrary (lookup failures not modelled) |
 
 ## Results (bounded proofs; all PASS)
 
@@ -59,6 +62,15 @@ all on a shared 4-CPU slice with other jobs running.
 | record_encode_decode_roundtrip_tty | a tty-scope session record encodes to 50 bytes and decodes to itself | all field values, nanoseconds in [0, 10^9) | 45 s | 519 | 5G |
 | record_encode_decode_roundtrip_ppid | a parent-process-scope record encodes to 46 bytes and decodes to itself | same | 40 s | 460 | 5G |
 | record_matches_exactly_its_scope_and_auth_user | a record matches (scope, authenticating user) iff scope and uid are the ones written; the targetpw and invoking-user constructors carry that user's uid | all scopes, uids; 2-byte user names | 172 s | 2571 | 5G |
+| record_path_is_uid_entry_name_2_bytes | (E1, CVE-2023-42456 class) `open_for_user` opens exactly `/var/run/sudo-rs/ts/1000`: inside the directory, no `..` last component, named by the uid alone | uid 1000; every valid 2-byte name | 132 s | 1196 | 5G |
+| record_path_is_uid_entry_name_3_bytes | same | uid 1000; every valid 3-byte name | 127 s | 1200 | 5G |
+| record_decode_tty_50_bytes | (E3) decoding never panics or reads outside the input; accepted iff enabled flag is 0x00/0xFF | 50 bytes, tag 1; stored seconds in [-2^62, 2^62] | 32 s | 462 | 5G |
+| record_decode_ppid_46_bytes | same | 46 bytes, tag 2; same precondition | 30 s | 447 | 5G |
+| record_decode_tty_wrong_lengths_fail | (E3) rejected without panic | tag 1; 1, 13, 45, 46, 47, 49, 51 bytes; same precondition | 129 s | 2183 | 5G |
+| record_decode_ppid_wrong_lengths_fail | same | tag 2; 1, 13, 45, 47, 49, 50, 51 bytes; same precondition | 183 s | 2721 | 5G |
+| created_record_identifies_invoking_user | (E5, CVE-2025-64517 class) the created record matches the authenticating user, no user with another uid, and not the invoking user unless same uid | default authentication; all scopes, uids; 2-byte names | 56 s | 666 | 5G |
+| created_record_identifies_target_user_targetpw | same; the record carries the target user's uid | targetpw | 64 s | 683 | 5G |
+| created_record_identifies_root_rootpw | same; `resolve_root_for_rootpw` yields uid 0 | rootpw, lookup returns an entry | 491 s | 828 | 5G |
 
 ## Planted bugs
 
@@ -82,7 +94,9 @@ CVE-2023-42456), record decoding without its precondition.
   `Group::from_libc`: Kani 0.68 does not support the foreign `strlen` used by `CStr::from_ptr`.
 - `read_unbuffered` (rpassword): unwinding of the 512-byte wipe on drop exceeds the bounds.
 - Direct-mode `build_from_args` argv tail: timed out (420 s) even at 2 x 1 byte.
-- Session record file path (`SessionRecordFile::open_for_user`), decoding of arbitrary bytes,
-  and record creation per authentication source: in progress, not yet verified.
+- Session record decoding: inputs whose first byte (scope tag) is not 1 or 2 (error message
+  formatting and boxed custom error: timed out at 300-600 s, even for 3 concrete tags);
+  re-encoding a decoded well-formed record to the same bytes (out of memory at 5 GiB).
+- Session record path for an arbitrary uid (E1 uses uid 1000): timed out at 420 s.
 - The authenticating-user choice in `sudo::pipeline::auth_and_update_record_file` (PAM,
   process and file calls) and `SessionRecordFile::create` (real file I/O) are not reachable.

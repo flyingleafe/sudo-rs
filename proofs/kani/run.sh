@@ -77,7 +77,11 @@ for h in "${selected[@]}"; do
   secs=$(awk -v a="$start" -v b="$(date +%s.%N)" 'BEGIN { printf "%.1f", b - a }')
   peak=$(sed -n 's/^limited: peak memory \([0-9]*\) MiB.*/\1/p' "$log" | tail -n 1)
   [ -n "$peak" ] || peak=$(awk '/^maxrss_kib/ { print int($2 / 1024) }' "$log" | tail -n 1)
-  if [ $rc -eq 0 ] && grep -q 'Complete - 1 successfully verified harnesses, 0 failures' "$log"; then
+  # A harness whose `kani::cover!` is not satisfied verified nothing on that path (vacuous).
+  uncovered=$(sed -n 's/^ \*\* \([0-9]*\) of \([0-9]*\) cover properties satisfied.*/\1 \2/p' "$log" |
+                awk '$1 != $2' | head -n 1)
+  if [ $rc -eq 0 ] && grep -q 'Complete - 1 successfully verified harnesses, 0 failures' "$log" &&
+     [ -z "$uncovered" ]; then
     res=PASS
   elif [ $rc -eq 124 ]; then
     res=TIME; failed=1
