@@ -133,13 +133,18 @@ coverage() {
       echo "$t: coverage run failed, see $out/$t/coverage.log"
       continue
     }
-    "$llvm/llvm-cov" report "$CARGO_TARGET_DIR/x86_64-unknown-linux-gnu/coverage/x86_64-unknown-linux-gnu/release/$t" \
+    # cargo fuzz coverage builds into the target directory of the repository root
+    local bin
+    bin=$(find "$root/target" "$CARGO_TARGET_DIR" -path "*/coverage/*/release/$t" -type f 2>/dev/null | head -1)
+    "$llvm/llvm-cov" report "$bin" \
       -instr-profile="$here/coverage/$t/coverage.profdata" \
       -ignore-filename-regex='(\.cargo/registry|rustlib|fuzz/fuzz_targets|src/fuzz_api\.rs)' \
       > "$out/$t/coverage.txt" 2>&1
+    # files with at least one line executed (column 10: line coverage)
     echo "== $t"
-    grep -E '^(Filename|TOTAL)|src/' "$out/$t/coverage.txt" |
-      awk '$1 == "Filename" || $1 == "TOTAL" || $(NF - 2) != "0" { print }' | sed "s|$root/||"
+    printf '%-45s %7s %7s %8s\n' file lines missed covered
+    grep -vE '^(Filename|-|$)' "$out/$t/coverage.txt" |
+      awk '$1 == "TOTAL" || $10 != "0.00%" { printf "%-45s %7s %7s %8s\n", $1, $8, $9, $10 }'
   done
 }
 
