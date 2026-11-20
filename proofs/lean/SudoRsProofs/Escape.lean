@@ -134,12 +134,12 @@ theorem push_eq (v : alloc.vec.Vec U8) (x : U8) : v.push x = okIfFits (v.val ++ 
   · have h' : (decide (v.val.length + 1 ≤ U32.max) ||
         decide (v.val.length + 1 ≤ Usize.max)) = true := by
       simp [h]
-    simp only [h', h, ↓reduceDIte]
+    rw [dite_eq_left_of_eq_true (eq_true h'), dite_eq_left_of_eq_true (eq_true h)]
   · have h' : ¬ (decide (v.val.length + 1 ≤ U32.max) ||
         decide (v.val.length + 1 ≤ Usize.max)) = true := by
       simp only [Bool.or_eq_true, decide_eq_true_eq, not_or]
       omega
-    simp only [h', h, ↓reduceDIte]
+    rw [dite_eq_right_of_eq_false (eq_false h'), dite_eq_right_of_eq_false (eq_false h)]
 
 /-! ## `is_unescaped` -/
 
