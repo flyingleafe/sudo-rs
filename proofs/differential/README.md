@@ -1,4 +1,4 @@
-# Differential test of the sudoers decision: spec, sudo-rs, C sudo
+# Differential test of the sudoers decision: spec, sudo-rs, C sudo; property search on sudo-rs
 
 A three-way differential test of the authorization decision:
 
@@ -7,15 +7,29 @@ A three-way differential test of the authorization decision:
 3. C sudo 1.9.18 (`/tmp/fi/src/sudo`, git `d58e85d`): `plugins/sudoers/testsudoers`, which runs
    the real sudoers parser and `sudoers_lookup`.
 
-For `./run.sh 20000 1`, the spec and sudo-rs agree on all 20,000 cases.
-The spec and C sudo disagree on 213 cases. Replacing the runas and command-argument
-semantics in the spec with transcriptions of the C code accounts for those differences
-on this corpus (see *Findings*). This is empirical evidence, not a proof of the C code.
+and a search for counterexamples to seven properties of the real sudo-rs code, each stated in
+Lean as a predicate over test cases (`Differential/Props.lean`).
+
+Evidence kinds: everything in this directory is **test** evidence (only the inputs tried),
+except `CModel.decide_off`, a kernel-checked proof that the attribution model with all switches
+off is the spec decision.
+
+For `./run.sh 20000 1`, the spec and sudo-rs agree on all 20,000 cases, on the verdict with
+every tag field and on the alias diagnostics of `Sudoers::read`. 7,629 of the cases contain
+alias hazards (names spelled like aliases, references to undefined aliases, cycles, duplicate
+definitions). C sudo rejects 2,665 policies (all of them with a duplicate alias definition);
+on the other 17,335 cases a model of C (the spec with C's runas, argument and alias rules
+switched in) agrees with `testsudoers` on every case, and the spec and C sudo disagree on 171
+(see *Findings*). This is empirical evidence, not a proof of the C code.
+
+The property search (`./props.sh`) ran every property on at least 10,000 instances whose
+precondition holds; see *Properties of the real code*.
 
 ## Running
 
 ```
 cd proofs/differential && nix develop ../.. -c ./run.sh [N] [SEED]      # defaults: 20000 1
+cd proofs/differential && nix develop ../.. -c ./props.sh [N] [SEED] [PROPS]   # defaults: 10000 1 "a b c d e f g"
 ```
 
 `run.sh` does the following:
@@ -34,14 +48,14 @@ The exit status is non-zero if the spec and sudo-rs disagree on any case.
 Environment variables:
 - `DIFF_SCRATCH` (default `/tmp/sudo-differential`) holds the cases, the engine outputs, the
   private `CARGO_TARGET_DIR` and the `testsudoers` build. It takes about 100 MB. Delete it when
-  done.
+  done. `TS_BUILD` and `CARGO_TARGET_DIR` move the last two elsewhere (to reuse a build).
 - `SUDO_SRC` (default `/tmp/fi/src/sudo`) is the C source tree. It is read-only; the build
   happens in a copy.
 - `JOBS` (default `nproc`) is the number of parallel `testsudoers` workers.
 - `MINIMIZE` (default 20) is how many disagreements of each cause and kind are minimised.
 
-The run takes about 90 seconds. The outputs go to `disagreements/` (git-ignored, replaced on
-every run):
+The run takes about 6 minutes on 4 CPUs. The outputs go to `disagreements/` (git-ignored,
+replaced on every run):
 
 | Path | Content |
 |---|---|
@@ -53,6 +67,13 @@ every run):
 
 Each ignored `.case` file contains a synthetic policy, synthetic user/group data, and the
 oracle outputs. These are policy-evaluation fixtures, not tests of the privileged runtime.
+
+`props.sh` builds the oracle and the sudo-rs unit-test binary, checks the generated paths,
+and runs `oracle prop` for each property: it draws N instances, runs their probes on the test
+binary in batches, checks each instance, shrinks the first `CAP` (default 5) failures of every
+class, runs each shrunk instance twice more, and writes it with its probe records and results to
+`PROPS_OUT/NAME/CLASS/inst-I.txt` (default `PROPS_OUT=/tmp/sudo-props`, outside the
+repository). The summary goes to standard output.
 
 ## Design
 
@@ -78,12 +99,13 @@ The spec decision is `SudoersSpec.authorize (oracleOf db) policy request`, uncha
   runs as the invoking user, `-u` alone uses the target's primary group, and no flags means
   `root:root`.
 - **`Generate.lean`**: the generator. The database is fixed: `root` and `toor` (both uid 0),
-  `alice`, `bob`, `carol`, `dave`, and eight groups. Primary groups and memberships are random.
-  Each policy has 0-3 aliases of each kind (`User_Alias`, `Runas_Alias`, `Host_Alias`,
-  `Cmnd_Alias`). Aliases are nested: a definition may refer to earlier ones. Members may be
-  negated. The definitions are printed in random order, so sudo-rs's topological sort and C's
-  lazy lookup are both exercised. The spec gets them in dependency order; by
-  `getAliases_fixpoint`, the order does not matter for an acyclic table.
+  `alice`, `bob`, `carol`, `dave`, the accounts `UA1` and `RA0`, ten groups (two of them, `RA1`
+  and `UA0`, spelled like aliases) and the hosts `h1`-`h3` and `HA1`. Primary groups and
+  memberships are random. Each policy has 0-3 aliases of each kind (`User_Alias`,
+  `Runas_Alias`, `Host_Alias`, `Cmnd_Alias`, named `UA0`, `RA0`, `HA0`, `CA0`, ...). Aliases are
+  nested: a definition may refer to earlier ones. Members may be negated. The definitions are
+  printed in random order, so sudo-rs's topological sort and C's lazy lookup are both
+  exercised.
 
   Each policy also has 1-4 lines with 1-2 host groups each. A line holds:
   - user lists with `user`, `#uid`, `%group`, `%#gid`, `ALL`, alias references and `!`;
@@ -92,81 +114,150 @@ The spec decision is `SudoersSpec.authorize (oracleOf db) policy request`, uncha
   - commands: a bare path, `path ""`, `path args`, `path args *`, `ALL`, `Cmnd_Alias`
     references, and `!`.
 
+  Half of the cases also have **alias hazards**, each with its own probability:
+  - names spelled like aliases in user, host, runas-user and runas-group positions: the
+    accounts, groups and host above, which coincide with the names of generated aliases of
+    some tables and not of others, and names that no table defines (`UA7`, `RA7`, `HA7`, `CA7`,
+    and a `Host_Alias` name in a user list or a command list);
+  - references to undefined aliases, in rules and in alias bodies;
+  - cyclic definitions (a body may refer to its own or a later definition);
+  - duplicate definitions (a second definition of an existing name, with another body).
+
   The request (invoking user, host, `-u`/`-g`, command, arguments) is biased towards the names,
-  hosts, runas specs and commands that occur in the policy. This gives about 19% allows.
+  hosts, runas specs and commands that occur in the policy. This gives about 16% allows.
+- **`Sanitize.lean`**: alias definitions as written (`AnyDef`, in file order) and a
+  transcription of `sanitize_alias_table` (`src/sudoers/mod.rs`): the processing order of each
+  table and the diagnostics `undefined alias`, `recursive alias` and `multiple occurrences`, in
+  the order sudo-rs reports them. The spec takes alias tables in processing order and leaves the
+  sort out of scope, so this is part of the oracle; the comparison checks its diagnostics
+  against sudo-rs's.
 - **`Print.lean`**: the AST-to-sudoers printer, one function per AST node. Each function inverts
-  one parser production; the table in the module docstring lists them.
-- **`Case.lean`**: the case record. This line-based text format is shared with the sudo-rs
-  harness and `repro.sh`. The spec verdict line has the form
-  `allow auth=… env=… exec=… cwd=… apparmor=…` or `deny`.
+  one parser production; the table in the module docstring lists them. An upper-case name is
+  generated as an alias reference (`Meta.alias`), which is what both parsers make of it (see
+  *Upper-case names*).
+- **`Case.lean`**: the case record (rules, alias definitions in file order, database,
+  request) and `Probe`, the record the sudo-rs harness reads. This line-based text format is
+  shared with the harness and `repro.sh`. The spec verdict line has the form
+  `allow auth=… env=… exec=… cwd=… apparmor=…` or `deny`, followed by ` ;; MESSAGE` for every
+  predicted diagnostic.
 - **`CSudo.lean`**: the C driver. It writes the case's `passwd` and `group` files, runs
   `testsudoers -p passwd -P group -h HOST [-u U] [-g G] USER CMD ARGS < sudoers` and parses
   the verdict:
   - `Command allowed` means allow; `Command denied` and `Command unmatched` mean deny;
+    `Parse error` means C rejects the policy;
   - `testsudoers-flags.patch` adds one output line: the values of `def_authenticate`,
     `def_setenv` and `def_noexec` after `apply_cmndspec`. Nothing else in C sudo is changed;
   - `testsudoers` stops before `check_user`, so `effectivePasswd` applies the password
     exemptions of `check.c` 166-182: authentication off, invoking uid 0, or
     `running_as_user`.
 - **`CModel.lean`**: the attribution model. `decide toggles case` is the spec decision, built
-  from the spec's own functions, with two switchable components:
+  from the spec's own functions, with three switchable components:
   - `cRunas` replaces sudo-rs's runas test with a transcription of C's `runaslist_matches`,
     `runas_userlist_matches` and `runas_grouplist_matches` (`match.c` 151-331);
   - `cArgs` replaces argument matching with C's `fnmatch`-based `command_args_match`
-    (`match_command.c` 80-112).
+    (`match_command.c` 80-112);
+  - `cAliases` replaces the `get_aliases` tables with C's evaluation of an alias reference
+    (`alias_get` in `alias.c`, the `ALIAS` cases of `match.c`): a recursive evaluation of the
+    first definition of the name, with C's handling of a name that `alias_get` does not return
+    (undefined, or already being evaluated).
 
-  `decide_off` proves that with both switches off, `decide` is the spec decision.
+  `decide_off` proves that with all switches off, `decide` is the spec decision.
 - **`Compare.lean`**: the comparison.
-  - Spec vs sudo-rs compares the full verdict line, with every tag field.
+  - Spec vs sudo-rs compares the full result line: verdict with every tag field, and the
+    diagnostics.
   - Spec vs C sudo compares allow/deny. For allows it also compares "password asked",
-    "SETENV in effect" and "NOEXEC in effect". `cKind` names the difference (the kind).
-  - The cause of a disagreement is the first switch set (`{cArgs}`, `{cRunas}`, both) under
-    which `CModel.decide` agrees with `testsudoers`.
+    "SETENV in effect" and "NOEXEC in effect". `cKind` names the difference (the kind). A policy
+    that `testsudoers` rejects is not compared (cause `c-parse-error`).
+  - The cause of a disagreement is the first switch set (`{cArgs}`, `{cAliases}`, `{cRunas}`,
+    then the pairs, then all three) under which `CModel.decide` agrees with `testsudoers`.
   - Runas causes are refined by `runasLabels`: for each candidate entry on which the two runas
     tests differ, the label records the situation (no runas spec; running as oneself or as
-    another user; target group one of the target's groups or not).
+    another user; target group one of the target's groups or not). Alias causes are refined by
+    `aliasLabels`: which referenced aliases get different values in sudo-rs and in C, and
+    whether they are undefined or on a cycle.
 - **`Minimize.lean`**: a greedy 1-minimiser. It drops rules, host groups, entries, list items,
-  tags, unreferenced alias definitions, arguments, `-u`/`-g` and group memberships, as long as
-  the disagreement keeps its cause and kind.
+  tags, alias definitions, arguments, `-u`/`-g` and group memberships, as long as the
+  disagreement keeps its cause and kind. `minimizeBatch` does the same with one run of the
+  sudo-rs harness per step (for the property search).
 - **`Coverage.lean`**: counts how many cases contain each generated feature.
+- **`Engine.lean`**, **`Inline.lean`**, **`Props.lean`**, **`PropRun.lean`**: the property
+  search (see *Properties of the real code*).
 
 ### sudo-rs harness (`src/sudoers/test/differential.rs`)
 
 A `#[cfg(test)]` module, registered by one `mod differential;` line in
-`src/sudoers/test/mod.rs`. It reads the case records and builds fake `UnixUser`/`UnixGroup`
-values over each case's database. These behave like `impl UnixUser for User` and
+`src/sudoers/test/mod.rs`. It reads the records and builds fake `UnixUser`/`UnixGroup` values
+over each record's database. These behave like `impl UnixUser for User` and
 `impl UnixGroup for Group`. The harness resolves `-u`/`-g` as `resolve_target_user_and_group`
-does, parses the policy with `Sudoers::read`, and calls `Sudoers::check`. Any parser
-diagnostic is reported as `error …`; none occurred. Without `SUDO_DIFF_CASES` the test does
-nothing.
+does, including `#uid`/`#gid` (`NameOrId::parse`: the text after `#` is parsed as a `u32` with
+`str::parse`; the first passwd or group entry with that id is taken, as `getpwuid`/`getgrgid`
+do). It parses the policy with `Sudoers::read`, calls `Sudoers::check`, and prints the verdict
+followed by every diagnostic. With `mode list` it prints instead the entries that `sudo -l`
+prints for the invoking user on the host (`Sudoers::matching_entries` and
+`impl Display for Entry`, as `src/sudo/pipeline/list.rs` prints them). Without
+`SUDO_DIFF_CASES` the test does nothing.
+
+An entry whose runas user list is empty (`()`, `(: groups)`) prints the name of the real user of
+the process (`CurrentUser::resolve` in `src/sudoers/entry.rs`); in `sudo -l` that is the invoking
+user, so the harness replaces the test process's own name there by the invoking user's name.
 
 ### Lean hygiene
 
 `lake build` builds the package with no `sorry`, no `axiom` and no `native_decide`. The only
 theorems, `CModel.decide_off` and its helper `CModel.ite_isSome`, are proved.
 
+## Upper-case names
+
+Both parsers read a word of the form `[A-Z][A-Z0-9_]*` other than `ALL` (and the tag keywords
+in a command position) as a reference to an alias, in user lists, host lists, runas user lists
+and runas group lists, and in command lists:
+
+| | sudo-rs | C sudo 1.9.18 |
+|---|---|---|
+| user, host, runas user, runas group position | `Meta::Alias` (`Meta::construct`, `src/sudoers/tokens.rs`; `parse_meta`, `src/sudoers/ast.rs`) | `ALIAS` token (`toke.l` line 697), member of type `ALIAS` |
+| command position | `Meta::Alias` (`MetaOrTag::parse`, `ast.rs`); `NAME=` is an error | `ALIAS` token |
+| `%NAME`, `%#gid` | a group (`UserSpecifier::parse`), not an alias | a group (`USERGROUP`) |
+| `"NAME"` (quoted) | a plain user name (checked with the harness: `"UA0" ALL = /bin/ls` allows the account `UA0`) | a plain user name (checked with `testsudoers`) |
+| alias table looked up | the table of the position (user list: `User_Alias`; host list: `Host_Alias`; runas user and group lists: `Runas_Alias`; command: `Cmnd_Alias`) | the same |
+
+So an account, group or host whose name is spelled like an alias can only be named in a policy
+by quoting it (users), by `%` (groups) or by `#id`. sudo-rs never matches a reference to an
+alias that its table does not define (spec README, finding 17); the generated hazards exercise
+how C treats such references (class N1 below).
+
 ## Results (`./run.sh 20000 1`)
 
-| Comparison | Agree | Disagree |
-|---|---|---|
-| spec vs sudo-rs | 20000 / 20000 | 0 |
-| spec vs C sudo (`testsudoers`) | 19787 / 20000 | 213 |
-| C model (spec + C runas + C args) vs C sudo | 20000 / 20000 | 0 |
+| Comparison | Agree | Disagree | Not compared |
+|---|---|---|---|
+| spec vs sudo-rs (verdict, every tag field, alias diagnostics) | 20000 / 20000 | 0 | 0 |
+| spec vs C sudo (`testsudoers`) | 17164 / 20000 | 171 | 2665 (C rejects the policy) |
+| C model (spec + C runas + C args + C aliases) vs C sudo | 17335 / 17335 | 0 | 2665 |
 
-The spec allows 3853 cases and denies 16147.
+The spec allows 3178 cases and denies 16822. 7629 cases contain an alias hazard; 5869 of them
+have alias diagnostics (sudo-rs reports them and continues with the policy). The spec, with
+the processing order of `Sanitize.lean`, predicts every diagnostic and every verdict of these
+cases.
 
 Spec vs C sudo disagreements by cause and kind. "Tags differ" means both allow, but the
 password, SETENV or NOEXEC verdict differs.
 
 | Cause | spec allows, C denies | spec denies, C allows | tags differ | total |
 |---|---|---|---|---|
-| `args-prefix` (F1) | 51 | 4 | 12 | 67 |
-| `runas-default-root` (F2) | 100 | 1 | 7 | 108 |
-| `runas-own-group-list` (F3) | 13 | 0 | 2 | 15 |
-| `runas-self-own-group` (F4) | 1 | 9 | 5 | 15 |
-| `runas-self-foreign-group` (F5) | 5 | 0 | 2 | 7 |
-| `runas-default-root+own-group-list` (F2 and F3 in one case) | 1 | 0 | 0 | 1 |
-| **total** | 171 | 14 | 28 | **213** |
+| `args-prefix` (F1) | 32 | 0 | 4 | 36 |
+| `runas-default-root` (F2) | 49 | 1 | 0 | 50 |
+| `runas-own-group-list` (F3) | 12 | 0 | 2 | 14 |
+| `runas-self-own-group` (F4) | 0 | 10 | 0 | 10 |
+| `runas-self-foreign-group` (F5) | 4 | 0 | 0 | 4 |
+| `runas-default-root+self-own-group` (F2 and F4 in one case) | 0 | 1 | 0 | 1 |
+| F5 together with N1 in a runas group list | 1 | 0 | 0 | 1 |
+| N1 (alias hazards, not yet published) | 2 | 45 | 0 | 47 |
+| N2 (alias hazards, not yet published) | 0 | 6 | 0 | 6 |
+| N1 and N2 in one case | 0 | 2 | 0 | 2 |
+| **total compared** | 100 | 65 | 6 | **171** |
+| N3: C rejects the policy (`Parse error`), not compared | | | | 2665 |
+
+Classes N1-N3 are new and are described in the report to the coordinator, not here. 84 of the
+171 disagreements are in cases without alias hazards; they fall in F1-F5 as before.
 
 Every "tags differ" case comes from a different deciding entry, not from different tag
 semantics. The C model computes tags with the spec's rules and still matches `testsudoers` on
@@ -176,22 +267,27 @@ Feature coverage counts the cases, out of 20000, whose policy or request contain
 
 | Feature | Cases | Feature | Cases |
 |---|---|---|---|
-| user list: `name` | 18455 | runas omitted | 17724 |
-| user list: `#uid` | 11678 | runas `(users)` | 16726 |
-| user list: `%group` | 14708 | runas `(users : groups)` | 12394 |
-| user list: `%#gid` | 7348 | runas `(: groups)` | 12440 |
-| user list: `ALL` | 9776 | runas `()` | 8051 |
-| negated item | 19631 | `NOPASSWD` / `PASSWD` | 9611 / 9412 |
-| `User_Alias` / `Runas_Alias` | 13270 / 13223 | `SETENV` / `NOSETENV` | 9395 / 9454 |
-| `Host_Alias` / `Cmnd_Alias` | 13242 / 13391 | `NOEXEC` / `EXEC` | 9593 / 9418 |
-| nested alias | 10428 | command without arguments | 18645 |
-| negated alias member | 14578 | command `""` | 13956 |
-| negated alias reference | 7800 | command with exact arguments | 16350 |
-| two or more lines | 14968 | command with arguments and `*` | 9017 |
-| two host groups in a line | 15323 | command `ALL` | 15678 |
-| request: no `-u`/`-g` | 9785 | request: `-u` only | 5227 |
-| request: `-g` only | 2865 | request: `-u` and `-g` | 2123 |
-| invoked by `toor` (uid 0) | 3377 | runs as `toor` (uid 0) | 1210 |
+| user list: `name` | 18365 | runas omitted | 17685 |
+| user list: `#uid` | 11584 | runas `(users)` | 16743 |
+| user list: `%group` | 14465 | runas `(users : groups)` | 12506 |
+| user list: `%#gid` | 7053 | runas `(: groups)` | 12525 |
+| user list: `ALL` | 9565 | runas `()` | 8027 |
+| negated item | 19633 | `NOPASSWD` / `PASSWD` | 9316 / 9379 |
+| `User_Alias` / `Runas_Alias` | 13365 / 13372 | `SETENV` / `NOSETENV` | 9359 / 9501 |
+| `Host_Alias` / `Cmnd_Alias` | 13204 / 13327 | `NOEXEC` / `EXEC` | 9358 / 9357 |
+| nested alias | 12466 | command without arguments | 18488 |
+| negated alias member | 14746 | command `""` | 13596 |
+| negated alias reference | 8998 | command with exact arguments | 16151 |
+| two or more lines | 14943 | command with arguments and `*` | 8844 |
+| two host groups in a line | 15273 | command `ALL` | 15411 |
+| request: no `-u`/`-g` | 9317 | request: `-u` only | 5565 |
+| request: `-g` only | 2856 | request: `-u` and `-g` | 2262 |
+| invoked by `toor` (uid 0) | 2852 | runs as `toor` (uid 0) | 895 |
+| upper-case name of an account, group or host referenced | 17013 | ... and also an alias of that table | 16380 |
+| reference to an undefined alias | 6140 | undefined alias in a definition | 3089 |
+| duplicate definition | 2665 | cyclic definition | 2566 |
+| invoked by an upper-case account | 2856 | upper-case host | 2233 |
+| `-u`/`-g` with an upper-case name | 2774 | | |
 
 ## Findings: sudo-rs vs C sudo
 
@@ -222,11 +318,15 @@ found nothing, not that nothing exists.
 
 ### Parts where the engines agree
 
-Because the C model differs from the spec only in F1-F5 and matches `testsudoers` on every
-case, the generated cases found no difference between sudo-rs and C sudo in:
+Because the C model differs from the spec only in F1-F5 and in alias evaluation, and matches
+`testsudoers` on every compared case, the generated cases found no difference between sudo-rs
+and C sudo in:
 
 - user and host lists, including `#uid`, `%#gid`, `ALL` and `!`;
-- nested and negated aliases: substitution semantics, finding 14 of the spec README;
+- nested and negated aliases with well-formed tables: substitution semantics, finding 14 of the
+  spec README;
+- alias references whose names are also names of accounts, groups or hosts, when the alias is
+  defined in the table of the position;
 - last match wins across lines and host groups;
 - runas specs propagating along a `Cmnd_Spec_List` and resetting at `:` (finding 11);
 - tag accumulation, and the implicit SETENV of a literal `ALL` but not of `ALL` reached
@@ -238,10 +338,74 @@ case, the generated cases found no difference between sudo-rs and C sudo in:
 
 ## Spec vs sudo-rs
 
-The two agreed on all 20,000 cases, on every field of the returned `Tag`, so there is nothing
-to triage. sudo-rs reported no parser diagnostic on any generated policy. A sudo-rs harness
-fault would have shown up as a disagreement, because the harness resolves users and groups
-independently of the oracle.
+The two agreed on all 20,000 cases, on every field of the returned `Tag` and on the list of
+alias diagnostics, so there is nothing to triage. A sudo-rs harness fault would have shown up as
+a disagreement, because the harness resolves users and groups independently of the oracle.
+The agreement on cases with cycles and duplicates rests on `Sanitize.lean`, which is a
+transcription, not part of the proved spec.
+
+## Properties of the real code
+
+`Props.lean` states seven properties as Lean propositions over an `EngineFn`, the function from
+a probe (policy text and request) to the result line of the real code (`Sudoers::read`, then
+`Sudoers::check` or, for `sudo -l`, `Sudoers::matching_entries`). The propositions are what is
+tested; none is proved. For each, `Prop'.check` checks one instance, and `PropRun.run` searches
+(see *Running*). Instances are drawn by the differential generator (with hazards) and then
+transformed as the property says. Preconditions are computed in Lean; the one semantic
+precondition, "the last line decides the request" in (e), is computed with the spec.
+
+Results for `./props.sh N 1` (evidence: test):
+
+| | Property (Lean) | Instances | Precondition met | Holds | Violated |
+|---|---|---|---|---|---|
+| a | `OtherUsersLineIrrelevant`: inserting a line whose user list names only others (plain users, uids, groups that do not match the invoker), anywhere in the text, never changes the invoker's verdict | 10500 | 10500 | 10500 | 0 |
+| b | `AppendNeverRevokes`: appending a line with no command-side `!` (and no reference to a `Cmnd_Alias` containing `!`) never turns an allow into a deny | 75000 | 10067 | 10065 | 2 |
+| c | `UnmentionedNeverAllowed`: an invoking user, host or command that the user lists, host lists or command lists (with their aliases) never mention, `ALL` included, is refused | 11000 | 10757 | 10757 | 0 |
+| d | `AliasExpansionPreserves`: for alias tables without diagnostics, textual expansion of every alias (negations flipped, definitions deleted) preserves the verdict, tags included | 16000 | 11223 | 11001 | 222 |
+| e | `PrependIrrelevant`: if the last line decides the request, inserting rules, definitions of fresh aliases and unparsable lines before it changes nothing | 80000 | 10594 | 10594 | 0 |
+| f | `ListingFaithful`: the entries `sudo -l` prints for the invoker on the host, read back as a policy (with the `Runas_Alias` definitions, for the invoker as `#uid`, on `ALL` hosts), decide every request of the invoker on the host like the policy (allow, deny, password) | 10500 | 10500 | 10146 | 354 |
+| g | `UidSpellingsLikeRoot`: under `(ALL, !root)` or `(ALL, !#0)`, `-u '#0'`, `#00`, `#+0`, `#000`, `#+00`, `#0000000000` behave like `-u root`, and `#-0`, `#0x0`, `#4294967296`, `#` are refused as unknown; likewise `-g '#0'`, `#00`, `#+0` like `-g root` | 13500 | 10217 | 10217 | 0 |
+
+Classes of the violations and of the instances outside the precondition. Classes that follow
+from findings already published in the spec README are explained; the others (P1-P3) are new
+and are described in the report to the coordinator, not here.
+
+| | Class | Instances | Explanation |
+|---|---|---|---|
+| b | P1 | 2 | New; in the report. Appended rule lines never revoked. |
+| d | `Cmnd_Alias` whose body contains `ALL` | 49 | The expansion turns `ALL` reached through an alias into a literal `ALL`, which implies SETENV (spec README finding 3). Only the `env` field differs. |
+| d | `Runas_Alias` with a `%group` member used in a runas group list | 173 | The expansion writes `%group` into a group list, where the grammar has no `%group`; the line does not parse and is dropped. In the policy such a member never matches (spec README finding 15). |
+| e | outside the precondition: an inserted definition reuses a name the policy defines or refers to | 869 (24 differ) | A duplicate definition before the original one takes its place (spec README finding 17: the first definition counts), and P1. |
+| f | the target user is a uid-0 account other than `root` and the deciding entry has no runas spec | 190 | The listing prints `(root)`, a name test; no runas spec is a uid test (spec README finding 4). |
+| f | P2 | 48 | New; in the report. Only with accounts whose names are spelled like aliases. |
+| f | P3 | 116 | New; in the report. Only with alias hazards. |
+| g | outside the precondition: another uid-0 account precedes `root` in the passwd file | 3283 (1524 differ) | `#0` resolves to the first uid-0 entry (`getpwuid`), here `toor`, which `!root` does not exclude and whose groups differ. |
+
+The counterexamples were shrunk (to policies of one to three lines) and confirmed twice on the
+real code; they are kept outside the repository with the report, together with kernel-checked
+certificates (`decide` on the spec ASTs) of those that do not depend on parsing.
+
+`Inline.lean` defines the expansion of (d); `Engine.lean` runs probes on the harness.
+
+## Runtime checks (`src/sudoers/test/runtime.rs`)
+
+`#[cfg(test)]` unit tests of the real code, part of `cargo test --lib sudoers::` (evidence:
+test):
+
+- `command_path_spellings_are_canonicalised`: in a scratch directory with `real/x`, a symlink
+  `real/y -> x` and a directory symlink `lnk -> real`, the spellings `real/x`,
+  `real/../real/x`, `real/./x`, `<dir>//real/x`, `lnk/x`, `lnk/../real/x` and a leading `//`
+  name the same command on both sides, in every combination: the policy pattern is
+  canonicalised by `Sudoers::read`, the request by `CommandAndArguments::build_from_args`;
+- `command_symlink_itself_is_not_followed`: a symlink to a file is a command of its own
+  (`canonicalize` resolves the directories, not the file);
+- `nonexistent_command_paths_are_compared_as_text`: a path that does not exist is not
+  canonicalised on either side;
+- `unsupported_tags_are_rejected_at_parse`: `NOTBEFORE=`, `NOTAFTER=`, `TIMEOUT=`, `CHROOT=`,
+  `INTERCEPT:`, `ROLE=`, `TYPE=` produce their diagnostic and drop the whole line, so it
+  grants nothing, also for the other entries of the line;
+- `digests_are_rejected_at_parse`: `sha224:`, `sha256:`, `sha384:`, `sha512:` digests are
+  rejected the same way, in a rule and in a `Cmnd_Alias` (which then matches nothing).
 
 ## What limits coverage
 
@@ -251,23 +415,29 @@ independently of the oracle.
   - `CWD=`, `APPARMOR_PROFILE=` and the ignored or unsupported tags (so the `cwd` and
     `apparmor` fields are only compared between the spec and sudo-rs, and are always `none`);
   - quoting or escapes.
-- **Alias tables.** They are acyclic, uniquely named, and every reference is defined, so
-  error recovery (finding 17) is not exercised.
-- **File system.** Command paths must not exist on the test machine (`run.sh` checks this).
-  Neither engine therefore canonicalises paths (sudo-rs) or compares inodes (C).
+  Property (e) inserts a fixed pool of unparsable lines (unsupported tags, digests, unbalanced
+  parentheses, lower-case alias names, includes of missing files), never one that ends in a
+  backslash (which would continue onto the next line by design).
+- **Alias tables.** Duplicate definitions are only compared with sudo-rs and the spec: C sudo
+  rejects every policy that has one.
+- **File system.** Generated command paths must not exist on the test machine (`run.sh` and
+  `props.sh` check this). Neither engine therefore canonicalises paths (sudo-rs) or compares
+  inodes (C) in the differential test; `runtime.rs` checks the sudo-rs side on real files.
 - **Database.** Names are fixed. `toor` is the only uid shared by two accounts, and it is uid
   0, where every invoker is exempt from the password anyway. A difference in the "running as
   oneself" password exemption therefore cannot show: C compares uids (`check.c` 116-125),
   sudo-rs compares whole `User` values. Duplicate group names and gids are not generated
   either.
-- **Request.** The command-line front end is not exercised (`-u #uid`, `-g #gid`, `-i`, `-s`,
-  path resolution). The request is built from names as `resolve_target_user_and_group` would
-  build it. sudo-rs's user and group types are fakes over the case database, not NSS.
+- **Request.** The command-line front end is not exercised beyond `-u`/`-g` (`-i`, `-s`, path
+  resolution). `#uid`/`#gid` spellings are only exercised by property (g), not in the
+  differential test. sudo-rs's user and group types are fakes over the case database, not NSS.
+- **`sudo -l`.** Property (f) checks the default listing (`impl Display for Entry`), not the
+  verbose one (`-l -l`), and only the invoker's own listing, not `-U other`.
 - **C side.** `testsudoers` stops after `sudoers_lookup`. The `check_user` password exemptions
   are applied by `CSudo.effectivePasswd` (a transcription of `check.c`), not by running C.
   The tag flags come from `testsudoers-flags.patch`. Only allow/deny, password, SETENV and
   NOEXEC are compared with C.
-- **Distribution.** About 19% of the cases are allowed. The coverage table counts features
+- **Distribution.** About 16% of the cases are allowed. The coverage table counts features
   present in a case, not features that decided it.
 - **Attribution.** It rests on the C model. Its agreement with `testsudoers` is empirical: on
-  every case of this run, but not proved.
+  every compared case of this run, but not proved.

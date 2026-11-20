@@ -13,14 +13,12 @@ be replaced by transcriptions of the C sudo 1.9.18 code:
   `runas_allowed` (`check_permission`, `src/sudoers/mod.rs`);
 * `cArgs`: argument matching as C's `command_args_match` (`match_command.c` 80-112) does it
   with `fnmatch(3)`, instead of `Args::Prefix` / `Args::Exact`;
-* `cAliases`: what an alias reference means. sudo-rs evaluates every alias once, in the
-  processing order of `sanitize_alias_table`, and an undefined alias never matches. C looks
-  the alias up when it is referenced (`alias_get`, `alias.c`) and evaluates its members
-  recursively; an alias that is undefined, or already being evaluated (a cycle, `ELOOP`), is
-  matched as a plain name in user, host and runas lists (`FALLTHROUGH` to `WORD` in
-  `user_matches`, `host_matches`, `runas_userlist_matches`, `runas_grouplist_matches`) and
-  matches nothing in a command list (`cmnd_matches`). `cValue` transcribes this; it replaces
-  the `get_aliases` tables of the spec.
+* `cAliases`: what an alias reference means, as C evaluates it: `alias_get` (`alias.c`) looks
+  the alias up when it is referenced, and its members are evaluated recursively; for a name
+  that `alias_get` does not return (undefined, or already being evaluated: `ELOOP`), the
+  `ALIAS` cases of `user_matches`, `host_matches`, `runas_userlist_matches` and
+  `runas_grouplist_matches` fall through to `WORD`, and `cmnd_matches` matches nothing.
+  `cValue` transcribes this; it replaces the `get_aliases` tables of the spec.
 
 Everything else (user and host lists, command paths, last match wins, tag accumulation and the
 implicit SETENV of `ALL`) is the spec's: on this fragment the C code computes the same

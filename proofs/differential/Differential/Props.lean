@@ -366,12 +366,13 @@ def defLine (c : Case) : Gen AnyDef := do
   | _ => return .cmnd ⟨← pickName "CA" (w.cmnd.map (·.name)),
       ← listOf 1 3 (Generate.item Generate.command (w.cmnd.map (·.name)))⟩
 
-/-- Classes of (b) violations: the appended line is an alias definition; it defines a name the
-policy referred to without defining it, or redefines one. -/
+/-- Classes of (b) violations, by the appended line: a definition of a name the policy defines
+(`definition-duplicate`), of a name it refers to without defining it (`P1`), of another name, a
+rule. -/
 def classB (c : Case) : Line → String
   | .defn d =>
     if (c.defs.map (·.name)).contains d.name then "definition-duplicate"
-    else if (namesUsed c).contains d.name then "definition-of-referenced-undefined-alias"
+    else if (namesUsed c).contains d.name then "P1"
     else "definition-other"
   | .rule _ => "rule"
   | .raw _ => "raw"
@@ -468,12 +469,14 @@ def propC : Prop' Case where
 def cmndAliasWithAll (c : Case) : Bool :=
   c.written.cmnd.any (·.items.any (·.who == .all))
 
-/-- Does a `Runas_Alias` used in a runas group list contain a `%group` member? -/
-def groupAliasWithPercent (c : Case) : Bool :=
-  let used := c.rules.flatMap (·.permissions.flatMap (·.2.flatMap fun e =>
-    match e.1 with | some ra => aliasRefsOf ra.groups | none => []))
-  c.written.runas.any fun d => used.contains d.name &&
-    d.items.any fun s => match s.who with | .only (.group _) | .only (.nonunixGroup _) => true | _ => false
+/-- Does the expansion put a `%group` member of a `Runas_Alias` into a runas group list (where
+the grammar has no `%group`)? -/
+def percentInGroupList (c : Case) : Bool :=
+  c.rules.any (·.permissions.any (·.2.any fun e => match e.1 with
+    | some ra => ra.groups.any fun s => match s.who with
+      | .only (.name n) => n.startsWith "%"
+      | _ => false
+    | none => false))
 
 /-- The fields of a verdict that differ. -/
 def verdictDiff (a b : String) : String :=
@@ -495,7 +498,9 @@ def propD : Prop' Case where
         if verdictOf b == verdictOf v then .holds
         else
           let d := verdictDiff (verdictOf b) (verdictOf v)
-          if !(diagnosticsOf v).isEmpty then .violated s!"expansion-does-not-parse/{d}"
+          if !(diagnosticsOf v).isEmpty then
+            if percentInGroupList c.inlined then .violated s!"group-list-gets-percent-member/{d}"
+            else .violated s!"expansion-does-not-parse/{d}"
           else if d == "env" && cmndAliasWithAll c then .violated "cmnd-alias-all-setenv"
           else .violated s!"other/{d}"
       | _ => .violated "missing"
@@ -530,6 +535,12 @@ def propE : Prop' (Case × Nat × List Line) where
   statement := "lines inserted before a last line that decides the request change nothing"
   gen i := do
     let c ← Generate.case_ i
+    -- a request aimed at the last line, so that it often decides
+    let c ← match c.rules.getLast? with
+      | some last => do
+        let (invoker, host, cli, command, args) ← Generate.request [last] c.written
+        pure { c with invoker, host, cli, command, args }
+      | none => pure c
     let xs ← listOf 1 4 (prefixLine c)
     let k ← below c.sudoersLines.length
     return (c, k, xs)
@@ -557,19 +568,30 @@ def reqGen (c : Case) : Gen Req := do
   let (_, _, cli, command, args) ← Generate.request c.rules c.written
   return { cli, command, args }
 
-/-- Classes of (f) violations. -/
-def classF (c : Case) (q : Req) (base relist : String) : String :=
-  if !(diagnosticsOf relist).isEmpty then "listing-does-not-parse"
-  else if q.cli.runasUser == some "toor" then "uid-0-account-without-runas-spec"
-  else
-    let _ := c
-    s!"other/{authOutcome (verdictOf base)}-vs-{authOutcome (verdictOf relist)}"
+/-- Diagnostics other than the alias-table ones (which the copied `Runas_Alias` definitions of
+a relisted policy repeat): parse errors. -/
+def parseDiagnostics (result : String) : List String :=
+  (diagnosticsOf result).filter fun d =>
+    !(d.startsWith "recursive alias" || d.startsWith "multiple occurrences" ||
+      d.startsWith "undefined alias")
+
+/-- Classes of (f) violations: the listing does not parse back (`P3` if it contains `???`);
+the target user is a uid-0 account other than `root` (spec README finding 4); the invoking
+user's name is spelled like an alias (`P2`). -/
+def classF (c : Case) (listing : String) (q : Req) (base relist : String) : String :=
+  let target := q.cli.runasUser.getD (if q.cli.runasGroup.isSome then c.invoker else "root")
+  let uid0 := (c.db.userNamed target).any (·.uid == 0) && target != "root"
+  if !(parseDiagnostics relist).isEmpty then
+    if (verdictOf listing).contains "???" then "P3" else "listing-does-not-parse"
+  else if uid0 then "uid-0-account-without-runas-spec"
+  else if Generate.capsUsers.contains c.invoker then "P2"
+  else s!"other/{authOutcome (verdictOf base)}-vs-{authOutcome (verdictOf relist)}"
 
 /-- Compare the base and relisted verdicts of each request, in order. -/
-def checkPairs (c : Case) : List Req → List String → Outcome
+def checkPairs (c : Case) (listing : String) : List Req → List String → Outcome
   | q :: qs, b :: v :: rest =>
-    if authOutcome (verdictOf b) == authOutcome (verdictOf v) then checkPairs c qs rest
-    else .violated (classF c q b v)
+    if authOutcome (verdictOf b) == authOutcome (verdictOf v) then checkPairs c listing qs rest
+    else .violated (classF c listing q b v)
   | [], _ => .holds
   | _, _ => .violated "missing"
 
@@ -583,8 +605,8 @@ def propF : Prop' (Case × List Req) where
   stage2 := fun (c, qs) r1 =>
     let listed := relisted c (listedEntries (r1.headD ""))
     qs.flatMap fun q => [q.on c c.sudoersLines, q.on c listed]
-  check := fun (c, qs) _ r2 =>
-    if c.db.userNamed c.invoker |>.isNone then .vacuous else checkPairs c qs r2
+  check := fun (c, qs) r1 r2 =>
+    if c.db.userNamed c.invoker |>.isNone then .vacuous else checkPairs c (r1.headD "") qs r2
   shrink := fun (c, qs) =>
     (Minimize.shrinks c).map (·, qs) ++ (Minimize.drops qs).map (c, ·)
   describe := fun (c, qs) => showCase c ++ "\n  requests:\n" ++

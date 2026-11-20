@@ -72,4 +72,9 @@ def main (args : List String) : IO UInt32 := do
     let some jobs := jobs.toNat? | usage
     let some minCap := minCap.toNat? | usage
     Compare.compare n seed rust c outDir ts work jobs minCap
+  | ["prop", name, n, seed, bin, outDir, cap] =>
+    let some n := n.toNat? | usage
+    let some seed := seed.toNat? | usage
+    let some cap := cap.toNat? | usage
+    runProp name n seed bin outDir cap
   | _ => usage

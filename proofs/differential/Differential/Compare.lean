@@ -132,23 +132,17 @@ def cyclic (t : List (Def α)) (n : String) : Bool := Id.run do
   return seen.contains n
 
 /-- The labels from one alias table: for every referenced name whose value differs between
-sudo-rs's table (`sv`) and C's evaluation (`cv`), `undefined-name` if the table does not define
-it, `cycle` if it lies on a cycle of definitions. -/
+sudo-rs's table (`sv`) and C's evaluation (`cv`), `N1` if the table does not define it, `N2` if
+it lies on a cycle of definitions. -/
 def tableLabels (t : List (Def α)) (refs : List String) (sv cv : FoundAliases) : List String :=
   refs.eraseDups.filterMap fun n =>
     if sv n == cv n then none
-    else if !definesName t n then some "undefined-name"
-    else if cyclic t n then some "cycle"
+    else if !definesName t n then some "N1"
+    else if cyclic t n then some "N2"
     else none
 
-/-- Sub-causes of an alias disagreement, from the alias values for this request:
-
-* `undefined-name`: an alias that its table does not define gets a value in C (it is matched
-  as a plain name: a user, group or host of the case), none in sudo-rs;
-* `cycle`: an alias on a cycle of definitions gets different values (sudo-rs evaluates the
-  table once in processing order, a reference to an alias not yet evaluated is absent; C
-  evaluates recursively, and the alias being evaluated matches as a plain name);
-* `other`: no referenced alias differs in that way. -/
+/-- Sub-causes of an alias disagreement, from the alias values for this request: `N1`, `N2`
+(`tableLabels`), or `other` if no referenced alias differs in either way. -/
 def aliasLabels (c : Case) : List String := Id.run do
   let some r := c.request | return ["other"]
   let O := oracleOf c.db
