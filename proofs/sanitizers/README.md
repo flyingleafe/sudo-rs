@@ -64,6 +64,10 @@ proofs/sanitizers/run.sh debug asan      # selected modes
 SAN_FILTER=sudoers:: proofs/sanitizers/run.sh miri
 ```
 
+The reported run: `LIMIT_CPUS=5,7 LIMIT_MEM=3G SAN_OUT=/tmp/fuzz-san-final /tmp/sudo-rs-wt/dev
+proofs/sanitizers/run.sh`, then (after the oomd stop) the same with `SAN_RESUME=1 ... miri`;
+the summary table it prints reproduces the numbers above.
+
 Per mode the script builds the test binaries, lists their tests (`--list --format terse`) and
 runs each as `<test binary> --exact <name> --test-threads=1` (Miri: `cargo miri test --lib --
 --exact <name>`), with a time limit (120 s, Miri 1800 s). Results land in
