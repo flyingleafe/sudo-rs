@@ -1,4 +1,4 @@
-import SudoersSpec.Ast
+import Differential.Sanitize
 
 /-!
 # Printing the spec AST as sudoers text
@@ -94,11 +94,11 @@ def permissionSpec (p : PermissionSpec) : String :=
 def def_ (kind : String) (f : α → String) (d : Def α) : String :=
   s!"{kind} {d.name} = {specList f d.items}"
 
-/-- All alias definitions of a table, one line each. -/
-def aliasLines (t : AliasTable) : List String :=
-  t.user.map (def_ "User_Alias" userSpecifier) ++
-  t.runas.map (def_ "Runas_Alias" userSpecifier) ++
-  t.host.map (def_ "Host_Alias" hostname) ++
-  t.cmnd.map (def_ "Cmnd_Alias" command)
+/-- One alias definition line. -/
+def anyDef : Differential.AnyDef → String
+  | .user d => def_ "User_Alias" userSpecifier d
+  | .runas d => def_ "Runas_Alias" userSpecifier d
+  | .host d => def_ "Host_Alias" hostname d
+  | .cmnd d => def_ "Cmnd_Alias" command d
 
 end Differential.Print

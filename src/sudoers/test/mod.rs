@@ -6,6 +6,7 @@ use super::*;
 use basic_parser::{Status, parse_eval, parse_fatal, parse_lines, parse_string};
 
 mod differential;
+mod runtime;
 
 impl<T> Qualified<T> {
     pub fn as_allow(&self) -> Option<&T> {

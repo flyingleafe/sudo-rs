@@ -16,6 +16,19 @@ C sudo accept:
 * commands as exact paths with no argument list, with `""`, with an exact argument list, or
   with a leading argument list followed by `*`; `ALL`; `Cmnd_Alias` references; `!`.
 
+Half of the cases (`hazards`) also contain the constructs on which alias handling can go
+wrong:
+
+* names spelled like aliases: the database has the users `UA1` and `RA0`, the groups `RA1` and
+  `UA0` and the host `HA1`. Both parsers read an upper-case word (`[A-Z][A-Z0-9_]*`, other
+  than `ALL`) in a user, host, runas-user or runas-group position as an alias reference, so the
+  generator emits such names as `Meta.alias` (what `Sudoers::read` produces). `%UA0` is a
+  plain group in both;
+* references to undefined aliases (`UA7`, `RA7`, `HA7`, `CA7`, and names of aliases of
+  another kind), in rules and in alias bodies;
+* cyclic definitions (a body may refer to its own or a later definition);
+* duplicate definitions (a second definition of an existing name, with another body).
+
 No path contains a glob metacharacter. Paths are chosen not to exist on the test machine
 (`run.sh` checks this), so neither sudo-rs (which canonicalises existing paths) nor C sudo
 (which compares inodes of existing paths) looks at the file system.
@@ -31,13 +44,19 @@ open SudoersSpec Gen
 instance : Inhabited Modifier := ⟨.noop⟩
 instance : Inhabited Command := ⟨⟨"/", .prefix []⟩⟩
 
-def userNames : List String := ["root", "toor", "alice", "bob", "carol", "dave"]
-/-- Names that may occur in a policy; `eve` is not in the database. -/
-def policyUserNames : List String := userNames ++ ["eve"]
-def groupNames : List String := ["root", "wheel", "staff", "users", "alice", "bob", "carol", "dave"]
+/-- Accounts whose names are spelled like aliases. -/
+def capsUsers : List String := ["UA1", "RA0"]
+def userNames : List String := ["root", "toor", "alice", "bob", "carol", "dave"] ++ capsUsers
+/-- Names that may occur in a policy as plain user names; `eve` is not in the database. -/
+def policyUserNames : List String := ["root", "toor", "alice", "bob", "carol", "dave", "eve"]
+/-- Groups whose names are spelled like aliases. -/
+def capsGroups : List String := ["RA1", "UA0"]
+def groupNames : List String :=
+  ["root", "wheel", "staff", "users", "alice", "bob", "carol", "dave"] ++ capsGroups
 def uids : List Nat := [0, 1001, 1002, 1003, 1004, 1005]
 def gids : List Nat := [0, 10, 20, 100, 1001, 1002]
-def hosts : List String := ["h1", "h2", "h3"]
+def capsHosts : List String := ["HA1"]
+def hosts : List String := ["h1", "h2", "h3"] ++ capsHosts
 def paths : List String := ["/bin/ls", "/bin/cat", "/usr/bin/id", "/usr/local/bin/ls"]
 def argPool : List String := ["-a", "-l", "x"]
 
@@ -48,16 +67,18 @@ def db : Gen Db := do
   let bob ← pick [1002, 100]
   let carol ← pick [1003, 20]
   let dave ← pick [1004, 100]
+  let ua1 ← pick [1001, 2000]
   let users : List UserEnt :=
     [⟨"root", 0, 0⟩, ⟨"toor", 0, 0⟩, ⟨"alice", 1001, alice⟩, ⟨"bob", 1002, bob⟩,
-     ⟨"carol", 1003, carol⟩, ⟨"dave", 1004, dave⟩]
+     ⟨"carol", 1003, carol⟩, ⟨"dave", 1004, dave⟩, ⟨"UA1", 1005, ua1⟩, ⟨"RA0", 1006, 100⟩]
   let groupIds : List (String × Nat) :=
     [("root", 0), ("wheel", 10), ("staff", 20), ("users", 100),
-     ("alice", 1001), ("bob", 1002), ("carol", 1003), ("dave", 1004)]
+     ("alice", 1001), ("bob", 1002), ("carol", 1003), ("dave", 1004),
+     ("RA1", 2000), ("UA0", 2001)]
   let mut groups := #[]
   for (n, gid) in groupIds do
     let mut members := #[]
-    for u in ["root", "alice", "bob", "carol", "dave"] do
+    for u in ["root", "alice", "bob", "carol", "dave", "UA1", "RA0"] do
       if ← chance 1 4 then members := members.push u
     groups := groups.push { name := n, gid, members := members.toList }
   return { users, groups := groups.toList }
@@ -65,12 +86,15 @@ def db : Gen Db := do
 def negate (s : Spec α) : Gen (Spec α) := do
   if ← chance 1 6 then return s.negate else return s
 
-/-- An item of a list: `ALL` (rarely), a reference to an available alias, or a plain item. -/
-def item (plain : Gen α) (aliases : List String) : Gen (Spec α) := do
-  let m ← weighted [(1, 0), (if aliases.isEmpty then 0 else 3, 1), (8, 2)]
+/-- An item of a list: `ALL` (rarely), a reference to an available alias, an upper-case name
+that is not an available alias (only with hazards), or a plain item. -/
+def item (plain : Gen α) (aliases : List String) (caps : List String := []) : Gen (Spec α) := do
+  let m ← weighted [(1, 0), (if aliases.isEmpty then 0 else 3, 1),
+    (if caps.isEmpty then 0 else 1, 3), (8, 2)]
   match m with
   | 0 => negate (.allow .all)
   | 1 => negate (.allow (.alias (← pick aliases)))
+  | 3 => negate (.allow (.alias (← pick caps)))
   | _ => negate (.allow (.only (← plain)))
 
 def userSpecifier : Gen UserSpecifier := do
@@ -81,7 +105,10 @@ def userSpecifier : Gen UserSpecifier := do
   | _ => return .group (.id (← pick gids))
 
 def groupIdentifier : Gen Identifier := do
-  if ← chance 4 5 then return .name (← pick groupNames) else return .id (← pick gids)
+  if ← chance 4 5 then return .name (← pick (groupNames.filter (!capsGroups.contains ·)))
+  else return .id (← pick gids)
+
+def plainHost : Gen Hostname := pick (hosts.filter (!capsHosts.contains ·))
 
 def args : Gen Args := do
   match ← weighted [(5, 0), (2, 1), (3, 2), (1, 3)] with
@@ -93,20 +120,38 @@ def args : Gen Args := do
 def command : Gen Command := do
   return ⟨← pick paths, ← args⟩
 
-/-- Alias definitions of one kind: names `PREFIX0`, `PREFIX1`, ...; definition `i` may refer
-to definitions `0 .. i-1`, so the list is in dependency order. -/
-def defs (pfx : String) (plain : Gen α) : Gen (List (Def α)) := do
+/-- Which hazards a case has. -/
+structure Hazards where
+  /-- Upper-case names and undefined alias references. -/
+  caps : Bool := false
+  /-- Bodies may refer to their own or later definitions. -/
+  cycles : Bool := false
+  /-- A second definition of an existing name. -/
+  dupes : Bool := false
+
+/-- Alias definitions of one kind: names `PREFIX0`, `PREFIX1`, ...; without hazards definition
+`i` may refer to definitions `0 .. i-1`, so the list is in dependency order. `caps` are the
+upper-case names that are not definitions of this kind. -/
+def defs (h : Hazards) (pfx : String) (plain : Gen α) (caps : List String) : Gen (List (Def α)) := do
   let n ← weighted [(3, 0), (3, 1), (2, 2), (1, 3)]
+  let all := (List.range n).map (s!"{pfx}{·}")
+  let caps := if h.caps then caps else []
   let mut out := #[]
   for i in [0:n] do
     let earlier := (List.range i).map (s!"{pfx}{·}")
-    let items ← listOf 1 3 (item plain earlier)
+    let refs ← if h.cycles && (← chance 1 2) then pure all else pure earlier
+    let items ← listOf 1 3 (item plain refs caps)
     out := out.push { name := s!"{pfx}{i}", items }
+  if h.dupes && n > 0 && (← chance 1 2) then
+    let items ← listOf 1 3 (item plain all caps)
+    out := out.push { name := ← pick all, items }
   return out.toList
 
-def runAs (runasAliases : List String) : Gen (Option RunAs) := do
-  let users := listOf 1 2 (item userSpecifier runasAliases)
-  let groups := listOf 1 2 (item groupIdentifier runasAliases)
+def runAs (h : Hazards) (runasAliases : List String) : Gen (Option RunAs) := do
+  let ucaps := if h.caps then ["UA1", "RA7", "UA0"] else []
+  let gcaps := if h.caps then ["RA1", "RA7", "UA1"] else []
+  let users := listOf 1 2 (item userSpecifier runasAliases ucaps)
+  let groups := listOf 1 2 (item groupIdentifier runasAliases gcaps)
   match ← weighted [(5, 0), (4, 1), (2, 2), (2, 3), (1, 4)] with
   | 0 => return none
   | 1 => return some ⟨← users, []⟩
@@ -117,37 +162,53 @@ def runAs (runasAliases : List String) : Gen (Option RunAs) := do
 def modifier : Gen Modifier :=
   pick [.nopasswd, .passwd, .setenv, .nosetenv, .noexec, .exec]
 
-def cmndSpecItem (cmndAliases : List String) : Gen (Spec Command) := do
-  match ← weighted [(2, 0), (if cmndAliases.isEmpty then 0 else 2, 1), (7, 2)] with
+def cmndSpecItem (h : Hazards) (cmndAliases : List String) : Gen (Spec Command) := do
+  match ← weighted [(2, 0), (if cmndAliases.isEmpty then 0 else 2, 1),
+      (if h.caps then 1 else 0, 3), (7, 2)] with
   | 0 => negate (.allow .all)
   | 1 => negate (.allow (.alias (← pick cmndAliases)))
+  | 3 => negate (.allow (.alias (← pick ["CA7", "HA0"])))
   | _ => negate (.allow (.only (← command)))
 
-def entry (t : AliasTable) : Gen (Option RunAs × CommandSpec) := do
-  let r ← runAs (t.runas.map (·.name))
+/-- Names of the definitions of one kind (duplicates once). -/
+def namesOf (ds : List (Def α)) : List String := (ds.map (·.name)).eraseDups
+
+def entry (h : Hazards) (t : AliasTable) : Gen (Option RunAs × CommandSpec) := do
+  let r ← runAs h (namesOf t.runas)
   let mods ← weighted [(5, 0), (3, 1), (1, 2)] >>= fun n => listOf n n modifier
-  return (r, ⟨mods, ← cmndSpecItem (t.cmnd.map (·.name))⟩)
+  return (r, ⟨mods, ← cmndSpecItem h (namesOf t.cmnd)⟩)
 
-def hostGroup (t : AliasTable) : Gen (SpecList Hostname × List (Option RunAs × CommandSpec)) := do
-  let hs ← listOf 1 2 (item (pick hosts) (t.host.map (·.name)))
-  return (hs, ← listOf 1 3 (entry t))
+def hostCaps (h : Hazards) : List String := if h.caps then ["HA1", "HA7"] else []
+def userCaps (h : Hazards) : List String := if h.caps then ["UA1", "RA0", "UA7", "HA0"] else []
 
-def rule (t : AliasTable) : Gen PermissionSpec := do
-  let users ← listOf 1 3 (item userSpecifier (t.user.map (·.name)))
-  return ⟨users, ← listOf 1 2 (hostGroup t)⟩
+def hostGroup (h : Hazards) (t : AliasTable) :
+    Gen (SpecList Hostname × List (Option RunAs × CommandSpec)) := do
+  let hs ← listOf 1 2 (item plainHost (namesOf t.host) (hostCaps h))
+  return (hs, ← listOf 1 3 (entry h t))
 
-def policy : Gen Policy := do
-  let user ← defs "UA" userSpecifier
-  let runas ← defs "RA" userSpecifier
-  let host ← defs "HA" (pick hosts)
-  let cmnd ← defs "CA" command
+def rule (h : Hazards) (t : AliasTable) : Gen PermissionSpec := do
+  let users ← listOf 1 3 (item userSpecifier (namesOf t.user) (userCaps h))
+  return ⟨users, ← listOf 1 2 (hostGroup h t)⟩
+
+def hazards : Gen Hazards := do
+  if ← chance 1 2 then return {}
+  return { caps := ← chance 2 3, cycles := ← chance 1 3, dupes := ← chance 1 3 }
+
+/-- The alias definitions (tables in dependency order, with duplicates appended) and the rules. -/
+def policy (h : Hazards) : Gen (AliasTable × List PermissionSpec) := do
+  let user ← defs h "UA" userSpecifier ["UA1", "RA0", "UA7", "HA0"]
+  let runas ← defs h "RA" userSpecifier ["UA1", "RA1", "RA7"]
+  let host ← defs h "HA" plainHost ["HA1", "HA7"]
+  let cmnd ← defs h "CA" command ["CA7"]
   let t : AliasTable := { user, host, cmnd, runas }
-  return { rules := ← listOf 1 4 (rule t), aliases := t }
+  return (t, ← listOf 1 4 (rule h t))
 
-/-- Plain names occurring in a user specifier list (for biasing the request). -/
+/-- Plain names occurring in a user specifier list (for biasing the request), including
+upper-case names of accounts. -/
 def namesIn (l : SpecList UserSpecifier) : List String :=
   l.filterMap fun s => match s.who with
     | .only (.user (.name n)) => if userNames.contains n then some n else none
+    | .alias n => if userNames.contains n then some n else none
     | _ => none
 
 def commandsIn (p : Policy) : List Command :=
@@ -168,6 +229,7 @@ def requestArgs (c : Option Command) : Gen (List String) := do
 def groupNamesIn (l : SpecList Identifier) : List String :=
   l.filterMap fun s => match s.who with
     | .only (.name n) => if groupNames.contains n then some n else none
+    | .alias n => if groupNames.contains n then some n else none
     | _ => none
 
 /-- A command line that a given runas spec is likely to accept. -/
@@ -180,8 +242,8 @@ def cliFor : Option RunAs → Gen Cli
     let g ← if gs.isEmpty || (← chance 1 3) then pure none else some <$> pick gs
     return ⟨u, g⟩
 
-def cli (p : Policy) : Gen Cli := do
-  let runases := p.rules.flatMap fun r => r.permissions.flatMap fun g => g.2.map (·.1)
+def cli (rules : List PermissionSpec) : Gen Cli := do
+  let runases := rules.flatMap fun r => r.permissions.flatMap fun g => g.2.map (·.1)
   if !runases.isEmpty && (← chance 1 2) then return ← cliFor (← pick runases)
   match ← weighted [(3, 0), (4, 1), (2, 2), (2, 3)] with
   | 0 => return ⟨none, none⟩
@@ -189,25 +251,36 @@ def cli (p : Policy) : Gen Cli := do
   | 2 => return ⟨none, some (← pick groupNames)⟩
   | _ => return ⟨some (← pick userNames), some (← pick groupNames)⟩
 
-def case_ (index : Nat) : Gen Case := do
-  let db ← db
-  let p ← policy
-  let t := p.aliases
-  let order ← shuffle (t.user.map (·.name) ++ t.runas.map (·.name) ++
-    t.host.map (·.name) ++ t.cmnd.map (·.name))
-  let lineUsers := p.rules.flatMap (namesIn ·.users) ++ t.user.flatMap (namesIn ·.items)
+/-- All definitions of a table as `AnyDef`s. -/
+def anyDefs (t : AliasTable) : List AnyDef :=
+  t.user.map .user ++ t.runas.map .runas ++ t.host.map .host ++ t.cmnd.map .cmnd
+
+/-- A request biased towards a given policy. -/
+def request (rules : List PermissionSpec) (t : AliasTable) :
+    Gen (String × String × Cli × String × List String) := do
+  let lineUsers := rules.flatMap (namesIn ·.users) ++ t.user.flatMap (namesIn ·.items)
   let invoker ← if !lineUsers.isEmpty && (← chance 4 5) then pick lineUsers
     else pick userNames
-  let lineHosts := p.rules.flatMap fun r => r.permissions.flatMap fun g => g.1.filterMap
-    fun s => match s with | .allow (.only h) => some h | _ => none
+  let lineHosts := rules.flatMap fun r => r.permissions.flatMap fun g => g.1.filterMap
+    fun s => match s with
+      | .allow (.only h) => some h
+      | .allow (.alias h) => if hosts.contains h then some h else none
+      | _ => none
   let host ← if !lineHosts.isEmpty && (← chance 4 5) then pick lineHosts else pick hosts
-  let cli ← cli p
-  let cmds := commandsIn p
+  let cli ← cli rules
+  let cmds := commandsIn { rules, aliases := t }
   let c ← if !cmds.isEmpty && (← chance 4 5) then some <$> pick cmds else pure none
   let path ← match c with | some c => pure c.pattern | none => pick paths
   let args ← requestArgs c
-  return { index, db, policy := p, aliasOrder := order, host, invoker, cli,
-           command := path, args }
+  return (invoker, host, cli, path, args)
+
+def case_ (index : Nat) : Gen Case := do
+  let db ← db
+  let h ← hazards
+  let (t, rules) ← policy h
+  let defs ← shuffle (anyDefs t)
+  let (invoker, host, cli, command, args) ← request rules t
+  return { index, db, rules, defs, host, invoker, cli, command, args }
 
 /-- Case `index` of the run with seed `seed`. -/
 def caseOf (seed index : Nat) : Case :=

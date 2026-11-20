@@ -1,12 +1,23 @@
-//! Harness for the differential test in `proofs/differential`: runs the real sudoers parser
-//! (`Sudoers::read`) and the real decision (`Sudoers::check`) on every case of the file named
-//! by `SUDO_DIFF_CASES` and writes one verdict line per case to the file named by
-//! `SUDO_DIFF_OUT`. Without `SUDO_DIFF_CASES` the test does nothing.
+//! Harness for the differential test and the property search in `proofs/differential`: runs
+//! the real sudoers parser (`Sudoers::read`) and the real decision (`Sudoers::check`) on every
+//! record of the file named by `SUDO_DIFF_CASES` and writes one result line per record to the
+//! file named by `SUDO_DIFF_OUT`. Without `SUDO_DIFF_CASES` the test does nothing.
 //!
-//! The users and groups of a case come from its own passwd/group lines; the fake `UnixUser`
+//! The users and groups of a record come from its own passwd/group lines; the fake `UnixUser`
 //! and `UnixGroup` below behave like `impl UnixUser for User` and `impl UnixGroup for Group`
 //! (`src/system/interface.rs`) over that database, and the target user and group are derived
-//! from the `-u`/`-g` flags as `resolve_target_user_and_group` (`src/common/resolve.rs`) does.
+//! from the `-u`/`-g` flags as `resolve_target_user_and_group` (`src/common/resolve.rs`) does,
+//! including `#uid`/`#gid` (`NameOrId::parse`: the digits after `#` are parsed as a `u32` with
+//! `str::parse`, and the first passwd/group entry with that id is taken, as `getpwuid` and
+//! `getgrgid` do).
+//!
+//! A result line is `ID VERDICT`, followed by ` ;; MESSAGE` for every diagnostic of
+//! `Sudoers::read`. With `mode list` the verdict is replaced by `list` and the entries that
+//! `sudo -l` prints for the invoking user on the host (`Sudoers::matching_entries` and
+//! `impl Display for Entry`, as `src/sudo/pipeline/list.rs` prints them), separated by tabs.
+//! An entry with an empty runas user list prints the name of the real user of the process
+//! (`CurrentUser::resolve`), which in `sudo -l` is the invoking user; the harness replaces the
+//! test process's own name there by the invoking user's name.
 
 use std::ffi::{CStr, OsString};
 use std::fmt::Write as _;
@@ -84,6 +95,7 @@ struct Record {
     user: String,
     runas: Vec<String>,
     command: Vec<String>,
+    mode: String,
     sudoers: Vec<String>,
 }
 
@@ -100,6 +112,7 @@ fn parse_records(text: &str) -> Vec<Record> {
             "user" => cur.user = rest.to_string(),
             "runas" => cur.runas = rest.split_whitespace().map(String::from).collect(),
             "command" => cur.command = rest.split_whitespace().map(String::from).collect(),
+            "mode" => cur.mode = rest.to_string(),
             "sudoers" => cur.sudoers.push(rest.to_string()),
             "end" => out.push(std::mem::take(&mut cur)),
             _ => {}
@@ -183,10 +196,54 @@ fn verdict(rec: &Record) -> String {
     };
     let group_named = |n: &str| groups.iter().find(|g| g.name == n).map(group_ref);
     let group_with_gid = |gid: GroupId| groups.iter().find(|g| g.gid == gid).map(group_ref);
+    // `resolve_from_name_or_id` with `NameOrId::parse`: empty or a malformed `#id` resolves to
+    // nothing; `#id` is looked up by id (the first entry, as getpwuid/getgrgid), else by name
+    let resolve_user = |s: &str| match s.strip_prefix('#') {
+        _ if s.is_empty() => None,
+        Some(id) => id
+            .parse::<UserId>()
+            .ok()
+            .and_then(|uid| users.iter().find(|u| u.uid == uid)),
+        None => user_named(s),
+    };
+    let resolve_group = |s: &str| match s.strip_prefix('#') {
+        _ if s.is_empty() => None,
+        Some(id) => id.parse::<GroupId>().ok().and_then(group_with_gid),
+        None => group_named(s),
+    };
 
     let Some(am_user) = user_named(&rec.user) else {
         return "error unknown invoking user".into();
     };
+
+    let text = rec.sudoers.join("\n") + "\n";
+    let (mut sudoers, errors) = Sudoers::read(text.as_bytes(), "/etc/sudoers").unwrap();
+    let diagnostics: String = errors
+        .iter()
+        .map(|e| format!(" ;; {}", e.message))
+        .collect();
+    let host = system::Hostname::fake(&rec.host);
+
+    if rec.mode == "list" {
+        let me = crate::common::resolve::CurrentUser::resolve()
+            .map(|u| format!("    ({}", u.name))
+            .unwrap_or_default();
+        let entries: Vec<String> = sudoers
+            .matching_entries(am_user, &host)
+            .map(|entry| {
+                let text = entry.to_string();
+                let own = |rest: &str| rest.starts_with(')') || rest.starts_with(" :");
+                match text.strip_prefix(&me) {
+                    Some(rest) if !me.is_empty() && own(rest) => {
+                        format!("    ({}{rest}", am_user.name)
+                    }
+                    _ => text,
+                }
+            })
+            .collect();
+        return format!("list {}{diagnostics}", entries.join("\t"));
+    }
+
     let flag = |f: &str| {
         rec.runas
             .iter()
@@ -195,26 +252,19 @@ fn verdict(rec: &Record) -> String {
     };
     // resolve_target_user_and_group
     let target = match (flag("-u"), flag("-g")) {
-        (None, Some(g)) => Some(am_user).zip(group_named(g)),
-        (Some(u), None) => user_named(u).and_then(|u| Some(u).zip(group_with_gid(u.gid))),
+        (None, Some(g)) => Some(am_user).zip(resolve_group(g)),
+        (Some(u), None) => resolve_user(u).and_then(|u| Some(u).zip(group_with_gid(u.gid))),
         (None, None) => user_named("root").zip(group_named("root")),
-        (Some(u), Some(g)) => user_named(u).zip(group_named(g)),
+        (Some(u), Some(g)) => resolve_user(u).zip(resolve_group(g)),
     };
     let Some((target_user, target_group)) = target else {
-        return "error unresolved target".into();
+        return format!("error unresolved target{diagnostics}");
     };
-
-    let text = rec.sudoers.join("\n") + "\n";
-    let (mut sudoers, errors) = Sudoers::read(text.as_bytes(), "/etc/sudoers").unwrap();
-    if !errors.is_empty() {
-        let msgs: Vec<String> = errors.iter().map(|e| e.message.clone()).collect();
-        return format!("error {}", msgs.join("; "));
-    }
 
     let arguments: Vec<OsString> = rec.command[1..].iter().map(OsString::from).collect();
     let judgement = sudoers.check(
         am_user,
-        &system::Hostname::fake(&rec.host),
+        &host,
         Request {
             user: target_user,
             group: &target_group,
@@ -222,10 +272,11 @@ fn verdict(rec: &Record) -> String {
             arguments: &arguments,
         },
     );
-    match judgement.flags {
+    let verdict = match judgement.flags {
         Some(tag) => show_tag(&tag),
         None => "deny".into(),
-    }
+    };
+    format!("{verdict}{diagnostics}")
 }
 
 #[test]

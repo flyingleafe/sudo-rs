@@ -5,8 +5,9 @@
 #   cd proofs/differential && nix develop ../.. -c ./run.sh [N] [SEED]
 #
 # Environment: DIFF_SCRATCH (default /tmp/sudo-differential) holds the cases, the engine
-# outputs, the cargo target dir and the testsudoers build; JOBS (default nproc) parallel
-# testsudoers workers; MINIMIZE (default 20) C disagreements minimised per kind.
+# outputs, the cargo target dir and the testsudoers build (TS_BUILD and CARGO_TARGET_DIR
+# override the last two); JOBS (default nproc) parallel testsudoers workers; MINIMIZE
+# (default 20) C disagreements minimised per kind.
 # Disagreements are written to ./disagreements/ (replaced on every run).
 set -euo pipefail
 
@@ -20,7 +21,7 @@ mincap=${MINIMIZE:-20}
 mkdir -p "$scratch"
 
 echo "== building testsudoers and the oracle" >&2
-ts=$(TS_BUILD="$scratch/sudo" "$here/build-testsudoers.sh")
+ts=$(TS_BUILD="${TS_BUILD:-$scratch/sudo}" "$here/build-testsudoers.sh")
 (cd "$here" && lake build oracle >&2)
 oracle=$here/.lake/build/bin/oracle
 
@@ -37,7 +38,8 @@ echo "== generating $n cases (seed $seed) with the spec verdicts" >&2
 "$oracle" gen "$n" "$seed" > "$scratch/cases.txt"
 
 echo "== sudo-rs" >&2
-(cd "$repo" && CARGO_TARGET_DIR="$scratch/target" SUDO_DIFF_CASES="$scratch/cases.txt" \
+(cd "$repo" && CARGO_TARGET_DIR="${CARGO_TARGET_DIR:-$scratch/target}" \
+  SUDO_DIFF_CASES="$scratch/cases.txt" \
   SUDO_DIFF_OUT="$scratch/sudo-rs.out" \
   cargo test --quiet --lib differential_cases -- --nocapture >&2)
 

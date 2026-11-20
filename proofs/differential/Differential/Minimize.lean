@@ -4,9 +4,10 @@ import Differential.Case
 # Shrinking a case
 
 `shrinks c` lists the cases one step smaller than `c`: one rule, host group, command entry,
-list item, tag, alias definition (if unreferenced), argument, `-u`/`-g` flag or group
-membership fewer, or a runas spec dropped. `minimize` greedily takes the first shrink that
-keeps a property until none does, so the result is 1-minimal with respect to these steps.
+list item, tag, alias definition, argument, `-u`/`-g` flag or group membership fewer, or a
+runas spec dropped. `minimize` greedily takes the first shrink that keeps a property until
+none does, so the result is 1-minimal with respect to these steps; `minimizeBatch` does the
+same with one call of the property on all shrinks of a step (one run of the sudo-rs harness).
 Lists that the grammar requires to be non-empty (user lists, host lists, command lists, alias
 bodies) are never emptied.
 -/
@@ -43,40 +44,28 @@ def shrinkRule (r : PermissionSpec) : List PermissionSpec :=
   (drops r.permissions).map ({ r with permissions := · }) ++
   (shrinkEach r.permissions shrinkGroup).map ({ r with permissions := · })
 
-/-- Alias names referenced by a spec list. -/
-def refs (l : SpecList α) : List String :=
-  l.filterMap fun s => match s.who with | .alias n => some n | _ => none
+def shrinkDef (d : Def α) : List (Def α) := (drops d.items).map ({ d with items := · })
 
-def referenced (p : Policy) : List String :=
-  let t := p.aliases
-  p.rules.flatMap (fun r => refs r.users ++ r.permissions.flatMap fun g => refs g.1 ++
-      g.2.flatMap fun e => refs [e.2.cmd] ++
-        (match e.1 with | some ra => refs ra.users ++ refs ra.groups | none => [])) ++
-    t.user.flatMap (refs ·.items) ++ t.runas.flatMap (refs ·.items) ++
-    t.host.flatMap (refs ·.items) ++ t.cmnd.flatMap (refs ·.items)
+def shrinkAnyDef : AnyDef → List AnyDef
+  | .user d => (shrinkDef d).map .user
+  | .runas d => (shrinkDef d).map .runas
+  | .host d => (shrinkDef d).map .host
+  | .cmnd d => (shrinkDef d).map .cmnd
 
-def shrinkDefs (used : List String) (ds : List (Def α)) : List (List (Def α)) :=
-  ((List.range ds.length).filter (fun i => match ds[i]? with
-    | some d => !used.contains d.name
-    | none => false)).map ds.eraseIdx ++
-  shrinkEach ds fun d => (drops d.items).map ({ d with items := · })
-
-def shrinkPolicy (p : Policy) : List Policy :=
-  let t := p.aliases
-  let used := referenced p
-  (drops p.rules 0).map ({ p with rules := · }) ++
-  (shrinkEach p.rules shrinkRule).map ({ p with rules := · }) ++
-  (shrinkDefs used t.user).map (fun d => { p with aliases := { t with user := d } }) ++
-  (shrinkDefs used t.runas).map (fun d => { p with aliases := { t with runas := d } }) ++
-  (shrinkDefs used t.host).map (fun d => { p with aliases := { t with host := d } }) ++
-  (shrinkDefs used t.cmnd).map (fun d => { p with aliases := { t with cmnd := d } })
+/-- One rule fewer, a smaller rule, one definition fewer, or a smaller definition. -/
+def shrinkPolicy (rules : List PermissionSpec) (defs : List AnyDef) :
+    List (List PermissionSpec × List AnyDef) :=
+  (drops rules 0).map (·, defs) ++
+  (shrinkEach rules shrinkRule).map (·, defs) ++
+  (drops defs 0).map (rules, ·) ++
+  (shrinkEach defs shrinkAnyDef).map (rules, ·)
 
 def shrinkDb (db : Db) : List Db :=
   (shrinkEach db.groups fun g => (drops g.members 0).map ({ g with members := · })).map
     ({ db with groups := · })
 
 def shrinks (c : Case) : List Case :=
-  (shrinkPolicy c.policy).map ({ c with policy := · }) ++
+  (shrinkPolicy c.rules c.defs).map (fun (r, d) => { c with rules := r, defs := d }) ++
   (drops c.args 0).map ({ c with args := · }) ++
   (match c.cli with
     | ⟨some u, some g⟩ => [{ c with cli := ⟨some u, none⟩ }, { c with cli := ⟨none, some g⟩ }]
@@ -89,5 +78,15 @@ partial def minimize (keep : Case → IO Bool) (c : Case) : IO Case := do
   for c' in shrinks c do
     if ← keep c' then return ← minimize keep c'
   return c
+
+/-- Greedy 1-minimisation of any value with a shrinker, where `keepAll` evaluates the property
+on a whole list of candidates at once and returns the index of the first that keeps it. -/
+partial def minimizeBatch [Inhabited β] (shrink : β → List β) (keepAll : List β → IO (Option Nat))
+    (x : β) : IO β := do
+  let cands := shrink x
+  if cands.isEmpty then return x
+  match ← keepAll cands with
+  | some i => minimizeBatch shrink keepAll cands[i]!
+  | none => return x
 
 end Differential.Minimize
