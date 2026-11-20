@@ -93,6 +93,27 @@ results differ only by the implicit `SETENV` of a literal `ALL`
 (`authorize_expandAliases_rel`). Kernel-checked counterexamples show both conditions are
 needed; C sudo 1.9.18 behaves the same on those cases (test).
 
+[Argument escaping](lean/SudoRsProofs/Escape.lean) for `sudo -s`/`-i`: the extracted
+`escaped` (`src/common/command.rs`) equals `SudoersSpec.Escape.escapeArgs` for every input
+(`escaped_eq`, `escaped_spec`): it succeeds exactly when the line fits in `usize::MAX` bytes,
+keeps a byte iff it is ASCII alphanumeric, `_`, `-` or `$`, puts a backslash before every
+other byte, and joins arguments with one space. The only two argument lists with the same
+line are `[]` and `[""]` (`escaped_injective`; `build_from_args` never passes `[]`), and the
+line reads back to its arguments (`escaped_unescape`). `OsString`/`OsStr` are modelled as
+their bytes (see the assumptions ledger). The decoder follows the escaping grammar, not a
+shell.
+
+[Machine code](machine-code/README.md): a separate Lean project (Lean v4.34.0, Google
+DeepMind's `arm64-semantics` v0.51.2) proves that the AArch64 code rustc 1.98.1 emits for
+`NameOrId::<UserId>::parse` (the `-u '#uid'` parser; source copied verbatim and checked
+byte-identical; `opt-level = 3`) meets its specification under every valid linker placement
+(`parseUid_placed_ok`): it always returns normally, reads only the `String` header and
+buffer, writes only its two outputs and a 16-byte stack frame, and returns exactly the
+result of `NameOrId::parse`, for inputs of any length. `scripts/recheck.sh` rebuilds and
+re-checks it (copied source, engine trusted files, fresh export, instruction words against
+the object file, clean build, axioms). Trusted: the Lean kernel, the engine's ISA and memory
+model and its `parseDecimalU32`, and the specification.
+
 The parser, include processing, Defaults parsing and scoping, real OS identity lookup,
 glob matching, credential changes, authentication, command execution, rustc, and the
 deployed binary are outside the verified boundary. The Quint lifecycle model is a
@@ -146,6 +167,7 @@ Each item says what kind of evidence it is. A test covers only the inputs it ran
 | `differential/` | Unprivileged comparison of the Lean, Rust and C policy decisions; property search on the real code. |
 | `sanitizers/` | Unit suite under debug overflow checks, AddressSanitizer and Miri. |
 | `../fuzz/` | libFuzzer targets on the real code and the campaign runner. |
+| `machine-code/` | AArch64 machine-code proof of `NameOrId::<UserId>::parse` (own Lean project, pinned engine) and its re-check script. |
 | `compliance/` | Docker comparison of upstream and refactored sudo-rs. |
 | `parser/PLAN.md` | Plan and feasibility measurements for a parser proof. Nothing proved yet. |
 

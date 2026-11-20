@@ -160,8 +160,11 @@ shared machine run them under `/tmp/sudo-rs-wt/limited`.
 
 - Engine closure (Arm64 + the whole precompiled `ProofLib` library, 757 Lake jobs): built in
   several runs, the last two 39 min (497 jobs, peak 2.3 GiB in the scope) and 7 min (the
-  remaining jobs, peak 1.6 GiB); earlier partial runs took about 45 min more. A one-shot build
-  from scratch (`recheck.sh --fresh`) has not been timed.
+  remaining jobs, peak 1.6 GiB); earlier partial runs took about 45 min more.
+- `scripts/recheck.sh --fresh` on `5280f7f9` (fresh clone, engine cloned and built from
+  source, then all five re-checks): passed in 114 min 28 s wall, peak 2.0 GiB in the scope,
+  sharing the slice with other jobs. Inside it the clean `lake build` took 1162 s and the
+  direct elaboration of `Proof.lean` 462 s.
 - `scripts/recheck.sh` (engine prebuilt): 8 min 21 s wall, peak 1.6 GiB in the scope (1.3 GiB
   anonymous, at most 2 Lean processes). Inside it: the clean `lake build` of this package
   235 s, peak 2.0 GB RSS for the largest process; direct elaboration of `Proof.lean` 220 s,
