@@ -64,6 +64,35 @@ on the model of `alias_diagnostic`. Nothing is proved about which diagnostics ar
 about the order when diagnostics are present beyond those index properties, or that a
 given sudoers text produces none.
 
+The [policy-level properties](spec/SudoersSpec/Properties.lean) are kernel-checked for
+every oracle, policy and request: an allowed request has a witness line, host group and
+deciding entry (P1); a user, host or command that no list mentions is never allowed (P2);
+the denial of a matched request comes from a command-side `!` (P3); `!` in user and host
+lists only switches a line or host group off (P3b); the last line with a deciding entry
+decides (P4); other users' lines are irrelevant (P5); adding a line without a
+command-side `!` never revokes (P6); `()` and `(: grp)` only run as oneself (P7); `-g grp`
+is justified by membership or the group list (P8); NOPASSWD comes from the root/self
+exception or a tag in the deciding host group (P9). Where sudo-rs lacks the documented
+property (runas targets without a runas spec, F2; `!` in runas lists, F3 and F5), the exact
+sudo-rs rule is proved instead. [`RunasManual.lean`](spec/SudoersSpec/RunasManual.lean)
+states the man page's runas rule for lists without `!`; sudo-rs agrees except in F2, F4
+and F5. [`Certificates.lean`](spec/SudoersSpec/Certificates.lean) has 22 theorems checked
+by `decide` on concrete policies: the findings and one non-vacuity example per property.
+[`SudoRsProofs/Properties.lean`](lean/SudoRsProofs/Properties.lean) transfers P1-P3 and
+P7-P9 to the extracted `permission_flags`, P2 to `Judgement::authorization`, and P4-P6 to
+pairs of Rust rule slices, under the hypotheses of `permission_flags_eq`.
+
+[Alias expansion](spec/SudoersSpec/Expansion.lean): `Policy.expandAliases` flattens every
+User, Host, Runas and Cmnd_Alias reference (runas group lists through
+`match_group_alias`; a Cmnd_Alias becomes separate entries that inherit runas spec and
+tags). For alias tables that `sanitize_alias_tables` accepts without a diagnostic, the
+flattened policy decides exactly like the original (`authorize_expandAliases`, and
+`permission_flags_expandAliases` for the extracted code) provided expansion empties no
+runas user list and no Cmnd_Alias body contains `ALL`; without the second condition the
+results differ only by the implicit `SETENV` of a literal `ALL`
+(`authorize_expandAliases_rel`). Kernel-checked counterexamples show both conditions are
+needed; C sudo 1.9.18 behaves the same on those cases (test).
+
 The parser, include processing, Defaults parsing and scoping, real OS identity lookup,
 glob matching, credential changes, authentication, command execution, rustc, and the
 deployed binary are outside the verified boundary. The Quint lifecycle model is a
