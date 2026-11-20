@@ -14,8 +14,9 @@
 #      (`parseUidWords` in SudoRsMachineCode/Proof.lean) followed by the five words of the
 #      panic call, and its relocations all lie in that tail;
 #   5. the Lean package is rebuilt from an empty build directory (the engine's compiled
-#      libraries are reused), the theorem file is elaborated directly with `lean`, and every
-#      `#print axioms` line lists only propext, Classical.choice and Quot.sound.
+#      libraries are reused), the proof and theorem files are elaborated directly with `lean`
+#      (no error, no `sorry`), and every `#print axioms` line lists only propext,
+#      Classical.choice and Quot.sound.
 # With --fresh it first copies the committed tree (git HEAD) of proofs/machine-code into a new
 # directory under /tmp, lets Lake clone the engine there afresh, and builds the engine from
 # source as well, so no compiled artifact of this checkout is reused.
@@ -34,9 +35,7 @@ if [ "${1:-}" = --fresh ]; then
   echo "== fresh clone of $head in $fresh/repo"
   cd "$fresh/repo/$rel"
   echo "== lake: clone the engine and build it from source"
-  env time -f "engine build: %e s wall, %M KiB max RSS of the largest process" \
-    lake build ProofLib.SepLogic.LoopTactics ProofLib.SepLogic.Entry ProofLib.AsciiNum \
-      ProofLib.Placed.Fetch
+  env time -f "engine build: %e s wall, %M KiB max RSS of the largest process" lake build ProofLib
   exec ./scripts/recheck.sh
 fi
 
@@ -67,7 +66,7 @@ bin=$sysroot/lib/rustlib/$host/bin
 sec=.text.sudo_rs_name_or_id_parse_uid
 "$bin/llvm-objcopy" -O binary --only-section="$sec" "$tmp/harness.o" "$tmp/fn.bin"
 od -An -tx4 -v "$tmp/fn.bin" | tr -s ' ' '\n' | sed '/^$/d' > "$tmp/obj.words"
-sed -n '/^def parseUidWords/,/^]/p' SudoRsMachineCode/Proof.lean | grep -o '0x[0-9a-f]\{8\}#32' |
+sed -n '/^def parseUidWords/,/\]/p' SudoRsMachineCode/Proof.lean | grep -o '0x[0-9a-f]\{8\}#32' |
   sed 's/^0x//; s/#32$//' > "$tmp/lean.words"
 nl=$(wc -l < "$tmp/lean.words")
 [ "$nl" -gt 0 ] || { echo "FAIL: no words found in Proof.lean" >&2; exit 1; }
@@ -84,15 +83,26 @@ echo "ok   all $(wc -l < "$tmp/relocs") relocations of $sec are at or after byte
 
 echo "== 5. Lean: clean build, direct elaboration, axioms"
 rm -rf .lake/build
-lake build 2>&1 | tail -n 3
-lake env lean SudoRsMachineCode/Theorems.lean > "$tmp/axioms.txt" 2>&1 || {
-  cat "$tmp/axioms.txt"; echo "FAIL: lean SudoRsMachineCode/Theorems.lean" >&2; exit 1; }
-grep "depends on axioms" "$tmp/axioms.txt" || { echo "FAIL: no #print axioms output" >&2; exit 1; }
-if grep "depends on axioms" "$tmp/axioms.txt" | grep -v "\[propext, Classical.choice, Quot.sound\]"; then
-  echo "FAIL: a theorem depends on other axioms" >&2; exit 1
+env time -f "lake build: %e s wall, %M KiB max RSS of the largest process" lake build 2>&1 | tail -n 4
+engine=.lake/packages/prooflib/arm64-semantics
+plugin=$engine/Arm64/.lake/build/lib/libarm64_Arm64_Trusted.so
+dynlib=$engine/ProofLib/.lake/build/lib/libprooflib_ProofLib.so
+for f in SudoRsMachineCode/Proof.lean SudoRsMachineCode/Theorems.lean; do
+  out=$tmp/$(basename "$f").out
+  env time -f "lean $f: %e s wall, %M KiB max RSS" \
+    lake env lean -M 8192 --plugin="$plugin" --load-dynlib="$dynlib" "$f" > "$out" 2>&1 || {
+    cat "$out"; echo "FAIL: lean $f" >&2; exit 1; }
+  tail -n 1 "$out"
+  if grep -q "sorry\|error" "$out"; then
+    cat "$out"; echo "FAIL: $f reports an error or sorry" >&2; exit 1
+  fi
+done
+axioms=$tmp/Theorems.lean.out
+grep "depends on axioms" "$axioms" || { echo "FAIL: no #print axioms output" >&2; exit 1; }
+bad=$(grep "depends on axioms" "$axioms" | sed 's/.*depends on axioms: \[//; s/\]$//' | tr ',' '\n' |
+  sed 's/^ *//' | grep -v -x "propext\|Classical.choice\|Quot.sound" || true)
+if [ -n "$bad" ] || grep -q "sorryAx" "$axioms"; then
+  echo "FAIL: a theorem depends on other axioms: $bad" >&2; exit 1
 fi
-if grep -q "does not depend on any axioms\|sorryAx" "$tmp/axioms.txt"; then
-  echo "FAIL: unexpected axiom report" >&2; exit 1
-fi
-echo "ok   every #print axioms line is [propext, Classical.choice, Quot.sound]"
+echo "ok   every #print axioms line lists only propext, Classical.choice, Quot.sound"
 echo "== all re-checks passed"
