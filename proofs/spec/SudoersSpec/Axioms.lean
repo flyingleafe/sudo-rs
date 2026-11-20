@@ -2,6 +2,7 @@ import SudoersSpec.Theorems
 import SudoersSpec.ListValidate
 import SudoersSpec.Authorization
 import SudoersSpec.Certificates
+import SudoersSpec.Expansion
 
 /-! Axiom audit: every main result depends on at most `propext`, `Classical.choice` and
 `Quot.sound`. `lake build` prints the lists. -/
@@ -109,3 +110,14 @@ open SudoersSpec
 #print axioms Certificates.h_p7
 #print axioms Certificates.h_p8
 #print axioms Certificates.h_p9
+#print axioms findItem_expandAll
+#print axioms findItem_expandGroups
+#print axioms distributeTagsSpec_expandLine
+#print axioms checkPermission_expandAliases_rel
+#print axioms checkPermission_expandAliases
+#print axioms authorize_expandAliases_rel
+#print axioms authorize_expandAliases
+#print axioms RunAs.usersKept_of_defined
+#print axioms Policy.runasUsersKept_of_defined
+#print axioms SudoersSpec.ExpansionExamples.expandAliases_setenv_counterexample
+#print axioms SudoersSpec.ExpansionExamples.expandAliases_runas_counterexample

@@ -1,4 +1,4 @@
-import SudoersSpec.Theorems
+import SudoersSpec.Examples
 
 /-!
 # Alias expansion at the policy level
@@ -758,4 +758,277 @@ theorem authorize_expandAliases (p : Policy) (hX : p.aliases.OK) (hk : p.RunasUs
   unfold authorize
   rw [checkPermission_expandAliases O p hX hk hc r]
 
+/-! ## Sufficient conditions for the hypotheses -/
+
+/-- A uniquely named table whose bodies refer to no alias is `TableOK`. -/
+theorem TableOK.of_noRefs (t : List (Def α)) (hn : (names t).Nodup)
+    (h : ∀ d ∈ t, ∀ s ∈ d.items, isAliasRef s = false) : TableOK t := by
+  refine ⟨hn, fun pre d post ht s hs k hk => ?_⟩
+  have hd : d ∈ t := by rw [ht]; simp
+  have := h d hd s hs
+  simp [isAliasRef, hk] at this
+
+/-- With an empty `Runas_Alias` table nothing is expanded in runas specs. -/
+theorem expandList_nil_table (l : SpecList α) : expandList [] l = l := by
+  simp only [expandList, expandAll, List.length_nil, expandN, withUnit, List.map_map]
+  exact List.map_id' l
+
+theorem RunasUsersKept.of_nil (p : Policy) (h : p.aliases.runas = []) : p.RunasUsersKept := by
+  intro _ _ _ _ _ _ ra _
+  rw [RunAs.UsersKept, h, expandList_nil_table]
+
+theorem CmndAliasesNoAll.of_nil : CmndAliasesNoAll [] := fun _ hd => absurd hd List.not_mem_nil
+
+theorem refsIn_expandStep_self (t : List (Def α)) (hs : Sorted t) (l : List (Spec α × τ)) :
+    RefsIn t (expandStep t l) := by
+  intro y hy k' hk'
+  obtain ⟨x, -, hyx⟩ := List.mem_flatMap.1 hy
+  obtain ⟨q, i⟩ := x
+  have viaBody : ∀ k body, lookupDef t k = some body → ∀ s ∈ body, s.who = .alias k' →
+      k' ∈ names t := by
+    intro k body hb s hs' hsk
+    obtain ⟨d, hd, -, rfl⟩ := lookupDef_some hb
+    obtain ⟨pre, post, hsplit⟩ := List.append_of_mem hd
+    have := hs pre d post hsplit s hs' k' hsk
+    rw [hsplit, names_append]
+    exact List.mem_append_left _ this
+  rcases q with (_ | _ | k) | (_ | _ | k)
+  · simp [expandItem] at hyx; subst hyx; cases hk'
+  · simp [expandItem] at hyx; subst hyx; cases hk'
+  · cases hb : lookupDef t k with
+    | none => simp [expandItem, hb] at hyx
+    | some body =>
+      simp only [expandItem, hb, Option.getD_some, List.mem_map] at hyx
+      obtain ⟨s, hs', rfl⟩ := hyx
+      exact viaBody k body hb s hs' hk'
+  · simp [expandItem] at hyx; subst hyx; cases hk'
+  · simp [expandItem] at hyx; subst hyx; cases hk'
+  · cases hb : lookupDef t k with
+    | none => simp [expandItem, hb] at hyx
+    | some body =>
+      simp only [expandItem, hb, Option.getD_some, List.mem_map] at hyx
+      obtain ⟨s, hs', rfl⟩ := hyx
+      exact viaBody k body hb s hs' (by rw [← who_negate]; exact hk')
+
+theorem expandStep_ne_nil (t : List (Def α)) (hne : ∀ d ∈ t, d.items ≠ [])
+    (l : List (Spec α × τ)) (hl : RefsIn t l) (h : l ≠ []) : expandStep t l ≠ [] := by
+  obtain ⟨x, l', rfl⟩ := List.exists_cons_of_ne_nil h
+  rw [expandStep, List.flatMap_cons]
+  intro hnil
+  have hx : expandItem t x = [] := (List.append_eq_nil_iff.1 hnil).1
+  have hdef := hl x List.mem_cons_self
+  obtain ⟨q, i⟩ := x
+  have viaDef : ∀ k, k ∈ names t → (lookupDef t k).getD [] ≠ [] := by
+    intro k hk
+    cases hb : lookupDef t k with
+    | none => exact absurd hk (lookupDef_none hb)
+    | some body =>
+      obtain ⟨d, hd, -, rfl⟩ := lookupDef_some hb
+      exact hne d hd
+  rcases q with (_ | _ | k) | (_ | _ | k)
+  · simp [expandItem] at hx
+  · simp [expandItem] at hx
+  · simp only [expandItem, List.map_eq_nil_iff] at hx
+    exact viaDef k (hdef k rfl) hx
+  · simp [expandItem] at hx
+  · simp [expandItem] at hx
+  · simp only [expandItem, List.map_eq_nil_iff] at hx
+    exact viaDef k (hdef k rfl) hx
+
+theorem expandN_ne_nil (t : List (Def α)) (hs : Sorted t) (hne : ∀ d ∈ t, d.items ≠ [])
+    (n : Nat) : ∀ l : List (Spec α × τ), RefsIn t l → l ≠ [] → expandN t n l ≠ [] := by
+  induction n with
+  | zero => intro l _ h; exact h
+  | succ n ih =>
+    intro l hl h
+    exact ih _ (refsIn_expandStep_self t hs l) (expandStep_ne_nil t hne l hl h)
+
+/-- A runas user list keeps its emptiness if every alias it names is defined and no
+`Runas_Alias` body is empty (the parser accepts no empty alias body). -/
+theorem RunAs.usersKept_of_defined (t : List (Def UserSpecifier)) (hs : Sorted t)
+    (hne : ∀ d ∈ t, d.items ≠ []) (ra : RunAs) (hr : RefsIn t (withUnit ra.users)) :
+    RunAs.UsersKept t ra := by
+  unfold RunAs.UsersKept
+  cases h : ra.users with
+  | nil => rw [expandList_nil]
+  | cons s l =>
+    rw [h] at hr
+    have hne' := expandN_ne_nil t hs hne t.length (withUnit (s :: l)) hr (by simp [withUnit])
+    unfold expandList expandAll
+    cases he : expandN t t.length (withUnit (s :: l)) with
+    | nil => exact absurd he hne'
+    | cons => rfl
+
+theorem Policy.runasUsersKept_of_defined (p : Policy) (hs : Sorted p.aliases.runas)
+    (hne : ∀ d ∈ p.aliases.runas, d.items ≠ [])
+    (hr : ∀ rule ∈ p.rules, ∀ seg ∈ rule.permissions, ∀ x ∈ seg.2, ∀ ra, x.1 = some ra →
+      RefsIn p.aliases.runas (withUnit ra.users)) : p.RunasUsersKept :=
+  fun rule hrule seg hseg x hx ra hra =>
+    RunAs.usersKept_of_defined _ hs hne ra (hr rule hrule seg hseg x hx ra hra)
+
 end SudoersSpec
+
+/-! ## Kernel-checked examples
+
+The oracle `ex` is the user and group database of the C sudo comparison
+(`testsudoers -p passwd -P group`): `root` (uid 0, group `root`), `alice` (uid 1001, primary
+group `users`), `bob` (uid 1002, group `bob`); groups `wheel` and `staff` have no members.
+Commands are compared literally. Each example states the flattened policy and the decision on
+both policies. -/
+
+namespace SudoersSpec.ExpansionExamples
+
+open SudoersSpec SudoersSpec.Examples
+
+def uidOf (u : String) : Nat :=
+  if u = "root" then 0 else if u = "alice" then 1001 else if u = "bob" then 1002 else 4242
+
+def gidOf (g : String) : Nat :=
+  if g = "root" then 0 else if g = "wheel" then 10 else if g = "staff" then 20
+  else if g = "users" then 100 else if g = "bob" then 1002 else 4243
+
+def gidsOf (u : String) : List Nat :=
+  if u = "root" then [0] else if u = "alice" then [100] else if u = "bob" then [1002] else []
+
+def ex : Oracle String String where
+  hasName u n := u == n
+  hasUid u n := uidOf u == n
+  isRoot u := uidOf u == 0
+  inGroupByName u n := (gidsOf u).contains (gidOf n)
+  inGroupByGid u n := (gidsOf u).contains n
+  userEq u v := u == v
+  asGid g := gidOf g
+  tryAsName g := some g
+  globMatches pat path := pat == path
+  hostMatches pat host := pat == host
+
+def ls : Spec Command := c "/usr/local/bin/ls"
+def cat : Spec Command := c "/usr/local/bin/cat"
+def rootRA : RunAs := ⟨[u "root"], []⟩
+def bobRA : RunAs := ⟨[u "bob"], []⟩
+
+/-- `alice` on `host`, as `user:group`, runs `cmd`. -/
+def req (host user group : String) (cmd : Spec Command := ls) : Request String String :=
+  ⟨"alice", host, user, group, match cmd with | .allow (.only x) => x.pattern | _ => "", []⟩
+
+/-! ### User position (`User_Alias`, nested and negated) -/
+
+/-- `User_Alias ADM = alice`, `User_Alias NOTADM = ALL, !ADM`, `NOTADM ALL = (root) ls`. -/
+def pUser : Policy :=
+  pol [line [al "NOTADM"] [ent (some rootRA) [] ls]]
+    { user := [⟨"ADM", [u "alice"]⟩, ⟨"NOTADM", [all, notAl "ADM"]⟩] }
+
+example : pUser.expandAliases = pol [line [all, notU "alice"] [ent (some rootRA) [] ls]] := by
+  decide
+example : authorize ex pUser (req "h1" "root" "root") = none ∧
+    authorize ex pUser.expandAliases (req "h1" "root" "root") = none := by decide
+example : authorize ex pUser { req "h1" "root" "root" with invokingUser := "bob" } = some {} ∧
+    authorize ex pUser.expandAliases { req "h1" "root" "root" with invokingUser := "bob" } =
+      some {} := by decide
+
+/-! ### Host position (`Host_Alias`, negated) -/
+
+/-- `Host_Alias H = h1, h2`, `alice ALL, !H = (root) ls`. -/
+def pHost : Policy :=
+  pol [lineH [u "alice"] [all, notAl "H"] [ent (some rootRA) [] ls]] { host := [⟨"H", [h "h1", h "h2"]⟩] }
+
+example : pHost.expandAliases =
+    pol [lineH [u "alice"] [all, .forbid (.only "h1"), .forbid (.only "h2")] [ent (some rootRA) [] ls]] := by
+  decide
+example : authorize ex pHost (req "h1" "root" "root") = none ∧
+    authorize ex pHost.expandAliases (req "h1" "root" "root") = none := by decide
+example : authorize ex pHost (req "h3" "root" "root") = some {} ∧
+    authorize ex pHost.expandAliases (req "h3" "root" "root") = some {} := by decide
+
+/-! ### Runas user position (`Runas_Alias`) -/
+
+/-- `Runas_Alias R = bob, root`, `alice ALL = (R) ls`. -/
+def pRunas : Policy :=
+  pol [line [u "alice"] [ent (some ⟨[al "R"], []⟩) [] ls]] { runas := [⟨"R", [u "bob", u "root"]⟩] }
+
+example : pRunas.expandAliases = pol [line [u "alice"] [ent (some ⟨[u "bob", u "root"], []⟩) [] ls]] := by
+  decide
+example : authorize ex pRunas (req "h1" "bob" "bob") = some {} ∧
+    authorize ex pRunas.expandAliases (req "h1" "bob" "bob") = some {} := by decide
+example : authorize ex pRunas (req "h1" "alice" "users") = none ∧
+    authorize ex pRunas.expandAliases (req "h1" "alice" "users") = none := by decide
+
+/-! ### Runas group position (`Runas_Alias`, negated; `%group` members are dropped) -/
+
+/-- `Runas_Alias ADMG = wheel, %staff`, `alice ALL = (ALL : ALL, !ADMG) ls`. -/
+def pGroup : Policy :=
+  pol [line [u "alice"] [ent (some ⟨[all], [all, notAl "ADMG"]⟩) [] ls]]
+    { runas := [⟨"ADMG", [u "wheel", grp "staff"]⟩] }
+
+example : expandGroups [⟨"ADMG", [u "wheel", grp "staff"]⟩] [all, notAl "ADMG"] =
+    [all, .forbid (.only (.name "wheel"))] := by decide
+example : pGroup.expandAliases =
+    pol [line [u "alice"] [ent (some ⟨[all], [all, .forbid (.only (.name "wheel"))]⟩) [] ls]] := by
+  decide
+-- `sudo -g wheel`: denied by `!ADMG` / `!wheel`
+example : authorize ex pGroup (req "h1" "alice" "wheel") = none ∧
+    authorize ex pGroup.expandAliases (req "h1" "alice" "wheel") = none := by decide
+-- `sudo -g staff`: `%staff` never matches a group, so `!ADMG` does not take part
+example : authorize ex pGroup (req "h1" "alice" "staff") = some {} ∧
+    authorize ex pGroup.expandAliases (req "h1" "alice" "staff") = some {} := by decide
+
+/-! ### Command position (`Cmnd_Alias`, nested and negated; runas and tags distribute) -/
+
+/-- `Cmnd_Alias D = ls`, `Cmnd_Alias C = cat, D`, `alice ALL = (root) NOPASSWD: C, !D`. -/
+def pCmnd : Policy :=
+  pol [line [u "alice"] [ent (some rootRA) [.nopasswd] (al "C"), ent none [] (notAl "D")]]
+    { cmnd := [⟨"D", [ls]⟩, ⟨"C", [cat, al "D"]⟩] }
+
+example : pCmnd.expandAliases =
+    pol [line [u "alice"] [ent (some rootRA) [.nopasswd] cat, ent none [] ls, ent none [] (notC "/usr/local/bin/ls")]] := by
+  decide
+example : authorize ex pCmnd (req "h1" "root" "root" cat) = some { authenticate := .nopasswd } ∧
+    authorize ex pCmnd.expandAliases (req "h1" "root" "root" cat) = some { authenticate := .nopasswd } := by
+  decide
+example : authorize ex pCmnd (req "h1" "root" "root") = none ∧
+    authorize ex pCmnd.expandAliases (req "h1" "root" "root") = none := by decide
+
+/-- An entry that expands to nothing hands its runas spec and tags on:
+`alice ALL = (bob) NOPASSWD: UNDEF, ls` becomes `alice ALL = (bob) NOPASSWD: ls`. -/
+def pCarry : Policy :=
+  pol [line [u "alice"] [ent (some bobRA) [.nopasswd] (al "UNDEF"), ent none [] ls]]
+    { cmnd := [⟨"X", [cat]⟩] }
+
+example : pCarry.expandAliases = pol [line [u "alice"] [ent (some bobRA) [.nopasswd] ls]] := by decide
+example : authorize ex pCarry (req "h1" "bob" "bob") = some { authenticate := .nopasswd } ∧
+    authorize ex pCarry.expandAliases (req "h1" "bob" "bob") = some { authenticate := .nopasswd } := by
+  decide
+
+/-! ### Where expansion changes the decision -/
+
+/-- **`ALL` through a `Cmnd_Alias`.** `Cmnd_Alias EVERY = ALL`, `alice ALL = (ALL) EVERY`:
+the flattened `alice ALL = (ALL) ALL` adds the implicit `SETENV`. All other hypotheses of
+`authorize_expandAliases` hold. -/
+theorem expandAliases_setenv_counterexample :
+    ∃ (p : Policy) (r : Request String String), p.aliases.OK ∧ p.RunasUsersKept ∧
+      authorize ex p r = some {} ∧ authorize ex p.expandAliases r = some { env := .setenv } := by
+  refine ⟨pol [line [u "alice"] [ent (some ⟨[all], []⟩) [] (al "EVERY")]] { cmnd := [⟨"EVERY", [all]⟩] },
+    req "h1" "root" "root", ⟨?_, ?_, ?_, ?_⟩, RunasUsersKept.of_nil _ rfl, ?_⟩
+  · exact TableOK.of_noRefs _ (by decide) (by decide)
+  · exact TableOK.of_noRefs _ (by decide) (by decide)
+  · exact TableOK.of_noRefs _ (by decide) (by decide)
+  · exact TableOK.of_noRefs _ (by decide) (by decide)
+  · decide
+
+/-- **A runas user list that expands to nothing.** `Runas_Alias OTHER = bob`,
+`alice ALL = (UNDEF) ls`: `(UNDEF)` is a non-empty user list that matches nobody, so
+`sudo -u alice ls` is refused; the flattened `alice ALL = () ls` allows it (without a
+password: alice stays herself in her own group). All other hypotheses hold. -/
+theorem expandAliases_runas_counterexample :
+    ∃ (p : Policy) (r : Request String String), p.aliases.OK ∧ CmndAliasesNoAll p.aliases.cmnd ∧
+      authorize ex p r = none ∧
+      authorize ex p.expandAliases r = some { authenticate := .nopasswd } := by
+  refine ⟨pol [line [u "alice"] [ent (some ⟨[al "UNDEF"], []⟩) [] ls]] { runas := [⟨"OTHER", [u "bob"]⟩] },
+    req "h1" "alice" "users", ⟨?_, ?_, ?_, ?_⟩, CmndAliasesNoAll.of_nil, ?_⟩
+  · exact TableOK.of_noRefs _ (by decide) (by decide)
+  · exact TableOK.of_noRefs _ (by decide) (by decide)
+  · exact TableOK.of_noRefs _ (by decide) (by decide)
+  · exact TableOK.of_noRefs _ (by decide) (by decide)
+  · decide
+
+end SudoersSpec.ExpansionExamples
