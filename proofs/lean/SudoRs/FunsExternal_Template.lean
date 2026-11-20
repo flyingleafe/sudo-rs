@@ -183,6 +183,15 @@ axiom std.collections.hash.set.HashSet.insert
   std.collections.hash.set.HashSet T S A → T → Result (Bool ×
     (std.collections.hash.set.HashSet T S A))
 
+/-- [std::ffi::os_str::{impl core::ops::deref::Deref<std::ffi::os_str::OsStr> for std::ffi::os_str::OsString}::deref]:
+    Source: '/rustc/library/std/src/ffi/os_str.rs', lines 672:4-672:29
+    Name pattern: [std::ffi::os_str::{core::ops::deref::Deref<std::ffi::os_str::OsString, std::ffi::os_str::OsStr>}::deref]
+    Visibility: public -/
+@[rust_fun
+  "std::ffi::os_str::{core::ops::deref::Deref<std::ffi::os_str::OsString, std::ffi::os_str::OsStr>}::deref"]
+axiom std.ffi.os_str.OsString.Insts.CoreOpsDerefDerefOsStr.deref
+  : std.ffi.os_str.OsString → Result std.ffi.os_str.OsStr
+
 /-- [std::ffi::os_str::{impl core::cmp::PartialEq<std::ffi::os_str::OsString> for std::ffi::os_str::OsString}::eq]:
     Source: '/rustc/library/std/src/ffi/os_str.rs', lines 721:4-721:42
     Name pattern: [std::ffi::os_str::{core::cmp::PartialEq<std::ffi::os_str::OsString, std::ffi::os_str::OsString>}::eq]
@@ -191,6 +200,14 @@ axiom std.collections.hash.set.HashSet.insert
   "std::ffi::os_str::{core::cmp::PartialEq<std::ffi::os_str::OsString, std::ffi::os_str::OsString>}::eq"]
 axiom std.ffi.os_str.OsString.Insts.CoreCmpPartialEqOsString.eq
   : std.ffi.os_str.OsString → std.ffi.os_str.OsString → Result Bool
+
+/-- [std::ffi::os_str::{std::ffi::os_str::OsStr}::as_encoded_bytes]:
+    Source: '/rustc/library/std/src/ffi/os_str.rs', lines 1121:4-1121:43
+    Name pattern: [std::ffi::os_str::{std::ffi::os_str::OsStr}::as_encoded_bytes]
+    Visibility: public -/
+@[rust_fun "std::ffi::os_str::{std::ffi::os_str::OsStr}::as_encoded_bytes"]
+axiom std.ffi.os_str.OsStr.as_encoded_bytes
+  : std.ffi.os_str.OsStr → Result (Slice Std.U8)
 
 /-- [std::ffi::os_str::{impl core::convert::AsRef<std::ffi::os_str::OsStr> for str}::as_ref]:
     Source: '/rustc/library/std/src/ffi/os_str.rs', lines 1771:4-1771:30
@@ -230,6 +247,15 @@ axiom std.hash.random.DefaultHasher.Insts.CoreHashHasher.write
 axiom
   std.hash.random.RandomState.Insts.CoreHashBuildHasherDefaultHasher.build_hasher
   : std.hash.random.RandomState → Result std.hash.random.DefaultHasher
+
+/-- [std::os::unix::ffi::os_str::{impl std::os::unix::ffi::os_str::OsStringExt for std::ffi::os_str::OsString}::from_vec]:
+    Source: '/rustc/library/std/src/os/unix/ffi/os_str.rs', lines 28:4-28:41
+    Name pattern: [std::os::unix::ffi::os_str::{std::os::unix::ffi::os_str::OsStringExt<std::ffi::os_str::OsString>}::from_vec]
+    Visibility: public -/
+@[rust_fun
+  "std::os::unix::ffi::os_str::{std::os::unix::ffi::os_str::OsStringExt<std::ffi::os_str::OsString>}::from_vec"]
+axiom std.ffi.os_str.OsString.Insts.StdOsUnixFfiOs_strOsStringExt.from_vec
+  : alloc.vec.Vec Std.U8 → Result std.ffi.os_str.OsString
 
 /-- [std::path::{std::path::Path}::new]:
     Source: '/rustc/library/std/src/path.rs', lines 2412:4-2412:70

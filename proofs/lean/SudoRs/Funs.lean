@@ -167,6 +167,158 @@ def alloc.string.String.Insts.CoreHashHash : core.hash.Hash String := {
     alloc.string.String.Insts.CoreHashHash.hash corehashHasherInst
 }
 
+/-- [sudo_rs::common::command::is_unescaped]:
+    Source: 'src/common/command.rs', lines 58:0-60:1 -/
+def common.command.is_unescaped (c : Std.U8) : Result Bool := do
+  if 48#u8 <= c
+  then
+    if c <= 57#u8
+    then ok true
+    else
+      if 65#u8 <= c
+      then
+        if c <= 90#u8
+        then ok true
+        else
+          if 97#u8 <= c
+          then
+            if c <= 122#u8
+            then ok true
+            else
+              match c with
+              | 95#uscalar => ok true
+              | 45#uscalar => ok true
+              | 36#uscalar => ok true
+              | _ => ok false
+          else
+            match c with
+            | 95#uscalar => ok true
+            | 45#uscalar => ok true
+            | 36#uscalar => ok true
+            | _ => ok false
+      else
+        if 97#u8 <= c
+        then
+          if c <= 122#u8
+          then ok true
+          else
+            match c with
+            | 95#uscalar => ok true
+            | 45#uscalar => ok true
+            | 36#uscalar => ok true
+            | _ => ok false
+        else
+          match c with
+          | 95#uscalar => ok true
+          | 45#uscalar => ok true
+          | 36#uscalar => ok true
+          | _ => ok false
+  else
+    if 65#u8 <= c
+    then
+      if c <= 90#u8
+      then ok true
+      else
+        if 97#u8 <= c
+        then
+          if c <= 122#u8
+          then ok true
+          else
+            match c with
+            | 95#uscalar => ok true
+            | 45#uscalar => ok true
+            | 36#uscalar => ok true
+            | _ => ok false
+        else
+          match c with
+          | 95#uscalar => ok true
+          | 45#uscalar => ok true
+          | 36#uscalar => ok true
+          | _ => ok false
+    else
+      if 97#u8 <= c
+      then
+        if c <= 122#u8
+        then ok true
+        else
+          match c with
+          | 95#uscalar => ok true
+          | 45#uscalar => ok true
+          | 36#uscalar => ok true
+          | _ => ok false
+      else
+        match c with
+        | 95#uscalar => ok true
+        | 45#uscalar => ok true
+        | 36#uscalar => ok true
+        | _ => ok false
+
+/-- [sudo_rs::common::command::escape_arg_into]: loop 0:
+    Source: 'src/common/command.rs', lines 65:4-72:5 -/
+@[rust_loop]
+def common.command.escape_arg_into_loop
+  (arg : Slice Std.U8) (line : alloc.vec.Vec Std.U8) (i : Std.Usize) :
+  Result (alloc.vec.Vec Std.U8)
+  := do
+  let i1 := Slice.len arg
+  if i < i1
+  then
+    let c ← Slice.index_usize arg i
+    let b ← common.command.is_unescaped c
+    let line1 ← if b
+                  then ok line
+                  else alloc.vec.Vec.push line 92#u8
+    let line2 ← alloc.vec.Vec.push line1 c
+    let i2 ← i + 1#usize
+    common.command.escape_arg_into_loop arg line2 i2
+  else ok line
+partial_fixpoint
+
+/-- [sudo_rs::common::command::escape_arg_into]:
+    Source: 'src/common/command.rs', lines 63:0-73:1 -/
+@[reducible]
+def common.command.escape_arg_into
+  (arg : Slice Std.U8) (line : alloc.vec.Vec Std.U8) :
+  Result (alloc.vec.Vec Std.U8)
+  := do
+  common.command.escape_arg_into_loop arg line 0#usize
+
+/-- [sudo_rs::common::command::escaped]: loop 0:
+    Source: 'src/common/command.rs', lines 47:4-53:5 -/
+@[rust_loop]
+def common.command.escaped_loop
+  (arguments : alloc.vec.Vec std.ffi.os_str.OsString)
+  (line : alloc.vec.Vec Std.U8) (i : Std.Usize) :
+  Result (alloc.vec.Vec Std.U8)
+  := do
+  let i1 := alloc.vec.Vec.len arguments
+  if i < i1
+  then
+    let line1 ←
+      if i > 0#usize
+      then alloc.vec.Vec.push line 32#u8
+      else ok line
+    let os ←
+      alloc.vec.Vec.index (core.slice.index.SliceIndexUsizeSlice
+        std.ffi.os_str.OsString) arguments i
+    let os1 ← std.ffi.os_str.OsString.Insts.CoreOpsDerefDerefOsStr.deref os
+    let s ← std.ffi.os_str.OsStr.as_encoded_bytes os1
+    let line2 ← common.command.escape_arg_into s line1
+    let i2 ← i + 1#usize
+    common.command.escaped_loop arguments line2 i2
+  else ok line
+partial_fixpoint
+
+/-- [sudo_rs::common::command::escaped]:
+    Source: 'src/common/command.rs', lines 44:0-55:1 -/
+def common.command.escaped
+  (arguments : alloc.vec.Vec std.ffi.os_str.OsString) :
+  Result std.ffi.os_str.OsString
+  := do
+  let line ←
+    common.command.escaped_loop arguments (alloc.vec.Vec.new Std.U8) 0#usize
+  std.ffi.os_str.OsString.Insts.StdOsUnixFfiOs_strOsStringExt.from_vec line
+
 /-- [sudo_rs::common::path::{impl core::clone::Clone for sudo_rs::common::path::SudoPath}::clone]:
     Source: 'src/common/path.rs', lines 12:9-12:14
     Visibility: public -/
