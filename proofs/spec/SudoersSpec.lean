@@ -10,4 +10,5 @@ import SudoersSpec.Examples
 import SudoersSpec.ListValidate
 import SudoersSpec.Properties
 import SudoersSpec.RunasManual
+import SudoersSpec.Certificates
 import SudoersSpec.Axioms

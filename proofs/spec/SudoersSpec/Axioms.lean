@@ -1,6 +1,7 @@
 import SudoersSpec.Theorems
 import SudoersSpec.ListValidate
 import SudoersSpec.Authorization
+import SudoersSpec.Certificates
 
 /-! Axiom audit: every main result depends on at most `propext`, `Classical.choice` and
 `Quot.sound`. `lake build` prints the lists. -/
@@ -55,3 +56,56 @@ open SudoersSpec
 #print axioms authorization_authorize_forbidden
 #print axioms authorization_authorize_no_auth
 #print axioms authorization_authorize_root
+#print axioms checkPermission_eq_deciding
+#print axioms authorize_eq_some_iff_deciding
+#print axioms allow_witness
+#print axioms condition_grants_iff
+#print axioms condition_denies_iff
+#print axioms getAliases_unmentioned
+#print axioms getAliases_false
+#print axioms getAliases_ne_false
+#print axioms unmentioned_user_unmatched
+#print axioms unmentioned_host_unmatched
+#print axioms unmentioned_command_unmatched
+#print axioms unmentioned_runas_target
+#print axioms deny_needs_cmd_negation
+#print axioms inapplicable_hostgroup_irrelevant
+#print axioms runasPermits_some_eq
+#print axioms runas_grouplist_ignored
+#print axioms runas_userlist_ignored
+#print axioms last_line_decides
+#print axioms insert_other_user_irrelevant
+#print axioms add_positive_preserves_allow
+#print axioms myself_no_impersonation
+#print axioms myself_no_impersonation_decision
+#print axioms runas_group_justified
+#print axioms runas_group_justified_decision
+#print axioms nopasswd_needs_explicit_tag
+#print axioms findItemSpec_isSome_positive
+#print axioms runasPermits_eq_manual
+#print axioms runasPermits_eq_manual_of_not
+#print axioms runasPermits_eq_manual_of_other
+#print axioms runasPermits_none_eq_manual
+#print axioms runasPermits_policy_eq_manual
+#print axioms Certificates.a_later_all_allows_su
+#print axioms Certificates.b_negated_user_cannot_revoke
+#print axioms Certificates.c_f1_trailing_star
+#print axioms Certificates.d_f2_toor
+#print axioms Certificates.e_f3_negated_group
+#print axioms Certificates.f_f4_member_denied
+#print axioms Certificates.f_f4_nonmember_allowed
+#print axioms Certificates.g_f5_negated_self
+#print axioms Certificates.g_f5_manual
+#print axioms Certificates.h_p1
+#print axioms Certificates.h_p2_user
+#print axioms Certificates.h_p2_host
+#print axioms Certificates.h_p2_command
+#print axioms Certificates.h_p2r
+#print axioms Certificates.h_p3
+#print axioms Certificates.h_p3b
+#print axioms Certificates.h_p4
+#print axioms Certificates.h_p5
+#print axioms Certificates.h_p6
+#print axioms Certificates.h_p7
+#print axioms Certificates.h_p8
+#print axioms Certificates.h_p9
