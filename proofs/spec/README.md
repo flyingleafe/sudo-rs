@@ -31,6 +31,9 @@ listed under *Findings* below.
 | `SudoersSpec/Authorization.lean` | `authorization`: the decision plus the Defaults in force mapped to `Authorization::{Allowed(Authentication, Restrictions), Forbidden}` (`policy.rs`); meta-theorems (forbidden iff denied, `must_authenticate` = `needsPasswd`, credential rule, explicit tags win, composition with `authorize`). |
 | `SudoersSpec/Examples.lean` | 99 `#guard`s, most mirroring `pass!`/`FAIL!` cases of `src/sudoers/test/mod.rs` `permission_test`, the rest pinning down the findings below; 6 kernel-checked `example ... := by decide`. |
 | `SudoersSpec/ListValidate.lean` | The flags of `sudo -v` and `sudo -l` (`mod.rs` `validate_flags`, `list_flags`): `maxByKey` (`Iterator::max_by_key` with a `Bool` key), `entryTags`/`applicableEntries`, `validateFlags`, `listFlags`; their meta-theorems; 11 `#guard`s for the findings below. |
+| `SudoersSpec/Properties.lean` | Policy-level properties P1-P9 (see *Property suite*): the deciding entry (`decidingEntry`), allow witness, unmentioned users/hosts/commands/runas targets, denial needs a command-side `!`, host-group and runas negation, last line decides, other users' lines, adding lines without `!`, `()`/`(: grp)`, `-g`, NOPASSWD. |
+| `SudoersSpec/RunasManual.lean` | `runasManual`: the runas rule as `docs/man/sudoers.5.md` states it, for lists without `!` (Runas_Aliases included); `runasPermits_eq_manual` gives the sudo-rs rule in terms of it, with the disagreements F2, F4, F5 as explicit cases. |
+| `SudoersSpec/Certificates.lean` | 22 kernel-checked (`by decide`) theorems on concrete policies, with an oracle that has a second uid-0 account `toor` and an explicit group table: negation behaving as documented, findings F1-F5, one example per property P1-P9 showing its hypotheses can hold. |
 | `SudoersSpec/Axioms.lean` | `#print axioms` audit. |
 
 ## What the spec covers
@@ -111,6 +114,49 @@ to a strictly earlier definition), which combines the Why3 "topologically sorted
 referenced aliases are defined" preconditions; undefined aliases expand to nothing, which is
 also how the table treats them.
 
+## Property suite (`Properties.lean`, `RunasManual.lean`, `Certificates.lean`)
+
+Properties a reader of a sudoers file relies on. All are kernel-checked proofs about
+`authorize` for every oracle, policy and request; "violated" means sudo-rs does not have the
+property as documented, and the file proves the exact sudo-rs statement and a kernel-checked
+counterexample (`Certificates.lean`, evidence: kernel-checked by `decide` on one concrete
+policy). The *deciding entry* (`decidingEntry`) is the final candidate entry whose runas spec
+permits the request and whose command spec takes part; `checkPermission_eq_deciding` shows
+the decision is its verdict. "Mentions": some list or alias definition of that kind contains
+`ALL` or a direct item that matches, under any number of `!`; an alias reference alone does
+not count.
+
+| | Property | Lean | Status |
+|---|---|---|---|
+| P1 | An allowed request has an applicable line, host group and deciding entry that grants it; `condition_grants_iff` lists when a participating entry grants (`ALL`, matching command, affirming alias, `!` alias that explicitly excludes). | `allow_witness`, `condition_grants_iff`, `condition_denies_iff` | proved |
+| P2 | An unmentioned invoking user, host or command is never allowed. | `unmentioned_user_unmatched`, `unmentioned_host_unmatched`, `unmentioned_command_unmatched` | proved |
+| P2r | A target other than the invoker that no runas user list or Runas_Alias mentions is never allowed ("no runas spec" = the user named root). | `unmentioned_runas_target`: allowed only if `is_root` (uid 0) and the deciding entry has no runas spec | violated (F2), `Certificates.d_f2_toor` |
+| P3 | If an allowed entry takes part and the request is denied, the final such entry is a negated command spec or a reference to a Cmnd_Alias that explicitly excludes the command, and then the Cmnd_Alias table contains a `!`. | `deny_needs_cmd_negation` | proved |
+| P3b | `!` in user and host lists only switches a line or host group off. | `inapplicable_line_irrelevant`, `inapplicable_hostgroup_irrelevant` | proved |
+| P3b runas | `!` in a runas list only switches the entry off. | `runasPermits_some_eq` (exact rule), `runas_grouplist_ignored`, `runas_userlist_ignored` | violated (F3, F5), `Certificates.e_f3_negated_group`, `Certificates.g_f5_negated_self` |
+| P4 | If line `R` has a deciding entry and no later line does, the earlier lines are irrelevant. | `last_line_decides` | proved |
+| P5 | Inserting a line whose user list rejects the invoker changes nothing. | `insert_other_user_irrelevant` | proved |
+| P6 | Inserting a line without a negated command spec, with a Cmnd_Alias table without `!`, never revokes. | `add_positive_preserves_allow` | proved |
+| P7 | `()` and `(: grp)` only run as oneself. | `myself_no_impersonation`, `myself_no_impersonation_decision` | proved |
+| P8 | The target group is one of the target user's groups or accepted by the deciding entry's group list. | `runas_group_justified`, `runas_group_justified_decision` | proved |
+| P9 | NOPASSWD comes from the root/self exception or a `NOPASSWD` written in the deciding host group at or before the deciding entry: no leak across lines, groups or users. | `nopasswd_needs_explicit_tag` | proved |
+| P10 | Alias recursion is adequate. | `demonstration`, `getAliases_fixpoint`: `get_aliases` is a single fold over the sorted table, no fuel | proved (no gap found) |
+| Manual | The runas rule agrees with the manual for lists without `!`. | `runasPermits_eq_manual`, `runasPermits_none_eq_manual`, `runasPermits_policy_eq_manual`: equal except F4 and F5 (explicit runas spec) and F2 (none) | violated in F2, F4, F5; certificates `d_f2_toor`, `f_f4_member_denied`, `f_f4_nonmember_allowed`, `g_f5_manual` |
+
+`runasManual` quotes sudoers.5 line 222 (Runas_Spec), 238-256 (`sudo -g operator`, `(:dialer)`)
+and 128 (names matched as strings). The request the decision sees does not record whether
+`-u` was given, so `runasManual` takes `gOnly` ("`-g` without `-u`", target = invoker) as a
+parameter; F4 occurs with `gOnly`, F5 without. Runas_Aliases are included; their definitions
+must be free of `!` (`runasUserAliases_ne_false`).
+
+Certificates also pin down (a) `alice ALL = !/usr/bin/su` then `alice ALL = ALL` allows `su`,
+(b) `!alice` in a later line's user list cannot revoke an earlier grant to alice, (c) F1:
+`alice h1 = /bin/ls -l *` allows `/bin/ls -l` (intended, documented).
+
+The policy-level properties also hold for the extracted Rust: `proofs/lean/SudoRsProofs/Properties.lean`
+transfers P1, P2, P2r, P3, P7, P8, P9 to `permission_flags` through `permission_flags_eq`, P2 also
+to `Judgement::authorization` (`Forbidden`), and P4, P5, P6 to pairs of Rust rule slices.
+
 ## Findings: man page vs. code
 
 Man page = `docs/man/sudoers.5.md`; code = `src/sudoers/mod.rs` unless stated otherwise. Line
@@ -132,7 +178,10 @@ numbers refer to upstream commit 81dff9a1.
 4. **Root without a Runas_Spec is a uid test.** Man 222 (last sentence) says the command may
    only be run "as root"; man 128 says users are matched as strings. Code 518 uses `is_root`,
    which is `has_uid(0)` (`src/system/interface.rs` 136-137), so any uid-0 account (e.g.
-   `toor`) qualifies, by uid, not by name.
+   `toor`) qualifies, by uid, not by name. This is F2 of `proofs/differential/README.md`; it
+   breaks the reading "a target user that no runas list mentions is never allowed"
+   (`unmentioned_runas_target` proves what holds instead; certificate
+   `Certificates.d_f2_toor`).
 5. **Order inside a Cmnd_Spec.** Man 204: `Runas_Spec? Chdir_Spec? Tag_Spec* Cmnd`, i.e. `CWD=`
    before the tags. `ast.rs` 420-438 accepts `CWD=`, `APPARMOR_PROFILE=` and tags in any order
    (test file line 195: "original sudo does not allow the below").
@@ -154,7 +203,14 @@ numbers refer to upstream commit 81dff9a1.
    explicitly deny root") does not say what the denial applies to. In code a negated user or
    host only makes that line inapplicable (279, 284) and can never revoke a grant from another
    line (`inapplicable_line_irrelevant`), while a negated command is an entry of the global
-   last-match list and revokes earlier grants of any line (`trailing_forbid_denies`).
+   last-match list and revokes earlier grants of any line (`trailing_forbid_denies`). The same
+   holds for host lists (`inapplicable_hostgroup_irrelevant`). In runas lists a `!` does not
+   even reliably switch the entry off: the group list is ignored when the target user is in the
+   target group (`runas_grouplist_ignored`, F3: `(root : !wheel)` allows `-u root -g wheel` when
+   root is in wheel), and the user list is ignored when the invoker runs as themself with a
+   group that is not theirs (`runas_userlist_ignored`, F5: `(!alice : wheel)` allows alice's
+   `sudo -g wheel`). Certificates `Certificates.e_f3_negated_group`,
+   `Certificates.g_f5_negated_self`.
 10. **Running as oneself with a foreign group.** Man 222 says that with both lists the command
     may be run with "any combination of users and groups listed". Code 512: when the target
     user is the invoking user and the target group is not one of their groups, the user list
@@ -163,6 +219,13 @@ numbers refer to upstream commit 81dff9a1.
     243-256 for the `-g` examples, but not stated for this case). Conversely, when the target
     user is the invoking user, the group is one of theirs and the user list is non-empty, the
     invoking user must be in the list: `alice ALL = (root) /bin/ls` denies `sudo -u alice`.
+    With both lists this gives F4: for `alice ALL = (root : wheel) /usr/local/bin/ls`,
+    `sudo -g wheel` is denied if alice is in wheel and allowed if she is not
+    (`Certificates.f_f4_member_denied`, `Certificates.f_f4_nonmember_allowed`); the manual's
+    rule allows both (`runasPermits_eq_manual`). The first case of this item is consistent
+    with the manual only for `sudo -g wheel`; spelled `sudo -u alice -g wheel`, the manual's
+    rule ("any combination of users and groups listed") denies it and sudo-rs allows it (F5,
+    `Certificates.g_f5_manual`): the decision cannot tell the two invocations apart.
 11. **Runas and tags reset at `:`.** Man 224-236 and 271 say runas specs and tags carry over to
     the following commands; in code the carry-over is per `Host_List = Cmnd_Spec_List` group
     (`distribute_tags` is applied per group, 283-286), so after `:` in

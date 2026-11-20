@@ -4,6 +4,7 @@ import SudoRsProofs.Permission
 import SudoRsProofs.ListValidate
 import SudoRsProofs.NonVacuity
 import SudoRsProofs.Authorization
+import SudoRsProofs.Properties
 
 /-!
 # Axiom audit
@@ -68,3 +69,19 @@ of `SudoRs/{Types,Funs}External.lean` are definitions or `opaque` constants, nev
 #print axioms SudoRsProofs.authorization_panics_of_umask
 #print axioms SudoRsProofs.authorization_permission_flags_eq
 #print axioms SudoRsProofs.authorization_permission_flags_props
+#print axioms SudoRsProofs.permission_flags_some_authorize
+#print axioms SudoRsProofs.permission_flags_none_authorize
+#print axioms SudoRsProofs.permission_flags_eq_none
+#print axioms SudoRsProofs.permission_flags_allow_witness
+#print axioms SudoRsProofs.permission_flags_unmentioned_user
+#print axioms SudoRsProofs.permission_flags_unmentioned_host
+#print axioms SudoRsProofs.permission_flags_unmentioned_command
+#print axioms SudoRsProofs.authorization_unmentioned_forbidden
+#print axioms SudoRsProofs.permission_flags_unmentioned_runas_target
+#print axioms SudoRsProofs.permission_flags_deny_needs_cmd_negation
+#print axioms SudoRsProofs.permission_flags_myself_no_impersonation
+#print axioms SudoRsProofs.permission_flags_runas_group_justified
+#print axioms SudoRsProofs.permission_flags_nopasswd_needs_explicit_tag
+#print axioms SudoRsProofs.permission_flags_last_line_decides
+#print axioms SudoRsProofs.permission_flags_insert_other_user_irrelevant
+#print axioms SudoRsProofs.permission_flags_add_positive_preserves_allow
