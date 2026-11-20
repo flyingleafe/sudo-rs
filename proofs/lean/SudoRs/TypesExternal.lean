@@ -26,11 +26,15 @@ abbrev std.collections.hash.set.HashSet (T : Type) (_S _A : Type) := List T
 opaque std.hash.random.RandomState : Type
 opaque std.hash.random.DefaultHasher : Type
 
-/-- [std::ffi::os_str::OsString]: abstract. -/
-opaque std.ffi.os_str.OsString : Type
+/-- [std::ffi::os_str::OsString]: `struct OsString { inner: Buf }` with, on Unix,
+`sys::os_str::bytes::Buf { inner: Vec<u8> }`: the bytes. -/
+structure std.ffi.os_str.OsString where
+  inner : alloc.vec.Vec U8
 
-/-- [std::ffi::os_str::OsStr]: abstract (only the argument of `Path::new("list")`). -/
-opaque std.ffi.os_str.OsStr : Type
+/-- [std::ffi::os_str::OsStr]: `struct OsStr { inner: Slice }` with, on Unix,
+`sys::os_str::bytes::Slice { inner: [u8] }`: the bytes. -/
+structure std.ffi.os_str.OsStr where
+  inner : Slice U8
 
 /-- [std::path::Path]: abstract. -/
 opaque std.path.Path : Type

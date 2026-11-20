@@ -105,13 +105,31 @@ def std.collections.hash.set.HashSet.insert
 
 open Classical in
 /-- [std::ffi::os_str::{impl core::cmp::PartialEq<std::ffi::os_str::OsString> for std::ffi::os_str::OsString}::eq]:
-equality of the (abstract) values. -/
+equality of the values, i.e. of their bytes. -/
 noncomputable def std.ffi.os_str.OsString.Insts.CoreCmpPartialEqOsString.eq
   (a b : std.ffi.os_str.OsString) : Result Bool := ok (decide (a = b))
 
 /-- [std::ffi::os_str::{impl core::convert::AsRef<std::ffi::os_str::OsStr> for str}::as_ref]:
 the `OsStr` view of a `&str`. Opaque (no axiom): nothing is known about it. -/
 opaque Str.Insts.CoreConvertAsRefOsStr.as_ref : Str → Result std.ffi.os_str.OsStr
+
+/-- [std::ffi::os_str::{impl core::ops::deref::Deref<std::ffi::os_str::OsStr> for std::ffi::os_str::OsString}::deref]:
+`&self[..]`, i.e. `OsStr::from_inner(self.inner.as_slice())`; on Unix `Buf::as_slice` reinterprets
+the `Vec<u8>` as `Slice`. The same bytes. -/
+def std.ffi.os_str.OsString.Insts.CoreOpsDerefDerefOsStr.deref
+  (s : std.ffi.os_str.OsString) : Result std.ffi.os_str.OsStr :=
+  ok ⟨alloc.vec.Vec.deref s.inner⟩
+
+/-- [std::ffi::os_str::{std::ffi::os_str::OsStr}::as_encoded_bytes]:
+`self.inner.as_encoded_bytes()`, on Unix `&self.inner`. The same bytes. -/
+def std.ffi.os_str.OsStr.as_encoded_bytes (s : std.ffi.os_str.OsStr) : Result (Slice U8) :=
+  ok s.inner
+
+/-- [std::os::unix::ffi::os_str::{impl std::os::unix::ffi::os_str::OsStringExt for std::ffi::os_str::OsString}::from_vec]:
+`FromInner::from_inner(Buf { inner: vec })`, i.e. `OsString { inner: Buf { inner: vec } }`. -/
+def std.ffi.os_str.OsString.Insts.StdOsUnixFfiOs_strOsStringExt.from_vec
+  (v : alloc.vec.Vec U8) : Result std.ffi.os_str.OsString :=
+  ok ⟨v⟩
 
 /-- [std::path::{std::path::Path}::new]: `Path` is abstract, so is its constructor. Opaque (no
 axiom): `list_flags` calls it once, as `Path::new("list")`; theorems about that call take its

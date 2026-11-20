@@ -26,8 +26,8 @@ call, so the proofs describe a run in which those lookups give consistent answer
 | Lean name | Model | Justification |
 |---|---|---|
 | `core.ffi.c_str.CStr` | `structure { str : String }` | Only ever produced by `SudoString::as_cstr` in the extracted code; represented by its text without the trailing NUL. |
-| `std.ffi.os_str.OsString` | `opaque` type | Command arguments; only compared for equality. |
-| `std.ffi.os_str.OsStr` | `opaque` type | Only the argument of `Path::new("list")` in `list_flags`; never inspected. |
+| `std.ffi.os_str.OsString` | `structure { inner : alloc.vec.Vec U8 }` | `std/src/ffi/os_str.rs`: `struct OsString { inner: Buf }`; on Unix `sys/os_str/mod.rs` selects `sys/os_str/bytes.rs`, `struct Buf { inner: Vec<u8> }`. The bytes. Command arguments in the decision (compared for equality and read as text through `GlobAbs.os`); the input of `escaped`. |
+| `std.ffi.os_str.OsStr` | `structure { inner : Slice U8 }` | `struct OsStr { inner: Slice }`, on Unix `struct Slice { inner: [u8] }` (`#[repr(transparent)]` wrappers of `[u8]`). The argument of `Path::new("list")` in `list_flags` (never inspected) and the `Deref` target read by `escaped`. |
 | `std.path.Path` | `opaque` type | Command path; only passed to the glob matcher (and produced by `Path::new("list")` in `list_flags`). |
 | `std.path.PathBuf` | `opaque` type | The sanitizer's diagnostics have no source path. |
 | `std.collections.hash.set.HashSet` | list of keys | The sanitizer observes only `new` and `insert`, not bucket layout or key order. |
@@ -56,7 +56,10 @@ Helpers: `sudo_rs.stringBytes s` = the UTF-8 bytes of `s` as `U8`s; `sudo_rs.str
 | `core.option.Option.Insts.CoreDefaultDefault.default` | `ok none` | `Option::default() = None`. |
 | `alloc.vec.Vec.Insts.CoreDefaultDefault.default` | `ok (Vec.new T)` | `Vec::default()` is empty. |
 | `core.slice.Slice.starts_with` | `len ≥ needle.len` and `List.allM eq (zip needle self)` | `self.len() >= n && needle == &self[..n]`; slice `==` compares element-wise in order and stops at the first difference. Uses the instance's `eq`; the std code calls `ne`, which `PartialEq` requires to be `!eq`. |
-| `std.ffi.os_str.OsString.Insts.CoreCmpPartialEqOsString.eq` | `ok (decide (a = b))` (classical) | Equality of the abstract values. |
+| `std.ffi.os_str.OsString.Insts.CoreCmpPartialEqOsString.eq` | `ok (decide (a = b))` (classical) | Equality of the values, i.e. of the bytes (`OsString ==` compares the underlying byte slices on Unix). |
+| `std.ffi.os_str.OsString.Insts.CoreOpsDerefDerefOsStr.deref` | `ok ⟨Vec.deref s.inner⟩` (the same bytes) | `os_str.rs` 668-674: `deref` is `&self[..]`; `Index<RangeFull>` (650-657) is `OsStr::from_inner(self.inner.as_slice())`; `bytes.rs` 160-165 `Buf::as_slice` transmutes `self.inner.as_slice()` (`&[u8]`) to `&Slice`, and `OsStr::from_inner` (879-883) casts `&Slice` to `&OsStr`. No copy, no check. |
+| `std.ffi.os_str.OsStr.as_encoded_bytes` | `ok s.inner` | `os_str.rs` 1121-1123: `self.inner.as_encoded_bytes()`; `bytes.rs` 229-231: `&self.inner`. |
+| `std.ffi.os_str.OsString.Insts.StdOsUnixFfiOs_strOsStringExt.from_vec` | `ok ⟨v⟩` | `std/src/os/unix/ffi/os_str.rs` 27-29: `FromInner::from_inner(Buf { inner: vec })`; `os_str.rs` 1784-1789: `OsString { inner: buf }`. Takes the vector as is. |
 | `Box.Insts.CoreConvertAsRef.as_ref` | `ok x` | Boxes and borrows are erased. |
 | `glob.MatchOptions.new` | `{ case_sensitive := true, require_literal_separator := false, require_literal_leading_dot := false }` | glob 0.3.4 `src/lib.rs` lines 1102-1108. |
 | `glob.Pattern.matches_path_with` | **`opaque`**, `Pattern → Path → MatchOptions → Result Bool` | Glob semantics is not modelled. A theorem about `match_command` has to assume its behaviour (e.g. `∀ pat path opts, matches_path_with pat path opts = ok (g pat path opts)`). |
@@ -136,7 +139,7 @@ above is discharged inside the proofs.
 | Hypothesis | Meaning | Why it is needed |
 |---|---|---|
 | `hO : InstOracle uInst eqInst gInst O` (`AbsMatch.lean`) | The `UnixUser`/`PartialEq`/`UnixGroup` instances of the Rust user and group types are pure, total and agree with the spec oracle `O` (whose user and group types are the Rust ones): `has_name` (text linked by UTF-8 bytes), `has_uid`, `is_root`, `in_group_by_name` (on the `CStr` content), `in_group_by_gid`, `eq`, `ne` (= `!eq`), `as_gid`, `try_as_name`. | The decision is generic in these traits; the spec takes their answers as an oracle. |
-| `hG : GlobOracle A O` (`AbsMatch.lean`) | `glob::Pattern::matches_path_with` with the options of `match_command` (`require_literal_separator: true`, other fields as `MatchOptions::new()`) returns `ok (O.globMatches (A.pat pat) (A.path path))`; `A.os` (the reading of an `OsString` as text) is injective. | `matches_path_with` is `opaque`; `Pattern`, `Path`, `OsString` are opaque types read as text through `A : GlobAbs`. |
+| `hG : GlobOracle A O` (`AbsMatch.lean`) | `glob::Pattern::matches_path_with` with the options of `match_command` (`require_literal_separator: true`, other fields as `MatchOptions::new()`) returns `ok (O.globMatches (A.pat pat) (A.path path))`; `A.os` (the reading of an `OsString` as text) is injective. | `matches_path_with` is `opaque`; `Pattern` and `Path` are opaque types, and the decision proofs read them and `OsString` (whose model is its bytes) as text through `A : GlobAbs`. |
 | `hH : O.SudoRsHosts` | `O.hostMatches p h = (p == h)`. | sudo-rs (`match_token`) compares host names by string equality; the spec allows any host predicate. |
 | `hpol : PolicyOK rules aliases` (`AbsPolicy.lean`) | Alias tables: valid processing orders (`TableWF`), names that fit (`TableFits`), identifier names that fit (`TableGood`). Rules: user/host lists and runas user/group lists with names that fit (`ItemsFit`, `ItemsGood UserSpecFits / IdentFits / Fits`), command alias names that fit (`CmdOK`), and modifier counts per line that fit in `usize`. | This collects the side conditions required by the decision proof. There is no checked theorem here that parsing and `analyze` establish them. |
 | `hhost : Fits onHost.inner` | The current host name fits in memory. | `Deref<str>` of `system::Hostname`. |
@@ -172,3 +175,16 @@ carries only `SettingsInRange j.settings`, for an arbitrary `Judgement j`.
 hypotheses above plus `SettingsInRange settings`. The `env_keep`/`env_check` sets are passed
 through and compared in the extensional list model of `HashSet`. The `apparmor` feature is not
 enabled during extraction, so its `apparmor_profile` restriction is not covered.
+
+## Hypotheses of the argument-escaping theorems
+
+`SudoRsProofs/Escape.lean` (`escaped` of `src/common/command.rs` against
+`SudoersSpec.Escape.escapeArgs`) uses the `OsString`/`OsStr` models and the three function
+models `deref`, `as_encoded_bytes`, `from_vec` above (line numbers from the `rust-src` of the
+Charon toolchain, `1.100.0-nightly-2026-09-17`), plus the Aeneas library models of `Vec::new`,
+`Vec::len`, `Vec::push`, `Vec` and slice indexing and `usize` addition. The only hypothesis
+is in `escaped_spec`: the line has at most `usize::MAX` bytes, which is when the Aeneas model of
+`Vec::push` does not fail (`escaped_ok_iff`; `escaped_overflow` gives the failure otherwise).
+Real Rust aborts earlier, at `isize::MAX` bytes of capacity; that bound is not modelled.
+`escaped_flatMap`, `escaped_injective`, `escaped_unescape` assume only that `escaped` returned.
+Arguments are read through `osBytes` (bytes as Lean `UInt8`s), an injective abstraction.
