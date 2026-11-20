@@ -58,8 +58,8 @@ undocumented_unsafe_blocks = "warn"
 uninlined_format_args = "warn"
 
 # Options for Charon (https://github.com/AeneasVerif/charon), which extracts the sudoers
-# authorization decision, its mapping to restrictions and the alias order producer for formal
-# verification (see `proofs/`).
+# authorization decision, its mapping to restrictions, the alias order producer and the
+# argument escaping of `sudo -s`/`-i` for formal verification (see `proofs/`).
 [package.metadata.charon]
-start_from = ["crate::sudoers::permission_flags", "crate::sudoers::sanitize_alias_tables", "crate::sudoers::list_flags", "crate::sudoers::validate_flags", "crate::sudoers::Judgement::authorization"]
+start_from = ["crate::sudoers::permission_flags", "crate::sudoers::sanitize_alias_tables", "crate::sudoers::list_flags", "crate::sudoers::validate_flags", "crate::sudoers::Judgement::authorization", "crate::common::command::escaped"]
 opaque = ["crate::common::string", "crate::sudoers::warn_ignored", "crate::sudoers::alias_diagnostic", "{impl crate::sudoers::basic_parser::Token for crate::sudoers::tokens::ChDir}::construct"]

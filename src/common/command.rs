@@ -1,5 +1,5 @@
 use std::{
-    ffi::{OsStr, OsString},
+    ffi::OsString,
     fmt::Display,
     os::unix::ffi::OsStringExt,
     path::{Path, PathBuf},
@@ -38,7 +38,44 @@ impl Display for CommandAndArguments {
 }
 
 // when -i and -s are used, the arguments given to sudo are escaped "except for alphanumerics, underscores, hyphens, and dollar signs."
+//
+// Written with index loops, without closures or iterator adapters, so that Charon/Aeneas can
+// extract it; `proofs/lean/SudoRsProofs/Escape.lean` proves it equal to a specification.
 fn escaped(arguments: Vec<OsString>) -> OsString {
+    let mut line = Vec::new();
+    let mut i = 0;
+    while i < arguments.len() {
+        if i > 0 {
+            line.push(b' ');
+        }
+        escape_arg_into(arguments[i].as_encoded_bytes(), &mut line);
+        i += 1;
+    }
+    OsString::from_vec(line)
+}
+
+/// Bytes that [escaped] passes through without a backslash: ASCII alphanumerics, `_`, `-`, `$`.
+fn is_unescaped(c: u8) -> bool {
+    matches!(c, b'0'..=b'9' | b'A'..=b'Z' | b'a'..=b'z' | b'_' | b'-' | b'$')
+}
+
+/// Appends `arg` to `line`, every byte that is not [is_unescaped] preceded by a backslash.
+fn escape_arg_into(arg: &[u8], line: &mut Vec<u8>) {
+    let mut i = 0;
+    while i < arg.len() {
+        let c = arg[i];
+        if !is_unescaped(c) {
+            line.push(b'\\');
+        }
+        line.push(c);
+        i += 1;
+    }
+}
+
+/// The implementation of [escaped] before it was rewritten for extraction; the tests compare
+/// both.
+#[cfg(test)]
+fn escaped_reference(arguments: Vec<OsString>) -> OsString {
     arguments
         .into_iter()
         .map(|arg| {
@@ -53,7 +90,7 @@ fn escaped(arguments: Vec<OsString>) -> OsString {
             OsString::from_vec(escaped_arg)
         })
         .collect::<Vec<OsString>>()
-        .join(OsStr::new(" "))
+        .join(std::ffi::OsStr::new(" "))
 }
 
 /// Fuzzing entry point for [escaped].
@@ -118,8 +155,86 @@ impl CommandAndArguments {
 #[cfg(test)]
 mod test {
     use std::ffi::OsString;
+    use std::os::unix::ffi::{OsStrExt, OsStringExt};
 
-    use super::{CommandAndArguments, escaped};
+    use super::{CommandAndArguments, escaped, escaped_reference};
+
+    fn os(bytes: &[u8]) -> OsString {
+        OsString::from_vec(bytes.to_vec())
+    }
+
+    fn escaped_bytes(args: &[&[u8]]) -> Vec<u8> {
+        escaped(args.iter().map(|a| os(a)).collect()).into_vec()
+    }
+
+    #[test]
+    fn escaped_argument_lists() {
+        assert_eq!(escaped_bytes(&[]), b"");
+        assert_eq!(escaped_bytes(&[b""]), b"");
+        assert_eq!(escaped_bytes(&[b"", b""]), b" ");
+        assert_eq!(escaped_bytes(&[b"a", b"", b"b"]), b"a  b");
+        assert_eq!(escaped_bytes(&[b"a", b"", b"", b"b"]), b"a   b");
+        assert_eq!(escaped_bytes(&[b"", b"x"]), b" x");
+        assert_eq!(escaped_bytes(&[b"x", b""]), b"x ");
+        assert_eq!(escaped_bytes(&[b"ls", b"-l", b"$HOME"]), b"ls -l $HOME");
+        assert_eq!(
+            escaped_bytes(&[b"a b", b"c\\d", b"e\nf"]),
+            b"a\\ b c\\\\d e\\\nf"
+        );
+    }
+
+    #[test]
+    fn escaped_byte_classes() {
+        let kept: &[u8] = b"_-$09azAZ5mQ";
+        let quoted: &[u8] = &[
+            b' ', b'\\', b'\t', b'\n', b'\'', b'"', b'`', b';', b'&', b'|', b'*', b'?', b'#',
+            b'!', b'(', b')', b'<', b'>', b'=', b'~', b'%', b'^', b'+', b'.', b',',
+            // neighbours of the kept ranges
+            b'/', b':', b'@', b'[', b'`', b'{',
+            // control, non-ASCII and invalid UTF-8 bytes
+            0x00, 0x01, 0x1f, 0x7f, 0x80, 0xa0, 0xc3, 0xfe, 0xff,
+        ];
+        for &c in kept {
+            assert_eq!(escaped_bytes(&[&[c]]), [c], "byte {c:#04x}");
+        }
+        for &c in quoted {
+            assert_eq!(escaped_bytes(&[&[c]]), [b'\\', c], "byte {c:#04x}");
+        }
+        let mut n_kept = 0;
+        for c in 0..=u8::MAX {
+            let out = escaped_bytes(&[&[c]]);
+            if out == [c] {
+                n_kept += 1;
+            } else {
+                assert_eq!(out, [b'\\', c], "byte {c:#04x}");
+            }
+        }
+        // 10 digits, 26 + 26 letters, `_`, `-`, `$`
+        assert_eq!(n_kept, 65);
+    }
+
+    #[test]
+    fn escaped_matches_reference() {
+        let same = |args: Vec<OsString>| {
+            assert_eq!(escaped(args.clone()), escaped_reference(args.clone()), "{args:?}");
+        };
+        for a in 0..=u8::MAX {
+            same(vec![os(&[a])]);
+            for b in 0..=u8::MAX {
+                same(vec![os(&[a, b])]);
+            }
+        }
+        same(vec![]);
+        same(vec![os(b"")]);
+        same(vec![os(b""), os(b"")]);
+        same(vec![os(b"a"), os(b""), os(b"b")]);
+        same(vec![os(b"echo"), os(b"a b"), os(b"$x"), os(b"\\"), os(b"\xff\x00")]);
+        same(vec![os(b"-c"), os(b"rm -rf /"), os(b""), os(b"\"q\"")]);
+        let all: Vec<u8> = (0..=u8::MAX).collect();
+        same(vec![os(&all), os(&all[..128]), os(&all[128..])]);
+        same(all.iter().map(|&c| os(&[c])).collect());
+        same(vec![std::ffi::OsStr::from_bytes(b"x y").to_os_string()]);
+    }
 
     #[test]
     fn test_escaped() {
