@@ -1,0 +1,77 @@
+[package]
+name = "sudo-rs-fuzz"
+version = "0.0.0"
+description = "libFuzzer targets for sudo-rs (see README.md)"
+publish = false
+edition = "2024"
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+libc = "0.2"
+sudo-rs = { path = ".." }
+
+# a workspace of its own, so that the fuzz crate and its lock file stay out of the sudo-rs build
+[workspace]
+members = ["."]
+
+[profile.release]
+debug = 1
+
+[[bin]]
+name = "sudoers_parse"
+path = "fuzz_targets/sudoers_parse.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "sudoers_decide"
+path = "fuzz_targets/sudoers_decide.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "sudoers_defaults"
+path = "fuzz_targets/sudoers_defaults.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "sudo_cli"
+path = "fuzz_targets/sudo_cli.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "su_cli"
+path = "fuzz_targets/su_cli.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "visudo_cli"
+path = "fuzz_targets/visudo_cli.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "timestamp"
+path = "fuzz_targets/timestamp.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "name_escape"
+path = "fuzz_targets/name_escape.rs"
+test = false
+doc = false
+bench = false
