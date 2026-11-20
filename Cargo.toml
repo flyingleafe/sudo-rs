@@ -50,6 +50,8 @@ opt-level = "s"
 
 [lints.rust]
 unsafe_op_in_unsafe_fn = { level = "deny" }
+# `cfg(fuzzing)` is set by cargo-fuzz; it only enables `src/fuzz_api.rs` (see `fuzz/`)
+unexpected_cfgs = { level = "warn", check-cfg = ["cfg(fuzzing)"] }
 
 [lints.clippy]
 undocumented_unsafe_blocks = "warn"

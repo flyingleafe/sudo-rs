@@ -17,6 +17,9 @@ mod cli;
 mod context;
 mod help;
 
+#[cfg(fuzzing)]
+pub(crate) use cli::fuzz_parse_cli;
+
 const DEFAULT_USER: &str = "root";
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 

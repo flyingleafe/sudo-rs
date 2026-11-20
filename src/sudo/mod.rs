@@ -7,9 +7,9 @@ use crate::system::User;
 use crate::system::interface::UserId;
 use crate::system::timestamp::RecordScope;
 use crate::system::{Process, timestamp::SessionRecordFile};
-#[cfg(test)]
+#[cfg(any(test, fuzzing))]
 pub(crate) use cli::SudoAction;
-#[cfg(not(test))]
+#[cfg(not(any(test, fuzzing)))]
 use cli::SudoAction;
 use std::{path::PathBuf, time::Duration};
 

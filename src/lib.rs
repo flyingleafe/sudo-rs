@@ -18,6 +18,9 @@ mod su;
 mod sudo;
 mod visudo;
 
+#[cfg(fuzzing)]
+pub mod fuzz_api;
+
 pub use su::main as su_main;
 pub use sudo::main as sudo_main;
 pub use visudo::main as visudo_main;

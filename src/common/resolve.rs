@@ -31,6 +31,16 @@ impl<'a, T: FromStr> NameOrId<'a, T> {
     }
 }
 
+/// Fuzzing entry point: `NameOrId::parse` with user ids, as `resolve_target_user_and_group`
+/// applies it to `-u`.
+#[cfg(fuzzing)]
+pub(crate) fn fuzz_name_or_id(input: &SudoString) -> Option<crate::fuzz_api::NameOrId> {
+    NameOrId::<UserId>::parse(input).map(|parsed| match parsed {
+        NameOrId::Name(name) => crate::fuzz_api::NameOrId::Name(name.as_str().to_owned()),
+        NameOrId::Id(id) => crate::fuzz_api::NameOrId::Id(id.inner()),
+    })
+}
+
 #[derive(Clone)]
 pub struct CurrentUser {
     inner: User,

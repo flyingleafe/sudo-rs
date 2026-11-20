@@ -56,6 +56,12 @@ fn escaped(arguments: Vec<OsString>) -> OsString {
         .join(OsStr::new(" "))
 }
 
+/// Fuzzing entry point for [escaped].
+#[cfg(fuzzing)]
+pub(crate) fn fuzz_escaped(arguments: Vec<OsString>) -> OsString {
+    escaped(arguments)
+}
+
 //checks whether the Path is actually describing a qualified path (i.e. contains "/")
 //or just specifying the name of a file (in which case we are going to resolve it via PATH)
 fn is_qualified(path: impl AsRef<Path>) -> bool {

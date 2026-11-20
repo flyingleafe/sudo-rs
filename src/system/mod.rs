@@ -203,7 +203,7 @@ impl ops::Deref for Hostname {
 }
 
 impl Hostname {
-    #[cfg(test)]
+    #[cfg(any(test, fuzzing))]
     pub fn fake(hostname: &str) -> Self {
         Self {
             inner: hostname.to_string(),

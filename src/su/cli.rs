@@ -17,6 +17,28 @@ impl SuAction {
     }
 }
 
+/// Fuzzing entry point: parse and validate `arguments` as `SuAction::from_env` does; `Ok`
+/// holds the action rendered as text and, for a run, the target user followed by the
+/// arguments for the shell.
+#[cfg(fuzzing)]
+pub(crate) fn fuzz_parse_cli(arguments: Vec<String>) -> Result<(String, Vec<String>), String> {
+    Ok(match SuOptions::parse_arguments(arguments)?.validate()? {
+        SuAction::Help(_) => ("help".to_owned(), Vec::new()),
+        SuAction::Version(_) => ("version".to_owned(), Vec::new()),
+        SuAction::Run(options) => {
+            let positional = std::iter::once(options.user.to_string())
+                .chain(
+                    options
+                        .arguments
+                        .iter()
+                        .map(|a| a.to_string_lossy().into_owned()),
+                )
+                .collect();
+            (format!("{options:?}"), positional)
+        }
+    })
+}
+
 #[cfg_attr(test, derive(Debug, PartialEq))]
 pub struct SuHelpOptions {}
 

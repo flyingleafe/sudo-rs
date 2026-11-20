@@ -33,6 +33,13 @@ use self::help::{USAGE_MSG, long_help_message};
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 
+/// Fuzzing entry point: parse `arguments` as `VisudoOptions::from_env` does; `Ok` holds the
+/// options rendered as text.
+#[cfg(fuzzing)]
+pub(crate) fn fuzz_parse_cli(arguments: Vec<String>) -> Result<String, String> {
+    VisudoOptions::parse_arguments(arguments).map(|options| format!("{options:?}"))
+}
+
 macro_rules! io_msg {
     ($err:expr, $($tt:tt)*) => {
         io::Error::new($err.kind(), format!("{}: {}", format_args!($($tt)*), $err))
