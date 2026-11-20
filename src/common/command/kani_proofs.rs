@@ -85,6 +85,20 @@ fn escaped_exact_1_arg_3_bytes() {
     check_exact(&[&bytes::<3>()[..]]);
 }
 
+/// A3b: one argument of 4 arbitrary bytes.
+#[kani::proof]
+#[kani::unwind(6)]
+fn escaped_exact_1_arg_4_bytes() {
+    check_exact(&[&bytes::<4>()[..]]);
+}
+
+/// A3c: one argument of 5 arbitrary bytes.
+#[kani::proof]
+#[kani::unwind(7)]
+fn escaped_exact_1_arg_5_bytes() {
+    check_exact(&[&bytes::<5>()[..]]);
+}
+
 /// A4: two arguments of 2 arbitrary bytes each.
 #[kani::proof]
 #[kani::unwind(4)]
@@ -113,7 +127,31 @@ fn check_injective(a: &[&[u8]], b: &[&[u8]]) {
 #[kani::proof]
 #[kani::unwind(4)]
 fn escaped_injective_1x2_vs_2x1() {
-    check_injective(&[&bytes::<2>()[..]], &[&bytes::<1>()[..], &bytes::<1>()[..]]);
+    check_injective(
+        &[&bytes::<2>()[..]],
+        &[&bytes::<1>()[..], &bytes::<1>()[..]],
+    );
+}
+
+/// B1b: one argument of 3 bytes against two arguments of 1 byte each: `"a b"` (one argument
+/// whose middle byte may be a space) never escapes to the same string as `"a", "b"`.
+#[kani::proof]
+#[kani::unwind(5)]
+fn escaped_injective_1x3_vs_2x1() {
+    check_injective(
+        &[&bytes::<3>()[..]],
+        &[&bytes::<1>()[..], &bytes::<1>()[..]],
+    );
+}
+
+/// B1c: as B1b with the middle byte of the 3-byte argument fixed to a space (first and last
+/// byte arbitrary): the smaller instance of the same question.
+#[kani::proof]
+#[kani::unwind(5)]
+fn escaped_injective_1x3_space_vs_2x1() {
+    let mut a = bytes::<3>();
+    a[1] = b' ';
+    check_injective(&[&a[..]], &[&bytes::<1>()[..], &bytes::<1>()[..]]);
 }
 
 /// B2: two single arguments of 2 bytes: equal escaped strings imply equal arguments.
@@ -130,8 +168,14 @@ fn escaped_injective_1x2_vs_1x2() {
 #[kani::unwind(4)]
 fn escaped_injective_mixed_lengths() {
     check_injective(&[&bytes::<1>()[..]], &[&bytes::<2>()[..]]);
-    check_injective(&[&bytes::<2>()[..]], &[&bytes::<1>()[..], &bytes::<0>()[..]]);
-    check_injective(&[&bytes::<2>()[..]], &[&bytes::<0>()[..], &bytes::<1>()[..]]);
+    check_injective(
+        &[&bytes::<2>()[..]],
+        &[&bytes::<1>()[..], &bytes::<0>()[..]],
+    );
+    check_injective(
+        &[&bytes::<2>()[..]],
+        &[&bytes::<0>()[..], &bytes::<1>()[..]],
+    );
 }
 
 /// File-system replacement for `canonicalize`: any outcome the real function could have
