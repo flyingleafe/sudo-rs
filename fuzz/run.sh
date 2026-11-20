@@ -2,7 +2,9 @@
 # Build and run the libFuzzer targets of fuzz/ (see fuzz/README.md).
 #
 #   nix develop -c fuzz/run.sh build                 build every target
-#   nix develop -c fuzz/run.sh campaign [target...]  fuzz every (or the named) target
+#   nix develop -c fuzz/run.sh seed                  write the seed corpora (fuzz/seeds.py)
+#   nix develop -c fuzz/run.sh fuzz <target...>      fuzz the named targets (built and seeded)
+#   nix develop -c fuzz/run.sh campaign [target...]  build, seed, fuzz every (or the named) target
 #   nix develop -c fuzz/run.sh coverage [target...]  line coverage of the corpora
 #   nix develop -c fuzz/run.sh summary               table of the last campaign
 #
@@ -75,21 +77,25 @@ fuzz_one() {
   echo "$t: exit $?"
 }
 
-campaign() {
+# fuzz <target...>: in batches of $parallel targets fuzzed at the same time
+fuzz() {
   local targets=("$@") i
   [ ${#targets[@]} -gt 0 ] || targets=("${all_targets[@]}")
-  build || exit 1
-  seed
   for ((i = 0; i < ${#targets[@]}; i += parallel)); do
     local batch=("${targets[@]:i:parallel}") t
     echo "batch: ${batch[*]} (${seconds}s)"
     for t in "${batch[@]}"; do
-      date +%s > "$out/$t.start" 2>/dev/null || { mkdir -p "$out"; date +%s > "$out/$t.start"; }
       fuzz_one "$t" &
     done
     wait
   done
-  summary "${targets[@]}"
+}
+
+campaign() {
+  build || exit 1
+  seed
+  fuzz "$@"
+  summary "$@"
 }
 
 # the last fork-mode status line: "#<execs>: cov: <edges> ft: <features> corp: <inputs> ...
@@ -141,8 +147,10 @@ cmd=${1:-}
 shift || true
 case $cmd in
   build) build "$@" ;;
+  seed) seed ;;
+  fuzz) fuzz "$@" ;;
   campaign) campaign "$@" ;;
   coverage) coverage "$@" ;;
   summary) summary "$@" ;;
-  *) sed -n '2,8p' "$0" >&2; exit 2 ;;
+  *) sed -n '2,10p' "$0" >&2; exit 2 ;;
 esac

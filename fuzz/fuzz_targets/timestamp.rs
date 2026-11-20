@@ -14,7 +14,7 @@
 #![no_main]
 
 use std::fs::File;
-use std::io::Write;
+use std::io::{Seek, Write};
 use std::os::fd::FromRawFd;
 use std::time::Duration;
 
@@ -38,6 +38,8 @@ fn memfd(contents: &[u8]) -> File {
     // SAFETY: fd is a fresh descriptor that nothing else owns
     let mut file = unsafe { File::from_raw_fd(fd) };
     file.write_all(contents).expect("writing a memfd");
+    // sudo opens the file afresh: start reading at the beginning
+    file.rewind().expect("rewinding a memfd");
     file
 }
 
