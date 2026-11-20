@@ -283,7 +283,8 @@ theorem parseUid_codeAt_ok (prog : Program) (a : BitVec 64)
     have hne1 : BitVec.ofNat 64 (rest.length + 1 + 1) ≠ 1#64 := by bv_omega
     have hne0 : (BitVec.ofNat 64 (rest.length + 1 + 1) == 0#64) = false := by
       simp only [beq_eq_false_iff_ne, ne_eq]; bv_omega
-    have hx3 : BitVec.ofNat 64 (rest.length + 1 + 1) - 1#64 = BitVec.ofNat 64 (rest.length + 1) := by
+    have hx3 : BitVec.ofNat 64 (rest.length + 1 + 1) - 1#64 =
+        BitVec.ofNat 64 (rest.length + 1) := by
       bv_omega
     have hle : ConditionHolds CondCode.LE (addsPState32 0#32 65#32) = false := by
       with_unfolding_all decide

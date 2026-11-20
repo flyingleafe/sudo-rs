@@ -124,15 +124,21 @@ into the value of `parseDecimalU32`.
   rustc, and no relocation falls inside them). rustc itself is not trusted for the statement:
   the theorem is about the machine code it produced.
 
-## Planted bugs: not yet run
+## Planted bugs (scratch copies, not committed)
 
-Two mutants are prepared in scratch copies outside the repository (`/tmp/mcode-planted-a`: the
-u32 parse replaced by a wrapping parse without the overflow check; `/tmp/mcode-planted-b`:
-`SudoString::deref` slicing `[..num_bytes]`, an off-by-one that keeps the NUL). Compiling,
-exporting and re-running the proof against them has not been done yet, so there is no recorded
-outcome. Note that any source mutation changes the instruction words, so the unchanged proof
-necessarily stops at the first differing word; the informative part of such a run is that the
-mutant is also wrong on concrete inputs (for example `#4294967296` and `""`).
+Each bug was planted in a copy of this directory under `/tmp`. The copy was compiled with the
+same settings and exported with `rust-obj2lean`, and its `parseUidWords` was replaced by the
+mutant function's words. The unchanged proof was then rebuilt against those words with
+`lake build SudoRsMachineCode.Proof`. Any change of the instruction words makes the proof fail,
+so each mutant's wrong behaviour was also shown on concrete inputs by compiling the mutant Rust
+source with rustc 1.98.1 for the host (x86_64) and running it natively. Its results are compared
+with `nameOrIdParseUid` (and with the unmutated source, which agrees with the specification on
+these inputs). This is a test, not a run of the mutant's AArch64 words in the engine.
+
+| Mutant | Proof against the mutant's words | Native run (mutant vs. specification) |
+|---|---|---|
+| (a) `u32` parse without the overflow check (wrapping arithmetic); function shrinks from 86 to 49 words, first differing word at `+0x010` | fails with 12 errors, at all five loop call sites: the loop tactic stops at an unresolved digit test (`9 <u byte - 0x30`) where the proof expects a loop header; in the checked loop, 7 `wp_done`s stop at unresolved branches and one `omega` goal fails | `#4294967296` → `Id(0)` (spec: `None`); `#18446744073709551615` → `Id(4294967295)` (spec: `None`) |
+| (b) off by one in `SudoString::deref` (`[..num_bytes]`, the trailing NUL stays in the string); function grows to 68 words, first differing word at `+0x000` | fails with 18 errors, the first in the empty-input case (`wp_done`, `content = []`), then at all five loop call sites | `""` → `Name` (spec: `None`); `#5` → `None` (spec: `Id 5`); `#4294967295` → `None` (spec: `Id 0xffffffff`) |
 
 ## Reproduce
 
