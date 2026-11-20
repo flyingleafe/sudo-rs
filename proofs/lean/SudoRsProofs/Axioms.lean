@@ -5,6 +5,7 @@ import SudoRsProofs.ListValidate
 import SudoRsProofs.NonVacuity
 import SudoRsProofs.Authorization
 import SudoRsProofs.Properties
+import SudoRsProofs.Expansion
 
 /-!
 # Axiom audit
@@ -85,3 +86,6 @@ of `SudoRs/{Types,Funs}External.lean` are definitions or `opaque` constants, nev
 #print axioms SudoRsProofs.permission_flags_last_line_decides
 #print axioms SudoRsProofs.permission_flags_insert_other_user_irrelevant
 #print axioms SudoRsProofs.permission_flags_add_positive_preserves_allow
+#print axioms SudoRsProofs.absAliasTable_OK_of_sanitize
+#print axioms SudoRsProofs.permission_flags_expandAliases_rel
+#print axioms SudoRsProofs.permission_flags_expandAliases

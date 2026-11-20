@@ -20,4 +20,5 @@ import SudoRsProofs.Permission
 import SudoRsProofs.ListValidate
 import SudoRsProofs.Authorization
 import SudoRsProofs.Properties
+import SudoRsProofs.Expansion
 import SudoRsProofs.Axioms
