@@ -8,4 +8,6 @@ import SudoersSpec.Theorems
 import SudoersSpec.Authorization
 import SudoersSpec.Examples
 import SudoersSpec.ListValidate
+import SudoersSpec.Properties
+import SudoersSpec.RunasManual
 import SudoersSpec.Axioms
