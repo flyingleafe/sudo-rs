@@ -102,6 +102,37 @@ The fork changes alias-membership storage from a hash table to a linear list for
 extraction. Resolving many dependent aliases can therefore be quadratic. Treat
 this branch as a verification PoC, not a production performance replacement.
 
+## Evidence that is not a proof
+
+Each item says what kind of evidence it is. A test covers only the inputs it ran.
+
+- **Differential test** ([`differential/`](differential/README.md), test): generated
+  policies and requests decided by the Lean spec, by sudo-rs (`Sudoers::read` + `check`) and
+  by C sudo 1.9.18 (`testsudoers`). The generator covers alias hazards: names spelled like
+  aliases, references to undefined aliases, cyclic and duplicate definitions. On 20,000
+  cases the spec and sudo-rs agree on every verdict, every tag field and every alias
+  diagnostic; a C model agrees with C sudo on all 17,335 cases C sudo accepts, which
+  explains every spec/C difference.
+- **Property search on the real code** (`differential/`, test): seven properties stated in
+  Lean (lines of other users are irrelevant, appending without a command-side `!` never
+  revokes, unmentioned users/hosts/commands are never allowed, textual alias expansion,
+  earlier lines before a deciding last line, `sudo -l` read back as a policy, `#0`
+  spellings), each run on at least 10,000 generated instances that meet its precondition;
+  counterexamples are shrunk and confirmed on sudo-rs twice. The README there lists the
+  outcome of each property.
+- **Runtime unit tests** (`src/sudoers/test/runtime.rs`, test): command paths match after
+  canonicalisation (`..`, `//`, `.`, directory symlinks); time windows, `CHROOT`,
+  `INTERCEPT`, `ROLE`, `TYPE` and digests are rejected at parse.
+- **Sanitizers** ([`sanitizers/`](sanitizers/README.md), test): all 191 unit tests in debug
+  mode (overflow checks), under AddressSanitizer and under Miri, one process per test:
+  0 ASan memory errors, 0 Miri undefined behaviour. The failures are the 12 host-dependent
+  tests that also fail without a sanitizer, plus 4 timestamp tests under Miri, which answers
+  `clock_gettime(CLOCK_BOOTTIME)` with `EINVAL`; Miri skips the 30 tests that cross FFI.
+- **Fuzzing** ([`../fuzz/`](../fuzz/README.md), test): eight libFuzzer targets on the real
+  code (sudoers parser, decision, Defaults, sudo/su/visudo command lines, timestamp records,
+  `NameOrId` and shell-mode argument escaping) through the `cfg(fuzzing)`-only
+  `src/fuzz_api.rs`, with AddressSanitizer, debug assertions and property assertions.
+
 ## Artifacts
 
 | Path | Contents |
@@ -112,7 +143,9 @@ this branch as a verification PoC, not a production performance replacement.
 | `spec/` | Hand-written Lean specification of the authorization decision. |
 | `quint/` | Quint model of the surrounding lifecycle. |
 | `check.sh` | Local gate for proof builds, axiom audit, model checks, and sudoers unit tests. |
-| `differential/` | Unprivileged comparison of the Lean, Rust and C policy decisions. |
+| `differential/` | Unprivileged comparison of the Lean, Rust and C policy decisions; property search on the real code. |
+| `sanitizers/` | Unit suite under debug overflow checks, AddressSanitizer and Miri. |
+| `../fuzz/` | libFuzzer targets on the real code and the campaign runner. |
 | `compliance/` | Docker comparison of upstream and refactored sudo-rs. |
 | `parser/PLAN.md` | Plan and feasibility measurements for a parser proof. Nothing proved yet. |
 
