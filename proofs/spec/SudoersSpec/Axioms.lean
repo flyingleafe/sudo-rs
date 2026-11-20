@@ -119,5 +119,6 @@ open SudoersSpec
 #print axioms authorize_expandAliases
 #print axioms RunAs.usersKept_of_defined
 #print axioms Policy.runasUsersKept_of_defined
+#print axioms expandAliases_aliasFree
 #print axioms SudoersSpec.ExpansionExamples.expandAliases_setenv_counterexample
 #print axioms SudoersSpec.ExpansionExamples.expandAliases_runas_counterexample

@@ -24,8 +24,8 @@ which a clean `sanitize_alias_tables` guarantees):
 
 * `findItem_expandAll`: on any list, deciding on the expansion with no table equals deciding
   with the table `get_aliases` computes. Unlike `demonstration` it does not need every
-  referenced alias to be defined (references to undefined aliases are not diagnosed by
-  `sanitize_alias_tables` when they occur in a rule).
+  referenced alias to be defined (the sanitizer theorems are about the alias tables only, not
+  about the references in the rules).
 * `authorize_expandAliases`: the decision on the expanded policy is the decision on the
   original policy, provided no `Cmnd_Alias` body mentions `ALL` (`CmndAliasesNoAll`) and
   expansion empties no non-empty runas user list (`Policy.RunasUsersKept`).
@@ -35,6 +35,8 @@ which a clean `sanitize_alias_tables` guarantees):
   a `Cmnd_Alias`.
 * `expandAliases_setenv_counterexample`, `expandAliases_runas_counterexample`: both hypotheses
   are needed.
+* `expandAliases_aliasFree`: if every alias the rules name is defined, the expanded policy
+  mentions no alias.
 -/
 
 namespace SudoersSpec
@@ -865,6 +867,112 @@ theorem Policy.runasUsersKept_of_defined (p : Policy) (hs : Sorted p.aliases.run
       RefsIn p.aliases.runas (withUnit ra.users)) : p.RunasUsersKept :=
   fun rule hrule seg hseg x hx ra hra =>
     RunAs.usersKept_of_defined _ hs hne ra (hr rule hrule seg hseg x hx ra hra)
+
+/-! ## The flattened policy is alias-free -/
+
+/-- No entry of a spec list refers to an alias. -/
+def NoRefs (l : SpecList α) : Prop := ∀ s ∈ l, isAliasRef s = false
+
+/-- Every alias a spec list names is in `ns`. -/
+def RefsDef (ns : List String) (l : SpecList α) : Prop := ∀ s ∈ l, ∀ k, s.who = .alias k → k ∈ ns
+
+/-- No alias reference anywhere in the rules. -/
+def Policy.AliasFree (p : Policy) : Prop :=
+  ∀ rule ∈ p.rules, NoRefs rule.users ∧ ∀ seg ∈ rule.permissions, NoRefs seg.1 ∧
+    ∀ e ∈ seg.2, isAliasRef e.2.cmd = false ∧
+      ∀ ra, e.1 = some ra → NoRefs ra.users ∧ NoRefs ra.groups
+
+/-- Every alias the rules name is defined in the table of its kind (no "undefined alias"). -/
+def Policy.RefsDefined (p : Policy) : Prop :=
+  ∀ rule ∈ p.rules, RefsDef (names p.aliases.user) rule.users ∧ ∀ seg ∈ rule.permissions,
+    RefsDef (names p.aliases.host) seg.1 ∧ ∀ e ∈ seg.2, RefsDef (names p.aliases.cmnd) [e.2.cmd] ∧
+      ∀ ra, e.1 = some ra →
+        RefsDef (names p.aliases.runas) ra.users ∧ RefsDef (names p.aliases.runas) ra.groups
+
+theorem isAliasRef_eq_false {s : Spec α} (h : ∀ k, s.who ≠ .alias k) : isAliasRef s = false := by
+  unfold isAliasRef
+  split
+  · rename_i k hk; exact absurd hk (h k)
+  · rfl
+
+theorem noRefs_expandList (t : List (Def α)) (ht : TableOK t) (l : SpecList α)
+    (hl : RefsDef (names t) l) : NoRefs (expandList t l) := by
+  have hdef : RefsIn t (withUnit l) := by
+    intro x hx k hk
+    obtain ⟨s, hs, rfl⟩ := List.mem_map.1 hx
+    exact hl s hs k hk
+  have hfree := (demonstration t t (fun _ => false) (withUnit l) FoundAliases.empty
+    (List.Perm.refl t) ht.1 ht.2 hdef).1
+  intro s hs
+  obtain ⟨x, hx, rfl⟩ := List.mem_map.1 hs
+  exact isAliasRef_eq_false (hfree x hx)
+
+theorem noRefs_expandGroups (t : List (Def UserSpecifier)) (ht : TableOK t)
+    (l : SpecList Identifier) (hl : RefsDef (names t) l) : NoRefs (expandGroups t l) := by
+  have hlift : RefsDef (names t) (liftGroups l) := by
+    intro s hs k hk
+    obtain ⟨s₀, hs₀, rfl⟩ := List.mem_map.1 hs
+    apply hl s₀ hs₀ k
+    rcases s₀ with (_ | _ | _) | (_ | _ | _) <;> (cases hk <;> rfl)
+  have h := noRefs_expandList t ht _ hlift
+  intro s' hs'
+  obtain ⟨s, hs, hlow⟩ := List.mem_filterMap.1 hs'
+  have := h s hs
+  rcases s with (_ | (_ | _ | _) | _) | (_ | (_ | _ | _) | _) <;>
+    simp only [lowerGroup, Option.some.injEq, reduceCtorEq] at hlow <;> subst hlow <;> first | rfl | exact this
+
+theorem expandEntries_aliasFree (X : AliasTable) (hX : X.OK) (Q : RunAs → Prop)
+    (L : List (Option RunAs × CommandSpec))
+    (hc : ∀ x ∈ L, RefsDef (names X.cmnd) [x.2.cmd]) (hr : ∀ x ∈ L, ∀ ra, x.1 = some ra → Q ra) :
+    ∀ (pr : Option RunAs) (pm : List Modifier), (∀ ra, pr = some ra → Q ra) →
+      ∀ e ∈ expandEntries X pr pm L, isAliasRef e.2.cmd = false ∧
+        ∀ ra', e.1 = some ra' → ∃ ra, Q ra ∧ ra' = RunAs.expand X.runas ra := by
+  induction L with
+  | nil => intro _ _ _ e he; cases he
+  | cons x rest ih =>
+    intro pr pm hpr e he
+    obtain ⟨ra, mods, cmd⟩ := x
+    have hc0 := noRefs_expandList X.cmnd hX.2.2.1 [cmd] (hc _ List.mem_cons_self)
+    have hor : ∀ r, ra.or pr = some r → Q r := by
+      intro r h
+      cases ra with
+      | none => exact hpr r h
+      | some ra => cases h; exact hr _ List.mem_cons_self _ rfl
+    have ih' := ih (fun x hx => hc x (List.mem_cons_of_mem _ hx))
+      (fun x hx => hr x (List.mem_cons_of_mem _ hx))
+    simp only [expandEntries] at he
+    split at he
+    · exact ih' _ _ hor e he
+    · rename_i c cs hcs
+      rw [hcs] at hc0
+      rcases List.mem_cons.1 he with rfl | he
+      · refine ⟨hc0 c List.mem_cons_self, fun ra' h => ?_⟩
+        obtain ⟨r, hr', rfl⟩ := Option.map_eq_some_iff.1 h
+        exact ⟨r, hor r hr', rfl⟩
+      · rcases List.mem_append.1 he with he | he
+        · obtain ⟨c', hc', rfl⟩ := List.mem_map.1 he
+          exact ⟨hc0 c' (List.mem_cons_of_mem _ hc'), fun _ h => by cases h⟩
+        · exact ih' none [] (fun _ h => by cases h) e he
+
+/-- **The flattened policy is alias-free** when every alias the rules name is defined (for a
+policy with undefined references, those references are dropped unless the table of their kind
+is empty, `expandAll_undefined`). -/
+theorem expandAliases_aliasFree (p : Policy) (hX : p.aliases.OK) (hd : p.RefsDefined) :
+    p.expandAliases.AliasFree := by
+  intro rule' hrule'
+  obtain ⟨rule, hrule, rfl⟩ := List.mem_map.1 hrule'
+  obtain ⟨hu, hsegs⟩ := hd rule hrule
+  refine ⟨noRefs_expandList _ hX.1 _ hu, fun seg' hseg' => ?_⟩
+  obtain ⟨seg, hseg, rfl⟩ := List.mem_map.1 hseg'
+  obtain ⟨hh, hents⟩ := hsegs seg hseg
+  refine ⟨noRefs_expandList _ hX.2.1 _ hh, fun e he => ?_⟩
+  obtain ⟨hcmd, hra⟩ := expandEntries_aliasFree p.aliases hX
+    (fun ra => RefsDef (names p.aliases.runas) ra.users ∧ RefsDef (names p.aliases.runas) ra.groups)
+    seg.2 (fun x hx => (hents x hx).1) (fun x hx => (hents x hx).2) none [] (fun _ h => by cases h)
+    e he
+  refine ⟨hcmd, fun ra' h => ?_⟩
+  obtain ⟨ra, ⟨hru, hrg⟩, rfl⟩ := hra ra' h
+  exact ⟨noRefs_expandList _ hX.2.2.2 _ hru, noRefs_expandGroups _ hX.2.2.2 _ hrg⟩
 
 end SudoersSpec
 
