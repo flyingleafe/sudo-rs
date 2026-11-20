@@ -440,7 +440,7 @@ def runasUserMentioned (p : Policy) (r : Request User Group) : Bool :=
 
 /-- **P2r, the sudo-rs form.** The documented analogue of P2 for runas ("a target user other
 than the invoker that no runas list mentions is never allowed", an absent runas spec meaning
-the user named `root`) does not hold (finding F2; certificate `Certificates.f2_toor`). What
+the user named `root`) does not hold (finding F2; certificate `Certificates.d_f2_toor`). What
 does hold: such a target is allowed only if it is root by `is_root` (uid 0, not by name), and
 only through a deciding entry without a runas spec. -/
 theorem unmentioned_runas_target (p : Policy) (r : Request User Group) (t : Tag)
@@ -546,7 +546,7 @@ theorem runasPermits_some_eq (r : Request User Group) (RU RG : FoundAliases) (ra
 
 /-- **F3: the group list is ignored when the target user is in the target group**, including a
 `!group` that names it: the documented "a `!` in a runas list switches the entry off" fails
-(certificate `Certificates.f3_negated_group`). -/
+(certificate `Certificates.e_f3_negated_group`). -/
 theorem runas_grouplist_ignored (r : Request User Group) (RU RG : FoundAliases)
     (users : SpecList UserSpecifier) (gs gs' : SpecList Identifier)
     (h : inGroup O r.targetUser r.targetGroup = true) :
@@ -555,7 +555,7 @@ theorem runas_grouplist_ignored (r : Request User Group) (RU RG : FoundAliases)
 
 /-- **F5: the user list is ignored when the invoker runs as themself with a group that is not
 theirs**, including a `!user` that names the invoker (certificate
-`Certificates.f5_negated_self`). -/
+`Certificates.g_f5_negated_self`). -/
 theorem runas_userlist_ignored (r : Request User Group) (RU RG : FoundAliases)
     (us us' : SpecList UserSpecifier) (groups : SpecList Identifier)
     (hself : O.userEq r.targetUser r.invokingUser = true)
