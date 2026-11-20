@@ -21,4 +21,5 @@ import SudoRsProofs.ListValidate
 import SudoRsProofs.Authorization
 import SudoRsProofs.Properties
 import SudoRsProofs.Expansion
+import SudoRsProofs.Escape
 import SudoRsProofs.Axioms

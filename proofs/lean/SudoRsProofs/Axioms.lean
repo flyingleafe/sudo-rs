@@ -6,6 +6,7 @@ import SudoRsProofs.NonVacuity
 import SudoRsProofs.Authorization
 import SudoRsProofs.Properties
 import SudoRsProofs.Expansion
+import SudoRsProofs.Escape
 
 /-!
 # Axiom audit
@@ -89,3 +90,15 @@ of `SudoRs/{Types,Funs}External.lean` are definitions or `opaque` constants, nev
 #print axioms SudoRsProofs.absAliasTable_OK_of_sanitize
 #print axioms SudoRsProofs.permission_flags_expandAliases_rel
 #print axioms SudoRsProofs.permission_flags_expandAliases
+#print axioms SudoRsProofs.Escape.is_unescaped_eq
+#print axioms SudoRsProofs.Escape.escape_arg_into_loop_eq
+#print axioms SudoRsProofs.Escape.escaped_loop_eq
+#print axioms SudoRsProofs.Escape.escaped_eq
+#print axioms SudoRsProofs.Escape.escaped_spec
+#print axioms SudoRsProofs.Escape.escaped_overflow
+#print axioms SudoRsProofs.Escape.escaped_ok_iff
+#print axioms SudoRsProofs.Escape.escaped_ok_eq
+#print axioms SudoRsProofs.Escape.escaped_flatMap
+#print axioms SudoRsProofs.Escape.escaped_injective
+#print axioms SudoRsProofs.Escape.escaped_collision
+#print axioms SudoRsProofs.Escape.escaped_unescape
