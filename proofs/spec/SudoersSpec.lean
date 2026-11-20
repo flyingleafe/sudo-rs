@@ -12,4 +12,5 @@ import SudoersSpec.ListValidate
 import SudoersSpec.Properties
 import SudoersSpec.RunasManual
 import SudoersSpec.Certificates
+import SudoersSpec.Escape
 import SudoersSpec.Axioms

@@ -3,6 +3,7 @@ import SudoersSpec.ListValidate
 import SudoersSpec.Authorization
 import SudoersSpec.Certificates
 import SudoersSpec.Expansion
+import SudoersSpec.Escape
 
 /-! Axiom audit: every main result depends on at most `propext`, `Classical.choice` and
 `Quot.sound`. `lake build` prints the lists. -/
@@ -122,3 +123,14 @@ open SudoersSpec
 #print axioms expandAliases_aliasFree
 #print axioms SudoersSpec.ExpansionExamples.expandAliases_setenv_counterexample
 #print axioms SudoersSpec.ExpansionExamples.expandAliases_runas_counterexample
+#print axioms SudoersSpec.Escape.keep_iff
+#print axioms SudoersSpec.Escape.keep_count
+#print axioms SudoersSpec.Escape.escapeArg_eq_flatMap
+#print axioms SudoersSpec.Escape.escapeArgs_eq_intercalate
+#print axioms SudoersSpec.Escape.escapeArgs_cons
+#print axioms SudoersSpec.Escape.escapeArgs_eq_nil_iff
+#print axioms SudoersSpec.Escape.escapeArg_wellEscaped
+#print axioms SudoersSpec.Escape.unescapeArgs_escapeArgs
+#print axioms SudoersSpec.Escape.escapeArgs_eq_iff
+#print axioms SudoersSpec.Escape.escapeArgs_injective
+#print axioms SudoersSpec.Escape.escapeArg_injective
