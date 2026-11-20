@@ -87,8 +87,13 @@ for h in "${selected[@]}"; do
     res=TIME; failed=1
   elif [ $rc -eq 99 ]; then
     res=OOM; failed=1
-  else
+  elif grep -q 'VERIFICATION:- FAILED' "$log"; then
     res=FAIL; failed=1
+  elif [ -n "$uncovered" ]; then
+    res=VACUOUS; failed=1
+  else
+    # No verdict: the build failed or Kani/CBMC stopped without one.
+    res=ERROR; failed=1
   fi
   printf '%s\t%s\t%s\t%s\n' "$h" "$res" "$secs" "${peak:-?}" >> "$results"
   printf '%-4s %7ss %6s MiB  %s\n' "$res" "$secs" "${peak:-?}" "$h"
