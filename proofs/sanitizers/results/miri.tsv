@@ -1,0 +1,191 @@
+common::bin_serde::tests::different_types	pass	
+common::bin_serde::tests::single_type	pass	
+common::command::test::qualified_paths	pass	
+common::command::test::test_build_command_and_args	fail	assertion `left == right` failed
+common::command::test::test_escaped	pass	
+common::context::tests::test_build_run_context	skip	can't call foreign function `getpwuid_r` on OS `linux`
+common::resolve::test::canonicalization	fail	assertion failed: Path::new("/bin").is_symlink()
+common::resolve::tests::test_name_or_id	pass	
+common::resolve::tests::test_resolve_path	fail	called `Option::unwrap()` on a `None` value
+common::resolve::tests::test_resolve_target_user_and_group	skip	can't call foreign function `getpwuid_r` on OS `linux`
+common::string::tests::cstr_conversion	pass	
+common::string::tests::null_byte_is_utf8_encoded_as_a_single_byte	pass	
+common::string::tests::rejects_string_that_contains_interior_null	pass	
+common::string::tests::sanity_check	pass	
+cutils::test::miri_test_os_str_to_ptr	pass	
+cutils::test::miri_test_str_to_ptr	pass	
+cutils::test::test_dynamic_fill	pass	
+cutils::test::test_tty	skip	can't call foreign function `openpty` on OS `linux`
+defaults::test::check	pass	
+exec::use_pty::pipe::ring_buffer::tests::buffer_is_fifo	pass	
+exec::use_pty::pipe::ring_buffer::tests::empty_buffer_is_empty	pass	
+exec::use_pty::pipe::ring_buffer::tests::full_buffer_is_full	pass	
+exec::use_pty::pipe::ring_buffer::tests::insert_into_empty_buffer_with_offset	pass	
+exec::use_pty::pipe::ring_buffer::tests::insert_into_non_empty_non_wrapping_buffer	pass	
+exec::use_pty::pipe::ring_buffer::tests::insert_into_non_empty_wrapping_buffer	pass	
+gettext::test::var_subst	pass	
+log::simple_logger::tests::test_write_and_flush	pass	
+log::syslog::tests::can_handle_multiple_writes	skip	can't call foreign function `syslog` on OS `linux`
+log::syslog::tests::can_truncate_syslog	skip	can't call foreign function `syslog` on OS `linux`
+log::syslog::tests::can_truncate_syslog_with_no_spaces	skip	can't call foreign function `syslog` on OS `linux`
+log::syslog::tests::can_write_to_syslog	skip	can't call foreign function `syslog` on OS `linux`
+log::syslog::tests::will_not_break_utf8	skip	can't call foreign function `syslog` on OS `linux`
+log::tests::can_construct_logger	pass	
+pam::converse::test::miri_pam_gpt	pass	
+pam::error::test::isomorphy	pass	
+pam::rpassword::test::displayed_prompt_ends_with_newline	skip	can't call foreign function `sigaction` on OS `linux`
+pam::rpassword::test::empty_prompt_does_not_write_to_sink	skip	can't call foreign function `sigaction` on OS `linux`
+pam::rpassword::test::miri_test_longpwd	pass	
+pam::rpassword::test::miri_test_read	pass	
+pam::rpassword::test::miri_test_write	pass	
+pam::securemem::test::miri_test_leaky_cstring	pass	
+pam::securemem::test::miri_test_wipe	pass	
+su::cli::tests::flag_after_positional_argument	pass	
+su::cli::tests::flags_after_dash	pass	
+su::cli::tests::it_parses_an_user	pass	
+su::cli::tests::it_parses_arguments	pass	
+su::cli::tests::it_parses_combined_options	pass	
+su::cli::tests::it_parses_combined_options_and_arguments	pass	
+su::cli::tests::it_parses_command	pass	
+su::cli::tests::it_parses_group	pass	
+su::cli::tests::it_parses_help	pass	
+su::cli::tests::it_parses_login	pass	
+su::cli::tests::it_parses_multiple_supplementary_groups	pass	
+su::cli::tests::it_parses_pty	pass	
+su::cli::tests::it_parses_shell	pass	
+su::cli::tests::it_parses_shell_default	pass	
+su::cli::tests::it_parses_supplementary_group	pass	
+su::cli::tests::it_parses_version	pass	
+su::cli::tests::it_parses_whitelist	pass	
+su::cli::tests::it_parses_whitelist_environment	pass	
+su::cli::tests::long_flag_equal_whitespace	pass	
+su::cli::tests::only_positional_args_after_dashdash	pass	
+su::cli::tests::repeated_boolean_flag	pass	
+su::cli::tests::short_flag_whitespace	pass	
+su::cli::tests::short_flag_whitespace_positional_argument	pass	
+su::context::tests::group_as_non_root	skip	can't call foreign function `getpwuid_r` on OS `linux`
+su::context::tests::invalid_shell	skip	can't call foreign function `getpwuid_r` on OS `linux`
+su::context::tests::su_to_root	skip	can't call foreign function `getpwuid_r` on OS `linux`
+sudo::cli::tests::conflicting_arguments	pass	
+sudo::cli::tests::directory	pass	
+sudo::cli::tests::edit	pass	
+sudo::cli::tests::env_variable	pass	
+sudo::cli::tests::first_trailing_env_var_is_not_an_external_arg	pass	
+sudo::cli::tests::group	pass	
+sudo::cli::tests::help	pass	
+sudo::cli::tests::invalid_option	pass	
+sudo::cli::tests::invalid_option_with_argument	pass	
+sudo::cli::tests::list	pass	
+sudo::cli::tests::login	pass	
+sudo::cli::tests::mix_env_variables_with_trailing_args_divided_by_hyphens	pass	
+sudo::cli::tests::mix_env_variables_with_trailing_args_divided_by_known_flag	pass	
+sudo::cli::tests::no_argument_provided	pass	
+sudo::cli::tests::non_interactive	pass	
+sudo::cli::tests::other_user	pass	
+sudo::cli::tests::preserve_env_boolean_and_list	pass	
+sudo::cli::tests::preserve_env_repeated	pass	
+sudo::cli::tests::preserve_env_with_several_vars	pass	
+sudo::cli::tests::preserve_env_with_var	pass	
+sudo::cli::tests::run_login	pass	
+sudo::cli::tests::run_no_command	pass	
+sudo::cli::tests::run_reset_timestamp_command	pass	
+sudo::cli::tests::run_reset_timestamp_login	pass	
+sudo::cli::tests::run_reset_timestamp_shell	pass	
+sudo::cli::tests::run_shell	pass	
+sudo::cli::tests::several_env_variables	pass	
+sudo::cli::tests::shell	pass	
+sudo::cli::tests::short_preserve_env_with_var_fails	pass	
+sudo::cli::tests::shorthand_with_argument	pass	
+sudo::cli::tests::shorthand_with_direct_argument	pass	
+sudo::cli::tests::shorthand_without_argument	pass	
+sudo::cli::tests::single_env_var_declaration	pass	
+sudo::cli::tests::stdin	pass	
+sudo::cli::tests::trailing_args_followed_by_known_flag	pass	
+sudo::cli::tests::trailing_args_hyphens_known_flag	pass	
+sudo::cli::tests::trailing_env_vars_are_external_args	pass	
+sudo::cli::tests::validate	pass	
+sudo::cli::tests::version	pass	
+sudo::env::environment::tests::test_filtering	pass	
+sudo::env::environment::tests::test_tzinfo	fail	called `Option::unwrap()` on a `None` value
+sudo::env::tests::test_environment_variable_filtering	pass	
+sudo::env::wildcard_match::tests::test_wildcard_match	pass	
+sudoers::basic_parser::test::comment_test	pass	
+sudoers::basic_parser::test::comment_test_fail	pass	
+sudoers::basic_parser::test::lines_test	pass	
+sudoers::basic_parser::test::whitespace_test	pass	
+sudoers::char_stream::test::test_iter	pass	
+sudoers::policy::test::authority_xlat_test	pass	
+sudoers::policy::test::chdir_test	pass	
+sudoers::policy::test::restrictions_test	pass	
+sudoers::policy::test::runcwd_test	pass	
+sudoers::test::alias_tables_sanitized_in_table_order	pass	
+sudoers::test::ambiguous_spec	pass	
+sudoers::test::at_sign_ambiguity	pass	
+sudoers::test::default_bool_test	pass	
+sudoers::test::default_multi_test	pass	
+sudoers::test::default_set_test	pass	
+sudoers::test::default_specific_test	pass	
+sudoers::test::defaults_hostname_shenanigans	pass	
+sudoers::test::defaults_regression	pass	
+sudoers::test::differential::differential_cases	pass	
+sudoers::test::directive_test	pass	
+sudoers::test::fuzz_topo_sort7	pass	
+sudoers::test::gh1295_escaped_equal_argument_ok	pass	
+sudoers::test::gh1466_hostname_cannot_be_ip	pass	
+sudoers::test::gh674_at_include_quoted_backslash	pass	
+sudoers::test::gh676_percent_h_escape_unsupported	pass	
+sudoers::test::hashsign_error	pass	
+sudoers::test::hashsign_test	pass	
+sudoers::test::ignored_specifiers_are_reported_in_sudoers_order	pass	
+sudoers::test::include_regression	pass	
+sudoers::test::inclusive_username	pass	
+sudoers::test::invalid_directive	pass	
+sudoers::test::invalid_username	pass	
+sudoers::test::list_and_validate_apply_defaults_then_decide	pass	
+sudoers::test::list_does_not_take_args	pass	
+sudoers::test::list_flags_cases	pass	
+sudoers::test::nullbyte_regression	pass	
+sudoers::test::permission_test	pass	
+sudoers::test::regression_check_recursion	pass	
+sudoers::test::reserved_alias_names_are_rejected_for_alias_definitions	pass	
+sudoers::test::select_tag_is_the_last_maximum	pass	
+sudoers::test::specific_defaults	pass	
+sudoers::test::sudoedit_recognized	pass	
+sudoers::test::test_topo_fail0	pass	
+sudoers::test::test_topo_fail1	pass	
+sudoers::test::test_topo_fail2	pass	
+sudoers::test::test_topo_fail5	pass	
+sudoers::test::test_topo_positive	pass	
+sudoers::test::user_id_regression	pass	
+sudoers::test::useralias_underscore_regression	pass	
+sudoers::test::validate_flags_password_rule	pass	
+sudoers::test::wildcard_in_argument	pass	
+system::audit::test::secure_open_is_predictable	fail	assertion failed: secure_open_sudoers("/etc/hosts").is_ok()
+system::audit::test::test_secure_open_cookie_file	pass	
+system::audit::test::test_traverse_secure_open_negative	skip	can't call foreign function `getpwnam_r` on OS `linux`
+system::audit::test::test_traverse_secure_open_positive	skip	can't call foreign function `getpwuid_r` on OS `linux`
+system::file::lock::tests::test_locking_of_tmp_file	pass	
+system::interface::test::test_unix_group	skip	unimplemented sysconf name: 69
+system::interface::test::test_unix_user	skip	can't call foreign function `getpwnam_r` on OS `linux`
+system::term::tests::open_pty	skip	can't call foreign function `openpty` on OS `linux`
+system::term::tests::tcsetpgrp_and_tcgetpgrp_are_consistent	skip	can't call foreign function `fork` on OS `linux`
+system::tests::get_process_tty_device	pass	
+system::tests::kill_test	skip	can't call foreign function `posix_spawnattr_init` on OS `linux`
+system::tests::killpg_test	skip	can't call foreign function `fork` on OS `linux`
+system::tests::mark_fds_as_cloexec	skip	can't call foreign function `fork` on OS `linux`
+system::tests::miri_test_group_impl	pass	
+system::tests::pgid_test	skip	can't call foreign function `getpgrp` on OS `linux`
+system::tests::proc_stat_test	skip	can't call foreign function `getppid` on OS `linux`
+system::tests::test_get_user_and_group_by_id	skip	can't call foreign function `getpwnam_r` on OS `linux`
+system::tests::test_group_lookup_fails_gracefully	skip	unimplemented sysconf name: 69
+system::time::tests::get_process_start_time	skip	unimplemented sysconf name: 2
+system::time::tests::test_new_system_time	pass	
+system::time::tests::test_time_ops	pass	
+system::timestamp::tests::can_create_and_update_valid_file	fail	called `Result::unwrap()` on an `Err` value: Os { code: 22, kind: InvalidInput, message: "Invalid argument (os error 22)" }
+system::timestamp::tests::can_encode_and_decode	fail	called `Result::unwrap()` on an `Err` value: Os { code: 22, kind: InvalidInput, message: "Invalid argument (os error 22)" }
+system::timestamp::tests::session_record_file_header_checks	pass	
+system::timestamp::tests::timestamp_record_matches_works	fail	called `Result::unwrap()` on an `Err` value: Os { code: 22, kind: InvalidInput, message: "Invalid argument (os error 22)" }
+system::timestamp::tests::timestamp_record_written_between_works	fail	called `Result::unwrap()` on an `Err` value: Os { code: 22, kind: InvalidInput, message: "Invalid argument (os error 22)" }
+system::wait::tests::exit_status	skip	can't call foreign function `posix_spawnattr_init` on OS `linux`
+system::wait::tests::no_hang	skip	can't call foreign function `posix_spawnattr_init` on OS `linux`
+system::wait::tests::signals	skip	can't call foreign function `posix_spawnattr_init` on OS `linux`
