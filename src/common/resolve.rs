@@ -67,7 +67,7 @@ impl ops::Deref for CurrentUser {
 }
 
 impl CurrentUser {
-    #[cfg(test)]
+    #[cfg(any(test, kani))]
     pub fn fake(user: User) -> Self {
         Self { inner: user }
     }
@@ -229,6 +229,9 @@ pub(crate) fn resolve_path(command: &Path, path: &str) -> Option<PathBuf> {
         // check whether the candidate is a regular file and any executable flag is set
         .find(|arg| is_valid_executable(arg))
 }
+
+#[cfg(kani)]
+mod kani_proofs;
 
 #[cfg(test)]
 mod tests {

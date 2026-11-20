@@ -587,6 +587,9 @@ impl SessionRecord {
     }
 }
 
+#[cfg(kani)]
+mod kani_proofs;
+
 #[cfg(test)]
 mod tests {
     use std::path::Path;

@@ -152,6 +152,9 @@ impl CommandAndArguments {
     }
 }
 
+#[cfg(kani)]
+mod kani_proofs;
+
 #[cfg(test)]
 mod test {
     use std::ffi::OsString;

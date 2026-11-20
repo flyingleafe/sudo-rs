@@ -50,8 +50,9 @@ opt-level = "s"
 
 [lints.rust]
 unsafe_op_in_unsafe_fn = { level = "deny" }
-# `cfg(fuzzing)` is set by cargo-fuzz; it only enables `src/fuzz_api.rs` (see `fuzz/`)
-unexpected_cfgs = { level = "warn", check-cfg = ["cfg(fuzzing)"] }
+# `cfg(fuzzing)` is set by cargo-fuzz (`src/fuzz_api.rs`, see `fuzz/`); `cfg(kani)` marks the
+# bounded proof harnesses (proofs/kani). Normal builds set neither.
+unexpected_cfgs = { level = "warn", check-cfg = ["cfg(fuzzing)", "cfg(kani)"] }
 
 [lints.clippy]
 undocumented_unsafe_blocks = "warn"

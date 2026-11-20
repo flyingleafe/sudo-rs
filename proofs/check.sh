@@ -17,6 +17,7 @@
 #   extract       proofs/extract.sh, then no drift in proofs/lean/SudoRs
 #   differential  proofs/differential/run.sh $DIFFERENTIAL_ARGS        (slow; not default)
 #   compliance    proofs/compliance/run.sh <base tree> <this tree>      (Docker; not default)
+#   kani          proofs/kani/run.sh $KANI_ARGS: Kani bounded proofs     (slow; not default)
 #
 # Environment:
 #   CHECK_LOG_DIR           directory for the per-stage logs (default: a fresh temp dir)
@@ -27,11 +28,12 @@
 #   DIFFERENTIAL_ARGS       arguments for proofs/differential/run.sh
 #   COMPLIANCE_BASE         git revision compared against the working tree by the compliance
 #                           stage (default: merge-base of HEAD and upstream/main)
+#   KANI_ARGS               harness name filters for proofs/kani/run.sh (default: all harnesses)
 set -uo pipefail
 
 proofs=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 root=$(dirname "$proofs")
-all_stages=(tokens spec lean axioms quint rust extract differential compliance)
+all_stages=(tokens spec lean axioms quint rust extract differential compliance kani)
 default_stages=(tokens spec lean axioms quint rust)
 allowed_axioms=(propext Classical.choice Quot.sound)
 
@@ -201,6 +203,13 @@ stage_compliance() {
   git -C "$root" archive "$base" | tar -x -C "$tree" || return 1
   echo "comparing $base with the working tree"
   OUT=$logdir/compliance "$run" "$tree" "$root"
+}
+
+stage_kani() {
+  local run=$proofs/kani/run.sh args=()
+  [ -x "$run" ] || { echo "SKIP: $run not present"; return 3; }
+  read -r -a args <<< "${KANI_ARGS:-}"
+  KANI_LOG_DIR=${KANI_LOG_DIR:-$logdir/kani} "$run" "${args[@]}"
 }
 
 # ---------------------------------------------------------------- driver

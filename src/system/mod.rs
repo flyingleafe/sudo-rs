@@ -921,6 +921,9 @@ pub(crate) const ROOT_GROUP_NAME: &str = "root";
 #[cfg(all(test, not(target_os = "linux")))]
 pub(crate) const ROOT_GROUP_NAME: &str = "wheel";
 
+#[cfg(kani)]
+mod kani_proofs;
+
 #[allow(clippy::undocumented_unsafe_blocks)]
 #[cfg(test)]
 mod tests {

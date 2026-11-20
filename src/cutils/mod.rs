@@ -150,6 +150,9 @@ pub fn pipe() -> std::io::Result<[OwnedFd; 2]> {
     Ok(pipes)
 }
 
+#[cfg(kani)]
+mod kani_proofs;
+
 #[allow(clippy::undocumented_unsafe_blocks)]
 #[cfg(test)]
 mod test {

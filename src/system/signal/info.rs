@@ -55,3 +55,6 @@ impl fmt::Display for SignalInfo {
         }
     }
 }
+
+#[cfg(kani)]
+mod kani_proofs;

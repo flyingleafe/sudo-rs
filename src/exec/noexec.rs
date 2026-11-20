@@ -456,3 +456,6 @@ pub(crate) fn add_noexec_filter(command: &mut Command) -> io::Result<SpawnNoexec
 
     Ok(SpawnNoexecHandler(rx_fd))
 }
+
+#[cfg(kani)]
+mod kani_proofs;
