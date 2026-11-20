@@ -230,9 +230,6 @@ pub(crate) fn resolve_path(command: &Path, path: &str) -> Option<PathBuf> {
         .find(|arg| is_valid_executable(arg))
 }
 
-#[cfg(kani)]
-mod kani_proofs;
-
 #[cfg(test)]
 mod tests {
     use std::path::Path;

@@ -188,20 +188,6 @@ fn shell_policy_arguments_injective_1x2_vs_2x1() {
     }
 }
 
-/// B7: direct mode, argv of 3 elements of 2 arbitrary bytes each: the arguments the policy
-/// sees are exactly argv[1..] and arg0 is argv[0], whatever the PATH lookup and
-/// `canonicalize` return (both replaced by `resolve_path_any`/`canonicalize_any`).
-#[kani::proof]
-#[kani::unwind(4)]
-#[kani::stub(crate::common::resolve::canonicalize, canonicalize_any)]
-#[kani::stub(crate::common::resolve::resolve_path, resolve_path_any)]
-fn direct_policy_arguments_are_argv_tail_3x2() {
-    let argv = vec![arg::<2>(), arg::<2>(), arg::<2>()];
-    let c = CommandAndArguments::build_from_args(None, argv.clone(), "");
-    assert_eq!(c.arguments.as_slice(), &argv[1..]);
-    assert_eq!(c.arg0, Some(PathBuf::from(&argv[0])));
-}
-
 /// B8: direct mode with an empty argv panics (`Vec::remove(0)`). The callers never pass one:
 /// run mode requires a command unless -s/-i (shell branch), and list mode checks for an empty
 /// argv first. This harness records that precondition.

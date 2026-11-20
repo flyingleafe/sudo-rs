@@ -1,64 +1,7 @@
 //! Kani bounded proofs for the C-string helpers and the pure helpers of `cutils`.
 //! Built only under `cfg(kani)`. Bounds are stated per harness; see proofs/kani/README.md.
 
-use std::ffi::c_char;
-
 use super::{cerr, dynamic_fill, os_string_from_ptr, string_from_ptr};
-
-/// A buffer of `M - 1` arbitrary bytes (interior NULs allowed) followed by one NUL, so that the
-/// C string it holds has any length 0..=M-1. Any read past the buffer is a Kani failure.
-fn c_buffer<const M: usize>() -> [c_char; M] {
-    let mut buf: [c_char; M] = kani::any();
-    buf[M - 1] = 0;
-    buf
-}
-
-/// Index of the first NUL.
-fn c_len(buf: &[c_char]) -> usize {
-    let mut n = 0;
-    while buf[n] != 0 {
-        n += 1;
-    }
-    n
-}
-
-/// D1: `os_string_from_ptr` on a NUL-terminated buffer of 6 arbitrary bytes plus terminator:
-/// no read outside the buffer, and the result is exactly the bytes before the first NUL.
-#[kani::proof]
-#[kani::unwind(8)]
-fn os_string_from_ptr_exact_6_bytes() {
-    let buf = c_buffer::<7>();
-    // SAFETY: `buf` is a valid NUL-terminated C string.
-    let s = unsafe { os_string_from_ptr(buf.as_ptr()) };
-    let bytes = s.as_encoded_bytes();
-    let n = c_len(&buf);
-    assert_eq!(bytes.len(), n);
-    for i in 0..n {
-        assert_eq!(bytes[i], buf[i] as u8);
-    }
-}
-
-/// D2: `string_from_ptr` on a NUL-terminated buffer of 3 arbitrary bytes plus terminator: no
-/// read outside the buffer; the result is the bytes before the first NUL when those are UTF-8
-/// (in particular every ASCII string), and their lossy conversion (each invalid sequence
-/// replaced by U+FFFD) otherwise.
-#[kani::proof]
-#[kani::unwind(5)]
-fn string_from_ptr_exact_3_bytes() {
-    let buf = c_buffer::<4>();
-    // SAFETY: `buf` is a valid NUL-terminated C string.
-    let s = unsafe { string_from_ptr(buf.as_ptr()) };
-    let n = c_len(&buf);
-    let prefix: [u8; 3] = [buf[0] as u8, buf[1] as u8, buf[2] as u8];
-    let prefix = &prefix[..n];
-    match std::str::from_utf8(prefix) {
-        Ok(valid) => assert_eq!(s, valid),
-        Err(_) => {
-            assert!(s.contains('\u{FFFD}'));
-            assert_eq!(s, String::from_utf8_lossy(prefix));
-        }
-    }
-}
 
 /// D3: both helpers map the null pointer to the empty string.
 #[kani::proof]

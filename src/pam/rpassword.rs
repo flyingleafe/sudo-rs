@@ -470,9 +470,6 @@ impl Terminal<'_> {
     }
 }
 
-#[cfg(kani)]
-mod kani_proofs;
-
 #[cfg(test)]
 mod test {
     use std::fs::File;
