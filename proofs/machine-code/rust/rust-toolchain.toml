@@ -1,0 +1,7 @@
+# The engine (arm64-semantics v0.51.2) pins rustc 1.98.1; the proof is about the machine code
+# that this exact compiler emits.
+[toolchain]
+channel = "1.98.1"
+targets = ["aarch64-unknown-linux-gnu"]
+components = ["rust-src", "llvm-tools"]
+profile = "minimal"

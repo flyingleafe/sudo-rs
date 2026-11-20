@@ -1,0 +1,31 @@
+# `rust-obj2lean` configuration (arm64-semantics v0.51.2) for the sudo-rs machine-code proof.
+#
+# Compiles this crate with `cargo rustc --release --lib --target aarch64-unknown-linux-gnu`
+# (rustc 1.98.1; the driver adds `-C codegen-units=1 -C relocation-model=static
+# -C target-cpu=generic -C no-vectorize-slp -C no-vectorize-loops`, `panic = "abort"`,
+# `lto = "off"`) and exports the code reachable from the `extern "C"` entry point as a
+# layout-generic placed library.
+
+crates = ["sudo-rs-machine-code"]
+obj_name = "sudoRsParseUid"
+obj_file = "SudoRsMachineCode/Generated/SudoRsParseUidObj.lean"
+namespace_prefix = "SudoRsMachineCode"
+title = "sudo-rs `NameOrId::<UserId>::parse` (`proofs/machine-code/rust`)"
+hashed_inputs = [
+    "Cargo.toml",
+    "Cargo.lock",
+    "src/lib.rs",
+    "copied/name_or_id.rs",
+    "copied/sudo_string.rs",
+    "copied/sudo_string_deref.rs",
+    "copied/sudo_string_debug.rs",
+    "copied/user_id.rs",
+    "copied/user_id_impl.rs",
+    "copied/user_id_from_str.rs",
+]
+
+[placed]
+placed_only = true
+exports = ["sudo_rs_name_or_id_parse_uid"]
+emit_extracted_obj = true
+witness = true
