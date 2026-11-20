@@ -6,7 +6,13 @@ The latter includes the root/self password-tag adjustment from `Sudoers::check`.
 The same is proved for the tags behind `sudo -v` and `sudo -l` (`validate_flags`, `list_flags`)
 and for the mapping from a decision and the Defaults in force to the terms of execution
 (`Judgement::authorization`).
-The proofs start with a parsed policy and a resolved request, not an invocation of `sudo`.
+Policy-level security properties (P1-P9) and alias flattening are proved for every policy and
+request and carried over to the extracted code; where sudo-rs differs from the documented
+behaviour the exact rule is proved instead. Shell-mode argument escaping is proved for every
+input, and the compiled AArch64 code of the `-u '#uid'` parser is proved at machine level.
+The proofs start with a parsed policy and a resolved request, not an invocation of `sudo`;
+the parser and the rest of the program are covered by tests and bounded proofs only
+(differential testing against C sudo, property search, sanitizers, fuzzing, Kani).
 
 ## Verification boundary
 
@@ -153,6 +159,16 @@ Each item says what kind of evidence it is. A test covers only the inputs it ran
   code (sudoers parser, decision, Defaults, sudo/su/visudo command lines, timestamp records,
   `NameOrId` and shell-mode argument escaping) through the `cfg(fuzzing)`-only
   `src/fuzz_api.rs`, with AddressSanitizer, debug assertions and property assertions.
+- **Kani** ([`kani/`](kani/README.md), bounded proof): 36 harnesses on the real functions
+  (`#[cfg(kani)]` modules), all passing in one run at `f20cfeb7`. They cover shell-mode
+  escaping (exact output up to one 5-byte argument or two 2-byte arguments; injectivity for
+  shapes such as [3] vs [1,1]), the arguments the policy sees in shell mode, the timestamp
+  record path (CVE-2023-42456 class), record encoding, decoding and matching, the user a new
+  record names under default, `targetpw` and `rootpw` authentication (CVE-2025-64517 class),
+  `PamBuffer` bounds and wiping, `cutils`, seccomp buffer allocation and `siginfo` reading.
+  Four planted bugs (the pre-fix CVE-2023-42456 record path, a space kept by `escaped`, a
+  `PamBuffer` one byte too long, record decoding without its seconds precondition) each fail
+  a harness that passes on the clean tree.
 
 ## Artifacts
 
@@ -167,6 +183,7 @@ Each item says what kind of evidence it is. A test covers only the inputs it ran
 | `differential/` | Unprivileged comparison of the Lean, Rust and C policy decisions; property search on the real code. |
 | `sanitizers/` | Unit suite under debug overflow checks, AddressSanitizer and Miri. |
 | `../fuzz/` | libFuzzer targets on the real code and the campaign runner. |
+| `kani/` | Runner and results of the Kani bounded proofs (harnesses in `src/**/kani_proofs.rs`). |
 | `machine-code/` | AArch64 machine-code proof of `NameOrId::<UserId>::parse` (own Lean project, pinned engine) and its re-check script. |
 | `compliance/` | Docker comparison of upstream and refactored sudo-rs. |
 | `parser/PLAN.md` | Plan and feasibility measurements for a parser proof. Nothing proved yet. |
