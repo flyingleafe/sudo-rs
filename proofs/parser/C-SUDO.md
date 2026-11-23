@@ -242,6 +242,30 @@ Fixed inputs (category `known`), run with both implementations:
 Further categories in section 3 not described in PLAN.md are recorded neutrally; details are in
 the local findings file of this stage.
 
+## Larger corpus: limits of the classification
+
+The 0-unclassified result above does **not** hold on the larger corpus. On `uni-cpu`,
+job `parser-p0-e3e4b7` ran the same observer at `d84ff98a` with C sudo 1.9.18
+(`d58e85d8`), eight seeds, and 1,000 cases per category per seed. Counts are **test**
+evidence. A difference is a reported line or content difference, not a distinct bug.
+
+| Seed | Cases | Differences | Without an explanation |
+|---:|---:|---:|---:|
+| 1 | 29,024 | 18,411 | 26 |
+| 2 | 29,024 | 18,673 | 33 |
+| 3 | 29,024 | 18,168 | 25 |
+| 4 | 29,024 | 18,073 | 22 |
+| 5 | 29,024 | 18,249 | 15 |
+| 6 | 29,024 | 18,060 | 24 |
+| 7 | 29,024 | 18,519 | 35 |
+| 8 | 29,024 | 18,386 | 21 |
+| **Total** | **232,192** | **146,539** | **201** |
+
+The Rust observer recorded no panic. For the unexplained content differences, knowing
+*which field* differs is not an explanation of *why* it differs. Counts from another host
+or a later comparator cannot retrospectively reclassify this run. P0's requirement to
+explain every C discrepancy remains open for this corpus.
+
 ## 5. Running
 
 Local (about 35 s wall, 1.6 CPU-minutes):
