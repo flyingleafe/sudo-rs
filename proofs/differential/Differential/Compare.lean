@@ -18,6 +18,7 @@ asked (`Tag.needsPasswd` vs `CSudo.effectivePasswd`), whether `SETENV` is in eff
 namespace Differential.Compare
 
 open SudoersSpec
+open SudoersSpec.Analysis (aliasRefsOf)
 
 /-- Run `act` on every index in `[0, n)` with `jobs` workers; worker `w` gets `w` as its
 first argument (to pick a private scratch directory). Results in index order. -/

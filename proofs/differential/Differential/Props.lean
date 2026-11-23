@@ -25,6 +25,7 @@ the spec (`SudoersSpec`), never the conclusion.
 namespace Differential.Props
 
 open SudoersSpec Gen Engine
+open SudoersSpec.Analysis (aliasRefsOf)
 
 /-- The engine under test: the result line for a probe. -/
 abbrev EngineFn := Probe → String

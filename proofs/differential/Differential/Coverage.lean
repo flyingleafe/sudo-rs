@@ -11,6 +11,7 @@ contains it.
 namespace Differential.Coverage
 
 open SudoersSpec
+open SudoersSpec.Analysis (aliasRefsOf)
 
 def isNeg : Qualified α → Bool | .forbid _ => true | .allow _ => false
 
