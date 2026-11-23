@@ -10,9 +10,20 @@ A three-way differential test of the authorization decision:
 and a search for counterexamples to seven properties of the real sudo-rs code, each stated in
 Lean as a predicate over test cases (`Differential/Props.lean`).
 
-Evidence kinds: everything in this directory is **test** evidence (only the inputs tried),
-except `CModel.decide_off`, a kernel-checked proof that the attribution model with all switches
-off is the spec decision.
+The comparisons below are **test** evidence on the inputs tried.
+`CModel.decide_off` and `Differential.OrdinaryPolicyRange` are kernel-checked
+results, not sampled tests.
+`ordinaryPolicy_range` proves that, for every starting `Rng`, the unchanged
+`Generate.policy {}` returns one to four structurally printable permission rules.
+The proof follows the generator's list lengths, weighted choices and literal
+pools. `ordinaryPolicy_roundTrip` then proves that the reference `Syntax.sudo`
+recovers each rule from the shared renderer followed by a newline, preserving
+the suffix and final position. The character oracle is the reference Latin-1
+table; the fixed path snapshot must leave each generated command path unchanged
+(or report canonicalization failure) and compile it successfully as a glob.
+The theorem does not cover hazard-mode generation, alias-definition rendering
+or authorization. To build just this proof and its axiom report, run
+`lake build Differential.OrdinaryPolicyRange` from this directory.
 
 For `./run.sh 20000 1`, the spec and sudo-rs agree on all 20,000 cases, on the verdict with
 every tag field and on the alias diagnostics of `Sudoers::read`. 7,629 of the cases contain

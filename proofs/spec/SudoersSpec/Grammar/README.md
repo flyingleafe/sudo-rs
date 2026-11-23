@@ -448,7 +448,9 @@ first user, runas, an ordinary tag, a command alias and argument sentinels.
 There is no second copy of the renderer in `Differential.Print`, so the harness
 uses the very function proved about here. `PermissionPrint.metaItem_not_injective`
 proves the generic spelling ambiguity between an alias and a direct item;
-the classifier obligations choose the supported interpretation. We do not prove
-that every seed of `Generate.policy` satisfies `PermissionValue`, nor certify a
-live filesystem snapshot. Distinct names with the same spelling, values requiring
-quoting, and unsupported modifiers are not covered by this canonical renderer.
+the classifier obligations choose the supported interpretation. The differential
+package proves that every seed of the ordinary `Generate.policy {}` passes
+`checkPermissionValue` for each generated permission clause, using the Latin-1
+character table and an explicit path snapshot. See `Differential.OrdinaryPolicyRange`.
+This does not prove printability for hazard modes, certify a live filesystem,
+or cover values that need quoting or unsupported modifiers.

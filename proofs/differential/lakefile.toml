@@ -1,5 +1,5 @@
 name = "differential"
-defaultTargets = ["oracle", "parser"]
+defaultTargets = ["oracle", "parser", "Differential.OrdinaryPolicyRange"]
 
 [[require]]
 name = "sudoers-spec"
