@@ -43,8 +43,15 @@ structure P2Oracle (A : GlobAbs) (O : Oracles) : Prop where
   compile_pattern : ∀ s : String, match O.glob.compile s with
     | none => ∃ pat, sudoers.tokens.compile_pattern s = ok (.Ok pat) ∧ A.pat pat = s
     | some e => sudoers.tokens.compile_pattern s = ok (.Err (.WildcardPattern e.render))
-  os_string : ∀ s, ∃ os, sudoers.tokens.os_string s = ok os ∧
-    os.inner.val = sudo_rs.stringBytes s ∧ A.os os = s
+  /-- Unix conversion preserves the UTF-8 bytes of a representable parser argument and
+  reads back as the same text. No bounded `OsString` is required for a larger Lean string.
+  This fixes `A.os` only on UTF-8 bytes in range. It is compatible with `GlobOracle.os_inj`:
+  non-UTF-8 byte strings can be given distinct equality keys outside the representable
+  text range (for example, a fixed oversized ASCII prefix followed by one scalar per byte).
+  Those keys are not UTF-8 decodings of the native values. -/
+  os_string : ∀ s : String, s.utf8ByteSize ≤ Usize.max →
+    ∃ os, sudoers.tokens.os_string s = ok os ∧
+      os.inner.val = sudo_rs.stringBytes s ∧ A.os os = s
 
 /-- The first three character agreements, for code that does not need the P2 selectors. -/
 theorem P2CharOracle.unicode {O : CharOracle} (h : P2CharOracle O) : UnicodeOracle O :=

@@ -15,6 +15,28 @@ abbrev WordRange := Usize × Usize
 def rangeChars (text : Slice Char) (r : WordRange) : List Char :=
   (text.val.drop r.1.val).take (r.2.val - r.1.val)
 
+private theorem utf8Len_ofList (cs : List Char) :
+    (String.ofList cs).utf8ByteSize = utf8Len cs := by
+  induction cs with
+  | nil => rfl
+  | cons c cs ih =>
+    rw [String.ofList_cons, String.utf8ByteSize_append, String.utf8ByteSize_singleton, ih,
+      utf8Len_cons]
+
+theorem utf8Len_toList (s : String) : s.utf8ByteSize = utf8Len s.toList := by
+  simpa only [String.ofList_toList] using utf8Len_ofList s.toList
+
+/-- Slicing at character boundaries cannot increase the UTF-8 byte length. -/
+theorem rangeChars_utf8ByteSize_le (text : Slice Char) (r : WordRange) :
+    (String.ofList (rangeChars text r)).utf8ByteSize ≤ utf8Len text.val := by
+  have budget (xs : List Char) (n : Nat) :
+      utf8Len (xs.take n) ≤ utf8Len xs ∧ utf8Len (xs.drop n) ≤ utf8Len xs := by
+    have he := congrArg utf8Len (List.take_append_drop n xs)
+    rw [utf8Len_append] at he
+    omega
+  rw [utf8Len_ofList]
+  exact (budget _ _).1.trans (budget _ _).2
+
 def WordInBounds (text : Slice Char) (r : WordRange) : Prop :=
   r.1.val < r.2.val ∧ r.2.val ≤ text.val.length
 
@@ -149,7 +171,8 @@ theorem any_glob_eq (text : Slice Char) (words : Slice WordRange) (stop : Usize)
   simpa [sudo_rs.sudoers.tokens.any_glob] using any_glob_loop_eq text words 1#usize stop hs hw false
 
 private theorem os_strings_loop_eq {A : GlobAbs} {O : Oracles} (hO : P2Oracle A O)
-    (text : Slice Char) (words : Slice WordRange) (stop : Usize)
+    (text : Slice Char) (htext : utf8Len text.val ≤ Usize.max)
+    (words : Slice WordRange) (stop : Usize)
     (hs : stop.val ≤ words.val.length) (hw : ∀ r ∈ words.val, WordInBounds text r)
     (acc : alloc.vec.Vec std.ffi.os_str.OsString) (i : Usize)
     (hb : acc.val.length + (stop.val - i.val) ≤ Usize.max) :
@@ -164,12 +187,13 @@ private theorem os_strings_loop_eq {A : GlobAbs} {O : Oracles} (hO : P2Oracle A 
     have he : sudo_rs.sudoers.tokens.word_text text r.1 r.2 =
         ok (String.ofList (rangeChars text r)) := word_text_eq text r.1 r.2 hr.2
     obtain ⟨os, hos, _, ha⟩ := hO.os_string (String.ofList (rangeChars text r))
+      ((rangeChars_utf8ByteSize_le text r).trans htext)
     obtain ⟨acc', hpush, hpv⟩ := exists_eq_ok_of_spec
       (alloc.vec.Vec.push_spec acc os (by omega))
     obtain ⟨j, hj, hjv⟩ := usizeAdd_eq i 1#usize (by have := words.property; scalar_tac)
     have hstep : j.val = i.val + 1 := by simpa using hjv
     have hb' : acc'.val.length + (stop.val - j.val) ≤ Usize.max := by simp [hpv]; omega
-    obtain ⟨v, ev, hv⟩ := os_strings_loop_eq hO text words stop hs hw acc' j hb'
+    obtain ⟨v, ev, hv⟩ := os_strings_loop_eq hO text htext words stop hs hw acc' j hb'
     refine ⟨v, ?_, ?_⟩
     · simp only [hi, ↓reduceIte, sliceIndex_eq words i hib, bind_ok]
       change (do
@@ -187,7 +211,8 @@ termination_by stop.val - i.val
 decreasing_by omega
 
 theorem os_strings_eq {A : GlobAbs} {O : Oracles} (hO : P2Oracle A O)
-    (text : Slice Char) (words : Slice WordRange) (stop : Usize)
+    (text : Slice Char) (htext : utf8Len text.val ≤ Usize.max)
+    (words : Slice WordRange) (stop : Usize)
     (hpos : 1 ≤ stop.val) (hs : stop.val ≤ words.val.length)
     (hw : ∀ r ∈ words.val, WordInBounds text r) :
     ∃ v, sudo_rs.sudoers.tokens.os_strings text words stop = ok v ∧
@@ -195,7 +220,7 @@ theorem os_strings_eq {A : GlobAbs} {O : Oracles} (hO : P2Oracle A O)
   obtain ⟨n, hn, _⟩ := usizeSub_eq stop 1#usize (by simpa using hpos)
   let v := alloc.vec.Vec.with_capacity std.ffi.os_str.OsString n
   have hv : v.val = [] := rfl
-  obtain ⟨v', e, h⟩ := os_strings_loop_eq hO text words stop hs hw v 1#usize (by
+  obtain ⟨v', e, h⟩ := os_strings_loop_eq hO text htext words stop hs hw v 1#usize (by
     have := words.property
     simp [hv]; omega)
   exact ⟨v', by simpa [sudo_rs.sudoers.tokens.os_strings, hn, v] using e, by simpa [hv] using h⟩

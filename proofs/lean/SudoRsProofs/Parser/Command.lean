@@ -16,27 +16,6 @@ open sudo_rs
 def CommandText (O : CharOracle) (cs : List Char) : Prop :=
   SudoersSpec.Syntax.splitWhitespace O cs ≠ []
 
-private theorem utf8Len_ofList (cs : List Char) :
-    (String.ofList cs).utf8ByteSize = SudoersSpec.Syntax.utf8Len cs := by
-  induction cs with
-  | nil => rfl
-  | cons c cs ih =>
-    rw [String.ofList_cons, String.utf8ByteSize_append, String.utf8ByteSize_singleton, ih,
-      utf8Len_cons]
-
-theorem utf8Len_toList (s : String) : s.utf8ByteSize = SudoersSpec.Syntax.utf8Len s.toList := by
-  simpa only [String.ofList_toList] using utf8Len_ofList s.toList
-
-private theorem rangeChars_utf8Len_le (src : Slice Char) (r : WordRange) :
-    SudoersSpec.Syntax.utf8Len (rangeChars src r) ≤ SudoersSpec.Syntax.utf8Len src.val := by
-  have h (xs : List Char) (n : Nat) :
-      SudoersSpec.Syntax.utf8Len (xs.take n) ≤ SudoersSpec.Syntax.utf8Len xs ∧
-      SudoersSpec.Syntax.utf8Len (xs.drop n) ≤ SudoersSpec.Syntax.utf8Len xs := by
-    have he := congrArg SudoersSpec.Syntax.utf8Len (List.take_append_drop n xs)
-    rw [utf8Len_append] at he
-    omega
-  exact (h _ _).1.trans (h _ _).2
-
 private theorem stringFits_of_bound {s : String} (h : s.utf8ByteSize ≤ Usize.max) : Fits s := by
   simpa only [Fits, sudo_rs.stringBytes, List.length_map, Array.length_toList,
     ByteArray.size_data, String.size_toByteArray] using h
@@ -138,6 +117,9 @@ theorem command_construct_refines {A : GlobAbs} {O : Oracles} (hO : P2Oracle A O
   obtain ⟨chars, echar, echars⟩ := chars_of_eq s hs
   let text := alloc.vec.Vec.deref chars
   have htext : text.val = s.toList := echars
+  have hBudget : SudoersSpec.Syntax.utf8Len text.val ≤ Usize.max := by
+    rw [htext, ← utf8Len_toList]
+    exact hs
   obtain ⟨words, ew, hBounds, hWords, _⟩ := split_words_refines hO.chars.unicode text
   have hWords' : words.val.map (rangeChars text) =
       SudoersSpec.Syntax.splitWhitespace O.char s.toList := by
@@ -156,10 +138,8 @@ theorem command_construct_refines {A : GlobAbs} {O : Oracles} (hO : P2Oracle A O
       simpa [hfirst] using vecIndex_eq words 0#usize (by simpa using hw0)
     let cmd := String.ofList (rangeChars text (a,b))
     have hcmd : sudo_rs.sudoers.tokens.word_text text a b = ok cmd := word_text_eq text a b hab.2
-    have hbCmd : cmd.utf8ByteSize ≤ Usize.max := by
-      have hb := rangeChars_utf8Len_le text (a,b)
-      rw [htext, ← utf8Len_toList] at hb
-      exact (utf8Len_ofList (rangeChars text (a,b))).trans_le (hb.trans hs)
+    have hbCmd : cmd.utf8ByteSize ≤ Usize.max :=
+      (rangeChars_utf8ByteSize_le text (a,b)).trans hBudget
     let rawArgs := tail.map (rangeChars text)
     have hr : SudoersSpec.Syntax.splitWhitespace O.char s.toList = cmd.toList :: rawArgs := by
       simpa [hW, cmd, rawArgs] using hWords'.symm
@@ -254,8 +234,10 @@ theorem command_construct_refines {A : GlobAbs} {O : Oracles} (hO : P2Oracle A O
           have hGlobCut := any_glob_eq text words.deref endCut hEndCut hB
           rw [hArgsFull] at hGlobFull
           rw [hArgsCut] at hGlobCut
-          obtain ⟨vFull, evFull, hvFull⟩ := os_strings_eq hO text words.deref endFull hFullPos hEndFull hB
-          obtain ⟨vCut, evCut, hvCut⟩ := os_strings_eq hO text words.deref endCut hCutPos hEndCut hB
+          obtain ⟨vFull, evFull, hvFull⟩ :=
+            os_strings_eq hO text hBudget words.deref endFull hFullPos hEndFull hB
+          obtain ⟨vCut, evCut, hvCut⟩ :=
+            os_strings_eq hO text hBudget words.deref endCut hCutPos hEndCut hB
           rw [hArgsFull] at hvFull
           rw [hArgsCut] at hvCut
           have hsliceFull : vFull.slice.val.map A.os = rawArgs.map String.ofList := hvFull
