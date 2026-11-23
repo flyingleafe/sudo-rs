@@ -102,11 +102,12 @@ unambiguous. Implementations: `quote` in `parser_dump.rs`, `dump_quoted` in
 
 ## 3. Settings modifiers
 
-`defaults::SettingsModifier` is `Box<dyn FnOnce(&mut Settings)>` (it becomes data in stage P5).
-A modifier is dumped by its effect: `(setting A B)`, where `A` is `Settings::default()` after
-applying the modifier and `B` is base B after applying it. Because a modifier is `FnOnce`, the
-harness parses the text twice and applies the n-th modifier of the first parse to base A and the
-n-th of the second parse to base B.
+`defaults::SettingsModifier` is data (`proofs/parser/DEFAULTS.md`); it was a
+`Box<dyn FnOnce(&mut Settings)>` in the legacy parser, so the format describes a modifier by
+what both forms can show. A modifier is dumped by its effect: `(setting A B)`, where `A` is
+`Settings::default()` after `apply` and `B` is base B after `apply`. `apply` consumes the
+modifier and the type is not `Clone`, so the harness parses the text twice and applies the n-th
+modifier of the first parse to base A and the n-th of the second parse to base B.
 
 Fields are printed by `Settings::dump_fields` (`cfg(any(test, fuzzing))`,
 `src/defaults/settings_dsl.rs`), every field in declaration order (that of `defaults!` in

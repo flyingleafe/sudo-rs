@@ -249,14 +249,18 @@ fn base_b() -> Settings {
         let modifier: SettingsModifier = match (how, defaults::set(name)) {
             (BaseB::Negate, _) => defaults::negate(name).expect("negatable"),
             (BaseB::Flag, Some(SettingKind::Flag(f))) => f,
-            (BaseB::Text(v), Some(SettingKind::Text(f))) => f(v).expect("valid text"),
-            (BaseB::Integer(v), Some(SettingKind::Integer(f))) => f(v).expect("valid integer"),
-            (BaseB::List(v), Some(SettingKind::List(f))) => {
-                f(ListMode::Set, v.iter().map(|s| s.to_string()).collect())
+            (BaseB::Text(v), Some(SettingKind::Text(s))) => {
+                defaults::check_text(s, v).expect("valid text")
+            }
+            (BaseB::Integer(v), Some(SettingKind::Integer(s))) => {
+                defaults::check_integer(s, v).expect("valid integer")
+            }
+            (BaseB::List(v), Some(SettingKind::List(s))) => {
+                defaults::build_list(s, ListMode::Set, v.iter().map(|s| s.to_string()).collect())
             }
             _ => panic!("base B: wrong kind for {name}"),
         };
-        modifier(&mut settings);
+        modifier.apply(&mut settings);
     }
     settings
 }
@@ -273,9 +277,9 @@ fn fields(settings: &Settings) -> String {
 /// A settings modifier, by its effect on base A (`Settings::default()`) and on base B.
 fn setting(on_a: SettingsModifier, on_b: SettingsModifier) -> String {
     let mut a = Settings::default();
-    on_a(&mut a);
+    on_a.apply(&mut a);
     let mut b = base_b();
-    on_b(&mut b);
+    on_b.apply(&mut b);
     format!("(setting {} {})", fields(&a), fields(&b))
 }
 
@@ -611,9 +615,9 @@ fn dump_is_deterministic() {
 #[test]
 fn dump_defaults_setting_by_effect() {
     let mut a = Settings::default();
-    defaults::negate("use_pty").unwrap()(&mut a);
+    defaults::negate("use_pty").unwrap().apply(&mut a);
     let mut b = base_b();
-    defaults::negate("use_pty").unwrap()(&mut b);
+    defaults::negate("use_pty").unwrap().apply(&mut b);
     assert_eq!(
         dump("Defaults!/sudoers-nx/x !use_pty\n"),
         format!(
