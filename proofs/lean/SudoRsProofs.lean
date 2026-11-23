@@ -39,3 +39,4 @@ import SudoRsProofs.Defaults.Observations
 import SudoRsProofs.Parser.Analysis.AliasOrder
 import SudoRsProofs.Parser.Analysis.Collect
 import SudoRsProofs.Parser.Analysis.Input
+import SudoRsProofs.Parser.PermissionLines.Refinement

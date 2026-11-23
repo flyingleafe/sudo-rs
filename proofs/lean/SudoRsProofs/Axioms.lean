@@ -15,6 +15,7 @@ import SudoRsProofs.Defaults.Observations
 import SudoRsProofs.Parser.Analysis.AliasOrder
 import SudoRsProofs.Parser.Analysis.Collect
 import SudoRsProofs.Parser.Analysis.Input
+import SudoRsProofs.Parser.PermissionLines.Refinement
 
 /-!
 # Axiom audit
@@ -161,3 +162,24 @@ of `SudoRs/{Types,Funs}External.lean` are definitions or `opaque` constants, nev
 #print axioms SudoRsProofs.Parser.Analysis.itemSize_sum_eq_of_rel
 #print axioms SudoRsProofs.Parser.Analysis.itemsFit_of_rel
 #print axioms SudoRsProofs.Parser.Analysis.analyze_refines_of_reference
+#print axioms SudoRsProofs.Parser.qualified_refines_on
+#print axioms SudoRsProofs.Parser.vec_refines_on
+#print axioms SudoRsProofs.Parser.quoteRoom_stable
+#print axioms SudoRsProofs.Parser.identifier_refines
+#print axioms SudoRsProofs.Parser.meta_identifier_refines
+#print axioms SudoRsProofs.Parser.user_specifier_refines
+#print axioms SudoRsProofs.Parser.meta_user_specifier_refines
+#print axioms SudoRsProofs.Parser.spec_list_user_refines
+#print axioms SudoRsProofs.Parser.run_as_refines
+#print axioms SudoRsProofs.Parser.meta_or_tag_refines_release
+#print axioms SudoRsProofs.Parser.command_tag_step_refines
+#print axioms SudoRsProofs.Parser.command_spec_loop_eq
+#print axioms SudoRsProofs.Parser.command_spec_refines_release
+#print axioms SudoRsProofs.Parser.runas_command_refines
+#print axioms SudoRsProofs.Parser.hosts_runas_commands_refines
+#print axioms SudoRsProofs.Parser.user_list_refines
+#print axioms SudoRsProofs.Parser.expect_user_list_refines
+#print axioms SudoRsProofs.Parser.permissions_refines
+#print axioms SudoRsProofs.Parser.user_list_refines_text
+#print axioms SudoRsProofs.Parser.expect_user_list_refines_text
+#print axioms SudoRsProofs.Parser.permissions_refines_text
