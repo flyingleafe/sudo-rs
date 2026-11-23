@@ -90,6 +90,7 @@ start_from = [
     "crate::sudoers::Sudoers::check",
     "crate::sudoers::Sudoers::check_list_permission",
     "crate::sudoers::Sudoers::check_validate_permission",
+    "{impl core::default::Default for crate::defaults::Settings}::default",
 ]
 opaque = [
     "crate::common::string",
@@ -106,5 +107,4 @@ opaque = [
     "crate::sudoers::include_file",
     "crate::sudoers::include_dir_files",
     "crate::sudoers::fatal_message",
-    "{impl core::default::Default for crate::defaults::Settings}::default",
 ]

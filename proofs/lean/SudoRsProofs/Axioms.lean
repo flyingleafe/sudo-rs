@@ -9,6 +9,7 @@ import SudoRsProofs.Expansion
 import SudoRsProofs.Escape
 import SudoRsProofs.Parser.Examples
 import SudoRsProofs.Parser.Grammar
+import SudoRsProofs.Defaults.Range
 
 /-!
 # Axiom audit

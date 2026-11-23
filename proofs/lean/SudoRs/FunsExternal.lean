@@ -527,12 +527,6 @@ Total: `Display for ErrorKind` writes into a `String` and cannot fail; its text 
 def sudoers.fatal_message (kind : sudoers.basic_parser.ErrorKind) : Result String :=
   ok (sudo_rs.errorKindText kind)
 
-/-- [sudo_rs::defaults::{impl Default for Settings}::default], kept opaque for Charon: the
-initializers of the list settings (`[..].into_iter().map(..).collect::<HashSet<_>>()` in
-`initializer_of!`, `src/defaults/settings_dsl.rs`) have no Aeneas model. Opaque (no axiom): a
-theorem about the settings in force starts from `Settings::default()` as a hypothesis. -/
-opaque defaults.Settings.Insts.CoreDefaultDefault.default : Result defaults.Settings
-
 /-- [alloc::boxed::{impl Default for Box<[T]>}::default]: the empty slice; boxes are erased. -/
 def BoxSlice.Insts.CoreDefaultDefault.default (T : Type _) : Result (Slice T) :=
   ok (Slice.new T)
