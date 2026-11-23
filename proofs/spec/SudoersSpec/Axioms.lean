@@ -15,6 +15,7 @@ import SudoersSpec.Grammar.PermissionExamples
 import SudoersSpec.Syntax.PanicFree
 import SudoersSpec.Settings.FromParser
 import SudoersSpec.Grammar.SudoFile
+import SudoersSpec.Analysis.Clean
 
 /-! Axiom audit: every main result depends on at most `propext`, `Classical.choice` and
 `Quot.sound`. `lake build` prints the lists. -/
@@ -296,6 +297,7 @@ open SudoersSpec
 #print axioms SudoersSpec.Grammar.parseSudoersWith_clean_sound
 #print axioms SudoersSpec.Grammar.sudo_clean_step_partition
 #print axioms SudoersSpec.Grammar.sudo_clean_eof_partition
+#print axioms SudoersSpec.Analysis.cleanGrammar_of_collected
 #print axioms SudoersSpec.Grammar.PermissionPrint.metaItem_not_injective
 #print axioms SudoersSpec.Grammar.permissionValue_printable
 #print axioms SudoersSpec.Grammar.sudo_permission_structural_roundTrip

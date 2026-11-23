@@ -61,6 +61,7 @@ import SudoersSpec.Grammar.SudoInclude
 import SudoersSpec.Grammar.SudoSettings
 import SudoersSpec.Grammar.SudoUserReject
 import SudoersSpec.Grammar.SudoFile
+import SudoersSpec.Analysis.Clean
 import SudoersSpec.Grammar.PermissionRender
 import SudoersSpec.Grammar.PermissionSurface
 import SudoersSpec.Grammar.PermissionNames
