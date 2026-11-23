@@ -14,6 +14,7 @@ import SudoRsProofs.Defaults.Range
 import SudoRsProofs.Defaults.Observations
 import SudoRsProofs.Parser.Analysis.AliasOrder
 import SudoRsProofs.Parser.Analysis.Collect
+import SudoRsProofs.Parser.Analysis.Input
 
 /-!
 # Axiom audit
@@ -156,3 +157,7 @@ of `SudoRs/{Types,Funs}External.lean` are definitions or `opaque` constants, nev
 #print axioms SudoRsProofs.Parser.Analysis.process_refines
 #print axioms SudoRsProofs.Parser.Analysis.no_include_dispatch
 #print axioms SudoRsProofs.Parser.Analysis.analyze_refines
+#print axioms SudoRsProofs.Parser.Analysis.AnalysisResult.aliasesOK_of_clean
+#print axioms SudoRsProofs.Parser.Analysis.itemSize_sum_eq_of_rel
+#print axioms SudoRsProofs.Parser.Analysis.itemsFit_of_rel
+#print axioms SudoRsProofs.Parser.Analysis.analyze_refines_of_reference

@@ -38,3 +38,4 @@ import SudoRsProofs.Defaults.Range
 import SudoRsProofs.Defaults.Observations
 import SudoRsProofs.Parser.Analysis.AliasOrder
 import SudoRsProofs.Parser.Analysis.Collect
+import SudoRsProofs.Parser.Analysis.Input

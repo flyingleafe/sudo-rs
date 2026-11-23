@@ -2,6 +2,7 @@ import SudoRsProofs.Parser.Ast
 import SudoRsProofs.Parser.Analysis.AliasOrder
 import SudoRsProofs.Parser.Analysis.Abs
 import SudoRsProofs.Defaults.Range
+import SudoRsProofs.Expansion
 
 /-! Refinement of the extracted analysis on local, non-`Reject` items. -/
 
@@ -872,6 +873,7 @@ structure AnalysisResult (A : GlobAbs) (source : Option std.path.PathBuf) (c : C
     localDiags.map diagnosticView = c.diagnostics.map (localDiagnosticView source)
   messages : diags.val.map sudoers.Error.message =
     c.diagnostics.map Prod.snd ++ (SudoersSpec.Analysis.orderAliases c.written).2
+  aliasesOK_of_clean : diags.val = [] → (policyOf c).aliases.OK
 
 /-- PA: on local, non-`Reject` items, the real analyzer returns the reference `policyOf`, the
 customisers in collection order, and the item diagnostics followed by the exact sanitizer
@@ -892,12 +894,20 @@ theorem analyze_refines (A : GlobAbs) (path : std.path.Path) (source : Option st
     rw [hab.user, hab.host, hab.cmnd, hab.runas]
   refine ⟨{ pre with aliases := aliases }, out, eq, ?_⟩
   refine ⟨?_, ?_, hab.nonCommand, hab.command, hsettings, hpolicy,
-    hok.customisers, ⟨ds.val, hprefix, hab.diagnostics⟩, ?_⟩
+    hok.customisers, ⟨ds.val, hprefix, hab.diagnostics⟩, ?_, ?_⟩
   · simp only [absPolicy, policyOf, Vec.deref_val, hab.rules, haliases, written]
   · simpa only [absWrittenAliasTable, eu, eh, ec, er] using written
   · have hlocal : ds.val.map sudoers.Error.message = c.diagnostics.map Prod.snd := by
       have e := congrArg (List.map (fun x => x.2.2)) hab.diagnostics
       simpa only [List.map_map, Function.comp_def, diagnosticView, localDiagnosticView] using e
     simpa only [written, hlocal] using hmessages
+  · intro clean
+    have hlen := hprefix.length_le
+    rw [clean, List.length_nil] at hlen
+    have exactLength : out.val.length = ds.val.length := by
+      rw [clean, List.length_nil]
+      omega
+    have sorted := absAliasTable_OK_of_sanitize hsan exactLength A
+    simpa only [haliases, written, policyOf] using sorted
 
 end SudoRsProofs.Parser.Analysis
