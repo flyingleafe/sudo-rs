@@ -108,6 +108,23 @@ inductive KindRel : RKind → ErrKind → Prop
   | unsupportedModifier (keyword : String) :
       KindRel (.UnsupportedModifier keyword) (.unsupportedModifier keyword)
   | tooManyTags : KindRel .TooManyTags .tooManyTags
+  | ambiguousSyntax : KindRel .AmbiguousSyntax .ambiguousSyntax
+  | unknownDirective : KindRel .UnknownDirective .unknownDirective
+  | quotesAroundFilenames : KindRel .QuotesAroundFilenames .useQuotesAroundFilenames
+  | reservedAlias (nm : String) : KindRel (.ReservedAlias nm) (.reservedAliasName nm)
+  | cannotUseInBoolean (nm : String) :
+      KindRel (.CannotUseInBoolean nm) (.cannotBeUsedInBooleanContext nm)
+  | unknownSetting (nm : String) : KindRel (.UnknownSetting nm) (.unknownSetting nm)
+  | notAListParameter (nm : String) : KindRel (.NotAListParameter nm) (.notAListParameter nm)
+  | cannotAssignBoolean (nm : String) :
+      KindRel (.CannotAssignBoolean nm) (.cannotAssignToBoolean nm)
+  | notABooleanSetting (nm : String) :
+      KindRel (.NotABooleanSetting nm) (.notABooleanSetting nm)
+  | invalidSettingValue (value nm : String) :
+      KindRel (.InvalidSettingValue value nm) (.invalidValue value nm)
+  | environmentListTooLong : KindRel .EnvironmentListTooLong .envVarListTooLong
+  | emptyStringNotAllowed : KindRel .EmptyStringNotAllowed .emptyStringNotAllowed
+  | quotesRequiredForVarValue : KindRel .QuotesRequiredForVarValue .doubleQuotesRequired
 
 /-- The transitional `ErrorKind::Message` refines no reference message. -/
 theorem KindRel.not_message {m : String} {k : ErrKind} : ¬ KindRel (.Message m) k := by
