@@ -1,5 +1,5 @@
 import SudoRsProofs.Parser.Ast
-import SudoRsProofs.SanitizeTotal
+import SudoRsProofs.Parser.Analysis.AliasOrder
 import SudoRsProofs.Parser.Analysis.Abs
 import SudoRsProofs.Defaults.Range
 
@@ -13,8 +13,12 @@ namespace SudoRsProofs.Parser.Analysis
 
 private def ignoredMessage : String := "this tag is ignored by sudo-rs"
 
-private def rawReport (source : std.path.PathBuf) (span : basic_parser.Span)
-    (message : String) : sudoers.Error := ⟨some source, some span, message⟩
+/-- A file with no local diagnostics need not provide even a `PathBuf` witness. -/
+def DiagnosticPath (path : std.path.Path) (source : Option std.path.PathBuf) : Prop :=
+  ∃ owned, source = some owned ∧ std.path.Path.to_path_buf path = ok owned
+
+private def rawReport (source : Option std.path.PathBuf) (span : basic_parser.Span)
+    (message : String) : sudoers.Error := ⟨source, some span, message⟩
 
 private def ignoredModifier : ast.Modifier → Option basic_parser.Span
   | .Ignored s => some s
@@ -40,21 +44,22 @@ private theorem ignoredMessage_ok :
   rw [← show ignoredMessage = "this tag is ignored by sudo-rs" from rfl, bytes]
   exact String.fromUTF8Lossy_toByteArray
 
-private theorem report_spec (path : std.path.Path) (source : std.path.PathBuf)
+private theorem report_spec (path : std.path.Path) (source : Option std.path.PathBuf)
     (span : basic_parser.Span) (message : String) (ds : Vec sudoers.Error)
-    (hp : std.path.Path.to_path_buf path = ok source) (hb : ds.val.length < Usize.max) :
+    (hp : DiagnosticPath path source) (hb : ds.val.length < Usize.max) :
     sudoers.report ds path span message ⦃ out => out.val = ds.val ++ [rawReport source span message] ⦄ := by
+  obtain ⟨owned, rfl, hp⟩ := hp
   unfold sudoers.report
   rw [hp]
   simp only [Std.bind_ok]
   exact Vec.push_spec ds _ hb
 
-private def ignoredReports (source : std.path.PathBuf) (spans : List basic_parser.Span) :
+private def ignoredReports (source : Option std.path.PathBuf) (spans : List basic_parser.Span) :
     List sudoers.Error := spans.map fun s => rawReport source s ignoredMessage
 
-private theorem ignored_one_spec (path : std.path.Path) (source : std.path.PathBuf)
+private theorem ignored_one_spec (path : std.path.Path) (source : Option std.path.PathBuf)
     (ds : Vec sudoers.Error) (m : ast.Modifier)
-    (hp : ∀ s, ignoredModifier m = some s → std.path.Path.to_path_buf path = ok source)
+    (hp : ∀ s, ignoredModifier m = some s → DiagnosticPath path source)
     (hb : ds.val.length + (ignoredModifier m).toList.length ≤ Usize.max) :
     (match m with
       | .Passwd => ok ds
@@ -76,10 +81,10 @@ private theorem ignored_one_spec (path : std.path.Path) (source : std.path.PathB
   rename_i span
   exact report_spec path source span ignoredMessage ds (hp span rfl) (by simpa [ignoredModifier] using hb)
 
-private theorem ignored_modifiers_loop_spec (path : std.path.Path) (source : std.path.PathBuf)
+private theorem ignored_modifiers_loop_spec (path : std.path.Path) (source : Option std.path.PathBuf)
     (mods : Slice ast.Modifier) (ds : Vec sudoers.Error) (i : Usize)
     (hp : (mods.val.drop i.val).filterMap ignoredModifier ≠ [] →
-      std.path.Path.to_path_buf path = ok source)
+      DiagnosticPath path source)
     (hb : ds.val.length + ((mods.val.drop i.val).filterMap ignoredModifier).length ≤ Usize.max) :
     sudoers.ignored_modifiers_loop path mods ds i ⦃ out => out.val = ds.val ++
       ignoredReports source ((mods.val.drop i.val).filterMap ignoredModifier) ⦄ := by
@@ -92,7 +97,7 @@ private theorem ignored_modifiers_loop_spec (path : std.path.Path) (source : std
     have hsplit : (mods.val.drop i.val).filterMap ignoredModifier =
         (ignoredModifier m).toList ++ (mods.val.drop (i.val + 1)).filterMap ignoredModifier := by
       rw [hdrop, ← hm]; cases h : ignoredModifier m <;> simp [h]
-    have hpath : ∀ s, ignoredModifier m = some s → std.path.Path.to_path_buf path = ok source := by
+    have hpath : ∀ s, ignoredModifier m = some s → DiagnosticPath path source := by
       intro s hs; apply hp; simp [hsplit, hs]
     rw [hsplit, List.length_append] at hb
     have one := ignored_one_spec path source ds m hpath (by omega)
@@ -104,7 +109,7 @@ private theorem ignored_modifiers_loop_spec (path : std.path.Path) (source : std
     have hlen := congrArg List.length hds'
     simp only [List.length_append, ignoredReports, List.length_map] at hlen
     have hpath' : (mods.val.drop i'.val).filterMap ignoredModifier ≠ [] →
-        std.path.Path.to_path_buf path = ok source := by
+        DiagnosticPath path source := by
       intro hn; apply hp; rw [hsplit]; intro h
       apply hn; rw [hi']; exact (List.append_eq_nil_iff.mp h).2
     have hb' : ds'.val.length + ((mods.val.drop i'.val).filterMap ignoredModifier).length ≤
@@ -116,10 +121,10 @@ private theorem ignored_modifiers_loop_spec (path : std.path.Path) (source : std
 termination_by mods.val.length - i.val
 decreasing_by omega
 
-private theorem ignored_entries_loop_spec (path : std.path.Path) (source : std.path.PathBuf)
+private theorem ignored_entries_loop_spec (path : std.path.Path) (source : Option std.path.PathBuf)
     (ds : Vec sudoers.Error) (entries : Vec REntry) (i : Usize)
     (hp : ((entries.val.drop i.val).flatMap ignoredEntry) ≠ [] →
-      std.path.Path.to_path_buf path = ok source)
+      DiagnosticPath path source)
     (hb : ds.val.length + ((entries.val.drop i.val).flatMap ignoredEntry).length ≤ Usize.max) :
     sudoers.ignored_tags_loop0_loop0 path ds entries i ⦃ out => out.val = ds.val ++
       ignoredReports source ((entries.val.drop i.val).flatMap ignoredEntry) ⦄ := by
@@ -136,7 +141,7 @@ private theorem ignored_entries_loop_spec (path : std.path.Path) (source : std.p
         mods.val.filterMap ignoredModifier ++ (entries.val.drop (i.val + 1)).flatMap ignoredEntry := by
       rw [hdrop, ← he]; rfl
     rw [hsplit, List.length_append] at hb
-    have hpath : mods.val.filterMap ignoredModifier ≠ [] → std.path.Path.to_path_buf path = ok source := by
+    have hpath : mods.val.filterMap ignoredModifier ≠ [] → DiagnosticPath path source := by
       intro hn; apply hp; simp [hsplit, hn]
     have one := ignored_modifiers_loop_spec path source (Vec.deref mods) ds 0#usize
       (by simpa using hpath) (by simpa using (show ds.val.length +
@@ -149,7 +154,7 @@ private theorem ignored_entries_loop_spec (path : std.path.Path) (source : std.p
     have hlen := congrArg List.length hds'
     simp only [List.length_append, ignoredReports, List.length_map] at hlen
     have hpath' : (entries.val.drop i'.val).flatMap ignoredEntry ≠ [] →
-        std.path.Path.to_path_buf path = ok source := by
+        DiagnosticPath path source := by
       intro hn; apply hp; rw [hsplit]; intro h
       apply hn; rw [hi']; exact (List.append_eq_nil_iff.mp h).2
     have hb' : ds'.val.length + ((entries.val.drop i'.val).flatMap ignoredEntry).length ≤
@@ -161,10 +166,10 @@ private theorem ignored_entries_loop_spec (path : std.path.Path) (source : std.p
 termination_by entries.val.length - i.val
 decreasing_by omega
 
-private theorem ignored_segments_loop_spec (path : std.path.Path) (source : std.path.PathBuf)
+private theorem ignored_segments_loop_spec (path : std.path.Path) (source : Option std.path.PathBuf)
     (ds : Vec sudoers.Error) (segments : Vec RSeg) (i : Usize)
     (hp : ((segments.val.drop i.val).flatMap ignoredSegment) ≠ [] →
-      std.path.Path.to_path_buf path = ok source)
+      DiagnosticPath path source)
     (hb : ds.val.length + ((segments.val.drop i.val).flatMap ignoredSegment).length ≤ Usize.max) :
     sudoers.ignored_tags_loop0 path ds segments i ⦃ out => out.val = ds.val ++
       ignoredReports source ((segments.val.drop i.val).flatMap ignoredSegment) ⦄ := by
@@ -181,7 +186,7 @@ private theorem ignored_segments_loop_spec (path : std.path.Path) (source : std.
         entries.val.flatMap ignoredEntry ++ (segments.val.drop (i.val + 1)).flatMap ignoredSegment := by
       rw [hdrop, ← he]; rfl
     rw [hsplit, List.length_append] at hb
-    have hpath : entries.val.flatMap ignoredEntry ≠ [] → std.path.Path.to_path_buf path = ok source := by
+    have hpath : entries.val.flatMap ignoredEntry ≠ [] → DiagnosticPath path source := by
       intro hn; apply hp; simp [hsplit, hn]
     have one := ignored_entries_loop_spec path source ds entries 0#usize
       (by simpa using hpath) (by simpa using (show ds.val.length +
@@ -194,7 +199,7 @@ private theorem ignored_segments_loop_spec (path : std.path.Path) (source : std.
     have hlen := congrArg List.length hds'
     simp only [List.length_append, ignoredReports, List.length_map] at hlen
     have hpath' : (segments.val.drop i'.val).flatMap ignoredSegment ≠ [] →
-        std.path.Path.to_path_buf path = ok source := by
+        DiagnosticPath path source := by
       intro hn; apply hp; rw [hsplit]; intro h
       apply hn; rw [hi']; exact (List.append_eq_nil_iff.mp h).2
     have hb' : ds'.val.length + ((segments.val.drop i'.val).flatMap ignoredSegment).length ≤
@@ -206,9 +211,9 @@ private theorem ignored_segments_loop_spec (path : std.path.Path) (source : std.
 termination_by segments.val.length - i.val
 decreasing_by omega
 
-private theorem ignored_tags_spec (path : std.path.Path) (source : std.path.PathBuf)
+private theorem ignored_tags_spec (path : std.path.Path) (source : Option std.path.PathBuf)
     (rule : ast.PermissionSpec) (ds : Vec sudoers.Error)
-    (hp : rawIgnored rule ≠ [] → std.path.Path.to_path_buf path = ok source)
+    (hp : rawIgnored rule ≠ [] → DiagnosticPath path source)
     (hb : ds.val.length + (rawIgnored rule).length ≤ Usize.max) :
     sudoers.ignored_tags path rule ds ⦃ out => out.val = ds.val ++ ignoredReports source (rawIgnored rule) ⦄ := by
   simpa [sudoers.ignored_tags, rawIgnored] using ignored_segments_loop_spec path source ds
@@ -294,13 +299,13 @@ def diagnosticView (e : sudoers.Error) :
     Option std.path.PathBuf × Option SudoersSpec.Span × String :=
   (e.source, e.location.map absSpan, e.message)
 
-def localDiagnosticView (source : std.path.PathBuf) (d : SudoersSpec.Span × String) :
+def localDiagnosticView (source : Option std.path.PathBuf) (d : SudoersSpec.Span × String) :
     Option std.path.PathBuf × Option SudoersSpec.Span × String :=
-  (some source, some d.1, d.2)
+  (source, some d.1, d.2)
 
 /-- The raw alias definition vectors are compared in their written order, not through the
 sanitizer's index vectors. Diagnostic sources and spans are checked rather than discarded. -/
-structure CollectedRel (A : GlobAbs) (source : std.path.PathBuf) (cfg : Sudoers)
+structure CollectedRel (A : GlobAbs) (source : Option std.path.PathBuf) (cfg : Sudoers)
     (ds : Vec sudoers.Error) (c : Collected) : Prop where
   rules : cfg.rules.val.map (absPermissionSpec A) = c.rules
   user : cfg.aliases.user.2.val.map (absDef absUserSpecifier) = c.written.user
@@ -374,6 +379,29 @@ def RenderOn : RItem → Item → Prop
   | .Err (.Fatal _ k), .error (.fatal _ k') => sudo_rs.errorKindText k = k'.render
   | _, _ => True
 
+/-- Lift the parser's result relation, requiring only render agreement on the fatal errors
+that occur in this stream. -/
+theorem related_rendered_items (A : GlobAbs) {rs : List RItem} {items : List Item}
+    (hr : List.Forall₂ (ResultRel (absSudo A)) rs items)
+    (hm : ∀ span k, .Err (.Fatal span k) ∈ rs → ∀ k',
+      KindRel k k' → sudo_rs.errorKindText k = k'.render) :
+    List.Forall₂ (fun r i => ResultRel (absSudo A) r i ∧ RenderOn r i) rs items := by
+  induction hr with
+  | nil => exact .nil
+  | @cons r i rs items hhead _ ih =>
+    refine .cons ⟨hhead, ?_⟩ (ih fun span k hk k' hkind =>
+      hm span k (List.mem_cons_of_mem r hk) k' hkind)
+    cases r with
+    | Ok _ => trivial
+    | Err status =>
+      cases i with
+      | ok _ => exact False.elim hhead
+      | error status' =>
+        change StatusRel status status' at hhead
+        cases hhead with
+        | reject => trivial
+        | fatal span k k' hkind => exact hm span k (by simp) k' hkind
+
 private theorem ignoredModifier_view (m : ast.Modifier) :
     (ignoredModifier m).map absSpan =
       (match absModifier m with | .ignored s => some s | _ => none) := by
@@ -421,7 +449,7 @@ private theorem tableGood_append {T : Type} {Good : T → Prop} {old new : VecOr
   rw [he, List.mem_append] at hm
   exact hm.elim (ho d) (hd d)
 
-private theorem ignoredReports_view (A : GlobAbs) (source : std.path.PathBuf)
+private theorem ignoredReports_view (A : GlobAbs) (source : Option std.path.PathBuf)
     (rule : ast.PermissionSpec) :
     (ignoredReports source (rawIgnored rule)).map diagnosticView =
       ((ignoredSpans (absPermissionSpec A rule)).map (·, ignoredMessage)).map
@@ -457,7 +485,7 @@ private theorem customisersOK_push_command {c : CustomiserTable}
   rw [hv, List.mem_append, List.mem_singleton] at he
   exact he.elim (old.command entry) (fun h => h ▸ fits)
 
-private theorem update_nonCommand {A : GlobAbs} {source : std.path.PathBuf} {cfg : Sudoers}
+private theorem update_nonCommand {A : GlobAbs} {source : Option std.path.PathBuf} {cfg : Sudoers}
     {ds : Vec sudoers.Error} {c : Collected} (h : CollectedRel A source cfg ds c)
     {scope : ast.ConfigScope} {mods : Vec defaults.SettingsModifier}
     {s : SudoersSpec.Analysis.NonCommandScope} (hs : absNonCommandScope scope = some s)
@@ -469,7 +497,7 @@ private theorem update_nonCommand {A : GlobAbs} {source : std.path.PathBuf} {cfg
   unfold absNonCommand at hn ⊢
   simp [hv, hn, hs]
 
-private theorem update_command {A : GlobAbs} {source : std.path.PathBuf} {cfg : Sudoers}
+private theorem update_command {A : GlobAbs} {source : Option std.path.PathBuf} {cfg : Sudoers}
     {ds : Vec sudoers.Error} {c : Collected} (h : CollectedRel A source cfg ds c)
     {scope : Vec (RSpec RCommand)} {mods : Vec defaults.SettingsModifier}
     {s : SudoersSpec.SpecList SudoersSpec.Command}
@@ -486,12 +514,12 @@ private theorem update_command {A : GlobAbs} {source : std.path.PathBuf} {cfg : 
 by sanitization, scope matching, and the decision. In particular it neither calls an include
 oracle nor touches the include attempt counter: the only two oracle branches cannot satisfy
 the `collectItem` premise. -/
-theorem process_item_refines (A : GlobAbs) (path : std.path.Path) (source : std.path.PathBuf)
+theorem process_item_refines (A : GlobAbs) (path : std.path.Path) (source : Option std.path.PathBuf)
     (cfg : Sudoers) (ds : Vec sudoers.Error) (st : IncludeState)
     (item : RItem) (ref : Item) (c c' : Collected)
     (hitem : collectItem c ref = some c')
     (hr : ResultRel (absSudo A) item ref) (hm : RenderOn item ref)
-    (hp : NeedsDiagnosticPath item → std.path.Path.to_path_buf path = ok source)
+    (hp : NeedsDiagnosticPath item → DiagnosticPath path source)
     (hfits : ItemFits item) (hok : CollectorOK cfg)
     (hab : CollectedRel A source cfg ds c)
     (hb : collectSize cfg ds + itemSize item ≤ Usize.max) :
@@ -650,12 +678,12 @@ theorem process_item_refines (A : GlobAbs) (path : std.path.Path) (source : std.
 
 /-- The iterator uses the real Rust owning iteration model. The induction consumes one parsed
 item and its matching reference item at the same time; it never unfolds an include oracle. -/
-theorem process_loop_refines (A : GlobAbs) (path : std.path.Path) (source : std.path.PathBuf)
+theorem process_loop_refines (A : GlobAbs) (path : std.path.Path) (source : Option std.path.PathBuf)
     (cfg : Sudoers) (ds : Vec sudoers.Error) (st : IncludeState)
     (it : alloc.vec.into_iter.IntoIter RItem) (rs : List RItem) (items : List Item)
     (hi : it.val = rs) (hr : List.Forall₂ (fun r i => ResultRel (absSudo A) r i ∧ RenderOn r i) rs items)
     (c c' : Collected) (hc : collectFrom c items = some c')
-    (hp : ∀ r ∈ rs, NeedsDiagnosticPath r → std.path.Path.to_path_buf path = ok source)
+    (hp : ∀ r ∈ rs, NeedsDiagnosticPath r → DiagnosticPath path source)
     (hf : ∀ r ∈ rs, ItemFits r) (hok : CollectorOK cfg) (hab : CollectedRel A source cfg ds c)
     (hb : collectSize cfg ds + (rs.map itemSize).sum ≤ Usize.max) :
     sudoers.process_loop cfg path ds st it true ⦃ out =>
@@ -684,7 +712,7 @@ theorem process_loop_refines (A : GlobAbs) (path : std.path.Path) (source : std.
       rintro ⟨cfg', ds', st'⟩ ⟨hab', hok', hsettings, rfl, hsize⟩
       simp only [uncurry_apply_pair]
       have tailFits : ∀ x ∈ rest, ItemFits x := fun x hx => hf x (List.mem_cons_of_mem _ hx)
-      have tailPath : ∀ x ∈ rest, NeedsDiagnosticPath x → std.path.Path.to_path_buf path = ok source :=
+      have tailPath : ∀ x ∈ rest, NeedsDiagnosticPath x → DiagnosticPath path source :=
         fun x hx => hp x (List.mem_cons_of_mem _ hx)
       have tailBound : collectSize cfg' ds' + (rest.map itemSize).sum ≤ Usize.max := by
         simp at hb
@@ -696,12 +724,12 @@ theorem process_loop_refines (A : GlobAbs) (path : std.path.Path) (source : std.
 
 /-- The parsed-item loop implements the reference collection fold, including fatal items.
 No include-oracle hypothesis is needed, even for files with diagnostics. -/
-theorem process_refines (A : GlobAbs) (path : std.path.Path) (source : std.path.PathBuf)
+theorem process_refines (A : GlobAbs) (path : std.path.Path) (source : Option std.path.PathBuf)
     (cfg : Sudoers) (ds : Vec sudoers.Error) (st : IncludeState)
     (rs : Vec RItem) (items : List Item)
     (hr : List.Forall₂ (fun r i => ResultRel (absSudo A) r i ∧ RenderOn r i) rs.val items)
     (c c' : Collected) (hc : collectFrom c items = some c')
-    (hp : ∀ r ∈ rs.val, NeedsDiagnosticPath r → std.path.Path.to_path_buf path = ok source)
+    (hp : ∀ r ∈ rs.val, NeedsDiagnosticPath r → DiagnosticPath path source)
     (hf : ∀ r ∈ rs.val, ItemFits r) (hok : CollectorOK cfg) (hab : CollectedRel A source cfg ds c)
     (hb : collectSize cfg ds + (rs.val.map itemSize).sum ≤ Usize.max) :
     sudoers.process cfg path rs ds st ⦃ out =>
@@ -764,7 +792,7 @@ private def emptyCfg (s : defaults.Settings) : Sudoers :=
   ⟨Vec.new _, ⟨emptyOrder _, emptyOrder _, emptyOrder _, emptyOrder _⟩, s,
     ⟨Vec.new _, Vec.new _⟩⟩
 
-private theorem emptyCfg_rel (A : GlobAbs) (source : std.path.PathBuf) (s : defaults.Settings) :
+private theorem emptyCfg_rel (A : GlobAbs) (source : Option std.path.PathBuf) (s : defaults.Settings) :
     CollectedRel A source (emptyCfg s) (Vec.new _) {} := by
   constructor <;> simp [emptyCfg, emptyOrder, absNonCommand, absCommandCustomisers]
 
@@ -794,11 +822,11 @@ private theorem default_returns_empty :
 The intermediate state exposes the four written definition lists, untouched settings, and
 local source/span/message triples. Sanitization establishes policy index well-formedness.
 The bound is on the parsed items alone, not on a caller-supplied analyzed policy. -/
-theorem analyze_partition (A : GlobAbs) (path : std.path.Path) (source : std.path.PathBuf)
+theorem analyze_partition (A : GlobAbs) (path : std.path.Path) (source : Option std.path.PathBuf)
     (rs : Vec RItem) (items : List Item) (c : Collected)
     (hr : List.Forall₂ (fun r i => ResultRel (absSudo A) r i ∧ RenderOn r i) rs.val items)
     (hc : collect items = some c)
-    (hp : ∀ r ∈ rs.val, NeedsDiagnosticPath r → std.path.Path.to_path_buf path = ok source)
+    (hp : ∀ r ∈ rs.val, NeedsDiagnosticPath r → DiagnosticPath path source)
     (hf : ∀ r ∈ rs.val, ItemFits r) (hb : (rs.val.map itemSize).sum ≤ Usize.max) :
     ∃ pre ds aliases finalDs,
       sudoers.analyze path rs = ok ({ pre with aliases := aliases }, finalDs) ∧
@@ -827,5 +855,49 @@ theorem analyze_partition (A : GlobAbs) (path : std.path.Path) (source : std.pat
   · exact (congrArg Defaults.absSettings hunchanged).trans hsettings
   · exact ⟨AliasTableOK.of_sanitize_alias_tables hsan hok.user.1 hok.user.2
       hok.host.1 hok.host.2 hok.cmnd hok.runas.1 hok.runas.2, by simpa using hok.rules⟩
+
+/-- The exact include-free PA postcondition. Rules and aliases are ready for the verified
+decision; the original definition vectors and both customiser lists are still available.
+The diagnostics preserve the raw local prefix, then the sanitizer's exact message sequence. -/
+structure AnalysisResult (A : GlobAbs) (source : Option std.path.PathBuf) (c : Collected)
+    (cfg : Sudoers) (diags : Vec sudoers.Error) : Prop where
+  policy : absPolicy A (Vec.deref cfg.rules) cfg.aliases = policyOf c
+  written : absWrittenAliasTable A cfg.aliases = c.written
+  nonCommand : absNonCommand cfg.customisers.non_cmnd = c.nonCommand
+  command : absCommandCustomisers A cfg.customisers.cmnd = c.command
+  settings : Defaults.absSettings cfg.settings = Defaults.initialModel
+  policyOK : PolicyOK (Vec.deref cfg.rules) cfg.aliases
+  customisersOK : CustomisersOK cfg.customisers
+  localPrefix : ∃ localDiags : List sudoers.Error, localDiags <+: diags.val ∧
+    localDiags.map diagnosticView = c.diagnostics.map (localDiagnosticView source)
+  messages : diags.val.map sudoers.Error.message =
+    c.diagnostics.map Prod.snd ++ (SudoersSpec.Analysis.orderAliases c.written).2
+
+/-- PA: on local, non-`Reject` items, the real analyzer returns the reference `policyOf`, the
+customisers in collection order, and the item diagnostics followed by the exact sanitizer
+messages. The include oracles are not reached (`no_include_dispatch` and `process_refines`). -/
+theorem analyze_refines (A : GlobAbs) (path : std.path.Path) (source : Option std.path.PathBuf)
+    (rs : Vec RItem) (items : List Item) (c : Collected)
+    (hr : List.Forall₂ (fun r i => ResultRel (absSudo A) r i ∧ RenderOn r i) rs.val items)
+    (hc : collect items = some c)
+    (hp : ∀ r ∈ rs.val, NeedsDiagnosticPath r → DiagnosticPath path source)
+    (hf : ∀ r ∈ rs.val, ItemFits r) (hb : (rs.val.map itemSize).sum ≤ Usize.max) :
+    ∃ cfg diags, sudoers.analyze path rs = ok (cfg, diags) ∧ AnalysisResult A source c cfg diags := by
+  obtain ⟨pre, ds, aliases, out, eq, hab, hok, hsettings, hsan, hpolicy⟩ :=
+    analyze_partition A path source rs items c hr hc hp hf hb
+  obtain ⟨haliases, hprefix, hmessages⟩ := sanitize_alias_tables_exact A hsan
+  obtain ⟨⟨eu, eh, ec, er⟩, _, _⟩ := sanitize_alias_tables_tableWF hsan
+  have written : absWrittenAliasTable A pre.aliases = c.written := by
+    unfold absWrittenAliasTable
+    rw [hab.user, hab.host, hab.cmnd, hab.runas]
+  refine ⟨{ pre with aliases := aliases }, out, eq, ?_⟩
+  refine ⟨?_, ?_, hab.nonCommand, hab.command, hsettings, hpolicy,
+    hok.customisers, ⟨ds.val, hprefix, hab.diagnostics⟩, ?_⟩
+  · simp only [absPolicy, policyOf, Vec.deref_val, hab.rules, haliases, written]
+  · simpa only [absWrittenAliasTable, eu, eh, ec, er] using written
+  · have hlocal : ds.val.map sudoers.Error.message = c.diagnostics.map Prod.snd := by
+      have e := congrArg (List.map (fun x => x.2.2)) hab.diagnostics
+      simpa only [List.map_map, Function.comp_def, diagnosticView, localDiagnosticView] using e
+    simpa only [written, hlocal] using hmessages
 
 end SudoRsProofs.Parser.Analysis
