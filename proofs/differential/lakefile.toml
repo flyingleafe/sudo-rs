@@ -1,5 +1,5 @@
 name = "differential"
-defaultTargets = ["oracle"]
+defaultTargets = ["oracle", "parser"]
 
 [[require]]
 name = "sudoers-spec"
@@ -11,3 +11,7 @@ name = "Differential"
 [[lean_exe]]
 name = "oracle"
 root = "Main"
+
+[[lean_exe]]
+name = "parser"
+root = "ParserMain"
