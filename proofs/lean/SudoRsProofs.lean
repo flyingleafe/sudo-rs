@@ -35,5 +35,6 @@ import SudoRsProofs.Parser.Grammar
 import SudoRsProofs.Parser.File
 import SudoRsProofs.Parser.Examples
 import SudoRsProofs.Defaults.Range
+import SudoRsProofs.Defaults.Observations
 import SudoRsProofs.Parser.Analysis.AliasOrder
 import SudoRsProofs.Parser.Analysis.Collect

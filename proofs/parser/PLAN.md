@@ -192,6 +192,17 @@ the terminator or text skipped on recovery. `garbage_point` shows why coverage b
 one or more characters. For PT6, `cleanFile_sound` transfers single-item grammar soundness
 to a clean file; its single-item premise still has to be discharged for the full grammar.
 
+**E2E-clean, alias expansion.** Diagnostic-free sanitization proves the dependency order
+needed for equivalence of an *item list* with its expansion. For a flattened *whole policy*,
+[`authorize_expandAliases`](../spec/SudoersSpec/Expansion.lean) also requires expansion
+not to empty a runas user list and no command-alias body to contain `ALL`. Clean syntax
+alone does not justify dropping those hypotheses or claiming exact equality of all tags.
+
+**Test boundary.** [P0](P0.md) records which dump format was compared; the original
+two-settings-base observer could miss differences between modifiers. The
+[C comparison](C-SUDO.md#larger-corpus-limits-of-the-classification) records unexplained
+differences separately. Neither test establishes the full-file Rust refinement PR.
+
 ## 5. Specification design
 
 ### 5.1 Reference parser (structural form)

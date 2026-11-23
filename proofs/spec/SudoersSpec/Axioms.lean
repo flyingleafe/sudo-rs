@@ -10,6 +10,7 @@ import SudoersSpec.Syntax.Sudo
 import SudoersSpec.Syntax.Recovery
 import SudoersSpec.Grammar.Examples
 import SudoersSpec.Analysis.Collect
+import SudoersSpec.Analysis.Observations
 import SudoersSpec.Grammar.PermissionExamples
 import SudoersSpec.Syntax.PanicFree
 import SudoersSpec.Settings.FromParser
@@ -281,3 +282,5 @@ open SudoersSpec
 #print axioms SudoersSpec.Settings.numeric_bytes_le
 #print axioms SudoersSpec.Settings.numeric_checker_run_eq
 #print axioms SudoersSpec.Settings.settingsInForce_inRange_of_includeFree_text
+#print axioms SudoersSpec.Settings.Equiv.settingsInForce
+#print axioms SudoersSpec.Settings.authorization_congr
