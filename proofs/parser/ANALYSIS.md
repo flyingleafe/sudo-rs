@@ -81,7 +81,7 @@ Successful includes use actual files in a per-thread temporary tree, with only t
 
 ## Measured sizes
 
-| Measure (against `b6a9bbdb`) | Size |
+| Measure (against `f4a11870`) | Size |
 |---|---:|
 | `src/sudoers/mod.rs`, lines added / removed | 458 / 310 |
 | New Rust analysis equivalence test / legacy snapshot, lines | 558 / 395 |
@@ -89,4 +89,4 @@ Successful includes use actual files in a per-thread temporary tree, with only t
 | Generated `Types.lean` growth (including comments) | 86 lines; 7 new declarations |
 | Hand-maintained `FunsExternal.lean` growth | 78 lines |
 
-Compared generated declarations by name after excluding source locations: no pre-existing function or type body changed. Declaration order can change when adding roots. Extraction after rebase took 71 seconds wall clock including the dev wrapper and used 805 MiB peak memory as reported by the limiter.
+Compared generated declarations by name after excluding source locations: no pre-existing function or type body changed. Declaration order can change when adding roots. The unioned extraction after rebasing onto the permission-line parser took 115 seconds wall clock including the dev wrapper and reported 1,347 MiB peak memory.
