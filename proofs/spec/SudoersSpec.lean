@@ -53,3 +53,4 @@ import SudoersSpec.Grammar.PermissionDispatch
 import SudoersSpec.Grammar.PermissionPrint
 import SudoersSpec.Grammar.PermissionExamples
 import SudoersSpec.Syntax.PanicFree
+import SudoersSpec.Settings.FromParser
