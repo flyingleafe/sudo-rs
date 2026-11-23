@@ -130,6 +130,14 @@ def std.hash.random.RandomState.Insts.CoreHashBuildHasherDefaultHasher :
     std.hash.random.RandomState.Insts.CoreHashBuildHasherDefaultHasher.build_hasher
 }
 
+/-- Trait implementation: [alloc::boxed::convert::{impl core::convert::From<&'_0 str> for alloc::boxed::Box<str>}]
+    Source: '/rustc/library/alloc/src/boxed/convert.rs', lines 124:0-124:28
+    Name pattern: [core::convert::From<Box<str>, &'0 str>] -/
+@[reducible, rust_trait_impl "core::convert::From<Box<str>, &'0 str>"]
+def BoxStr.Insts.CoreConvertFromShared0Str : core.convert.From Str Str := {
+  «from» := BoxStr.Insts.CoreConvertFromShared0Str.from
+}
+
 /-- Trait implementation: [alloc::string::{impl core::cmp::PartialEq<alloc::string::String> for alloc::string::String}]
     Source: '/rustc/library/alloc/src/string.rs', lines 350:9-350:18
     Name pattern: [core::cmp::PartialEq<alloc::string::String, alloc::string::String>] -/
@@ -336,6 +344,672 @@ impl_def common.string.SudoString.Insts.CoreCmpPartialEqStr :
   ne := core.cmp.PartialEq.ne.trait_default
     common.string.SudoString.Insts.CoreCmpPartialEqStr
 }
+
+/-- [sudo_rs::defaults::apply_list]: loop 0:
+    Source: 'src/defaults/mod.rs', lines 101:12-103:13 -/
+@[rust_loop]
+def defaults.apply_list_loop0
+  (iter : alloc.vec.into_iter.IntoIter String)
+  (set : std.collections.hash.set.HashSet String std.hash.random.RandomState
+  alloc.alloc.Global) :
+  Result (std.collections.hash.set.HashSet String std.hash.random.RandomState
+    alloc.alloc.Global)
+  := do
+  let (o, iter1) ← alloc.vec.into_iter.IteratorIntoIter.next iter
+  match o with
+  | none => ok set
+  | some item =>
+    let (_, set1) ←
+      std.collections.hash.set.HashSet.insert
+        alloc.string.String.Insts.CoreCmpEq
+        alloc.string.String.Insts.CoreHashHash
+        std.hash.random.RandomState.Insts.CoreHashBuildHasherDefaultHasher set
+        item
+    defaults.apply_list_loop0 iter1 set1
+partial_fixpoint
+
+/-- [sudo_rs::defaults::apply_list]: loop 1:
+    Source: 'src/defaults/mod.rs', lines 106:12-108:13 -/
+@[rust_loop]
+def defaults.apply_list_loop1
+  (iter : alloc.vec.into_iter.IntoIter String)
+  (set : std.collections.hash.set.HashSet String std.hash.random.RandomState
+  alloc.alloc.Global) :
+  Result (std.collections.hash.set.HashSet String std.hash.random.RandomState
+    alloc.alloc.Global)
+  := do
+  let (o, iter1) ← alloc.vec.into_iter.IteratorIntoIter.next iter
+  match o with
+  | none => ok set
+  | some item =>
+    let (_, set1) ←
+      std.collections.hash.set.HashSet.insert
+        alloc.string.String.Insts.CoreCmpEq
+        alloc.string.String.Insts.CoreHashHash
+        std.hash.random.RandomState.Insts.CoreHashBuildHasherDefaultHasher set
+        item
+    defaults.apply_list_loop1 iter1 set1
+partial_fixpoint
+
+/-- [sudo_rs::defaults::apply_list]: loop 2:
+    Source: 'src/defaults/mod.rs', lines 111:12-113:13 -/
+@[rust_loop]
+def defaults.apply_list_loop2
+  (iter : alloc.vec.into_iter.IntoIter String)
+  (set : std.collections.hash.set.HashSet String std.hash.random.RandomState
+  alloc.alloc.Global) :
+  Result (std.collections.hash.set.HashSet String std.hash.random.RandomState
+    alloc.alloc.Global)
+  := do
+  let (o, iter1) ← alloc.vec.into_iter.IteratorIntoIter.next iter
+  match o with
+  | none => ok set
+  | some key =>
+    let (_, set1) ←
+      std.collections.hash.set.HashSet.remove
+        alloc.string.String.Insts.CoreCmpEq
+        alloc.string.String.Insts.CoreHashHash
+        std.hash.random.RandomState.Insts.CoreHashBuildHasherDefaultHasher
+        (core.borrow.Borrow.Blanket String)
+        alloc.string.String.Insts.CoreHashHash
+        alloc.string.String.Insts.CoreCmpEq set key
+    defaults.apply_list_loop2 iter1 set1
+partial_fixpoint
+
+/-- [sudo_rs::defaults::apply_list]:
+    Source: 'src/defaults/mod.rs', lines 97:0-116:1 -/
+def defaults.apply_list
+  (set : std.collections.hash.set.HashSet String std.hash.random.RandomState
+  alloc.alloc.Global) (mode : defaults.ListMode) (items : alloc.vec.Vec String)
+  :
+  Result (std.collections.hash.set.HashSet String std.hash.random.RandomState
+    alloc.alloc.Global)
+  := do
+  match mode with
+  | defaults.ListMode.Set =>
+    let set1 ← std.collections.hash.set.HashSetTRandomStateGlobal.new String
+    let iter ← alloc.vec.IntoIteratorVec.into_iter items
+    defaults.apply_list_loop0 iter set1
+  | defaults.ListMode.Add =>
+    let iter ← alloc.vec.IntoIteratorVec.into_iter items
+    defaults.apply_list_loop1 iter set
+  | defaults.ListMode.Del =>
+    let iter ← alloc.vec.IntoIteratorVec.into_iter items
+    defaults.apply_list_loop2 iter set
+
+/-- [sudo_rs::defaults::{sudo_rs::defaults::SettingsModifier}::apply]:
+    Source: 'src/defaults/settings_dsl.rs', lines 285:12-289:13; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 38:0-92:1 -/
+def defaults.SettingsModifier.apply
+  (self : defaults.SettingsModifier) (obj : defaults.Settings) :
+  Result defaults.Settings
+  := do
+  match self with
+  | defaults.SettingsModifier.always_query_group_plugin value =>
+    ok { obj with always_query_group_plugin := value }
+  | defaults.SettingsModifier.always_set_home value =>
+    ok { obj with always_set_home := value }
+  | defaults.SettingsModifier.env_reset value =>
+    ok { obj with env_reset := value }
+  | defaults.SettingsModifier.fqdn value => ok { obj with fqdn := value }
+  | defaults.SettingsModifier.ignore_dot value =>
+    ok { obj with ignore_dot := value }
+  | defaults.SettingsModifier.lecture value => ok { obj with lecture := value }
+  | defaults.SettingsModifier.mailerpath value =>
+    ok { obj with mailerpath := value }
+  | defaults.SettingsModifier.mail_badpass value =>
+    ok { obj with mail_badpass := value }
+  | defaults.SettingsModifier.match_group_by_gid value =>
+    ok { obj with match_group_by_gid := value }
+  | defaults.SettingsModifier.use_pty value => ok { obj with use_pty := value }
+  | defaults.SettingsModifier.visiblepw value =>
+    ok { obj with visiblepw := value }
+  | defaults.SettingsModifier.pwfeedback value =>
+    ok { obj with pwfeedback := value }
+  | defaults.SettingsModifier.rootpw value => ok { obj with rootpw := value }
+  | defaults.SettingsModifier.targetpw value =>
+    ok { obj with targetpw := value }
+  | defaults.SettingsModifier.noexec value => ok { obj with noexec := value }
+  | defaults.SettingsModifier.noninteractive_auth value =>
+    ok { obj with noninteractive_auth := value }
+  | defaults.SettingsModifier.log_allowed value =>
+    ok { obj with log_allowed := value }
+  | defaults.SettingsModifier.log_denied value =>
+    ok { obj with log_denied := value }
+  | defaults.SettingsModifier.insults value => ok { obj with insults := value }
+  | defaults.SettingsModifier.setenv value => ok { obj with setenv := value }
+  | defaults.SettingsModifier.runcwd value => ok { obj with runcwd := value }
+  | defaults.SettingsModifier.apparmor_profile value =>
+    ok { obj with apparmor_profile := value }
+  | defaults.SettingsModifier.umask value => ok { obj with umask := value }
+  | defaults.SettingsModifier.umask_override value =>
+    ok { obj with umask_override := value }
+  | defaults.SettingsModifier.passwd_tries value =>
+    ok { obj with passwd_tries := value }
+  | defaults.SettingsModifier.secure_path value =>
+    ok { obj with secure_path := value }
+  | defaults.SettingsModifier.verifypw value =>
+    ok { obj with verifypw := value }
+  | defaults.SettingsModifier.passwd_timeout value =>
+    ok { obj with passwd_timeout := value }
+  | defaults.SettingsModifier.timestamp_timeout value =>
+    ok { obj with timestamp_timeout := value }
+  | defaults.SettingsModifier.timestamp_type value =>
+    ok { obj with timestamp_type := value }
+  | defaults.SettingsModifier.editor value => ok { obj with editor := value }
+  | defaults.SettingsModifier.env_editor value =>
+    ok { obj with env_editor := value }
+  | defaults.SettingsModifier.env_keep value =>
+    let (mode, items) := value
+    let hs ← defaults.apply_list obj.env_keep mode items
+    ok { obj with env_keep := hs }
+  | defaults.SettingsModifier.env_check value =>
+    let (mode, items) := value
+    let hs ← defaults.apply_list obj.env_check mode items
+    ok { obj with env_check := hs }
+  | defaults.SettingsModifier.env_delete value =>
+    let (mode, items) := value
+    let hs ← defaults.apply_list obj.env_delete mode items
+    ok { obj with env_delete := hs }
+
+/-- [sudo_rs::defaults::setting_at]:
+    Source: 'src/defaults/settings_dsl.rs', lines 307:8-312:9; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 38:0-92:1 -/
+def defaults.setting_at
+  (index : Std.Usize) : Result (Option (Str × defaults.Setting)) := do
+  match index.val with
+  | 0 =>
+    ok (some (toStr "always_query_group_plugin",
+      defaults.Setting.always_query_group_plugin))
+  | 1 => ok (some (toStr "always_set_home", defaults.Setting.always_set_home))
+  | 2 => ok (some (toStr "env_reset", defaults.Setting.env_reset))
+  | 3 => ok (some (toStr "fqdn", defaults.Setting.fqdn))
+  | 4 => ok (some (toStr "ignore_dot", defaults.Setting.ignore_dot))
+  | 5 => ok (some (toStr "lecture", defaults.Setting.lecture))
+  | 6 => ok (some (toStr "mailerpath", defaults.Setting.mailerpath))
+  | 7 => ok (some (toStr "mail_badpass", defaults.Setting.mail_badpass))
+  | 8 =>
+    ok (some (toStr "match_group_by_gid", defaults.Setting.match_group_by_gid))
+  | 9 => ok (some (toStr "use_pty", defaults.Setting.use_pty))
+  | 10 => ok (some (toStr "visiblepw", defaults.Setting.visiblepw))
+  | 11 => ok (some (toStr "pwfeedback", defaults.Setting.pwfeedback))
+  | 12 => ok (some (toStr "rootpw", defaults.Setting.rootpw))
+  | 13 => ok (some (toStr "targetpw", defaults.Setting.targetpw))
+  | 14 => ok (some (toStr "noexec", defaults.Setting.noexec))
+  | 15 =>
+    ok (some (toStr "noninteractive_auth",
+      defaults.Setting.noninteractive_auth))
+  | 16 => ok (some (toStr "log_allowed", defaults.Setting.log_allowed))
+  | 17 => ok (some (toStr "log_denied", defaults.Setting.log_denied))
+  | 18 => ok (some (toStr "insults", defaults.Setting.insults))
+  | 19 => ok (some (toStr "setenv", defaults.Setting.setenv))
+  | 20 => ok (some (toStr "runcwd", defaults.Setting.runcwd))
+  | 21 =>
+    ok (some (toStr "apparmor_profile", defaults.Setting.apparmor_profile))
+  | 22 => ok (some (toStr "umask", defaults.Setting.umask))
+  | 23 => ok (some (toStr "umask_override", defaults.Setting.umask_override))
+  | 24 => ok (some (toStr "passwd_tries", defaults.Setting.passwd_tries))
+  | 25 => ok (some (toStr "secure_path", defaults.Setting.secure_path))
+  | 26 => ok (some (toStr "verifypw", defaults.Setting.verifypw))
+  | 27 => ok (some (toStr "passwd_timeout", defaults.Setting.passwd_timeout))
+  | 28 =>
+    ok (some (toStr "timestamp_timeout", defaults.Setting.timestamp_timeout))
+  | 29 => ok (some (toStr "timestamp_type", defaults.Setting.timestamp_type))
+  | 30 => ok (some (toStr "editor", defaults.Setting.editor))
+  | 31 => ok (some (toStr "env_editor", defaults.Setting.env_editor))
+  | 32 => ok (some (toStr "env_keep", defaults.Setting.env_keep))
+  | 33 => ok (some (toStr "env_check", defaults.Setting.env_check))
+  | 34 => ok (some (toStr "env_delete", defaults.Setting.env_delete))
+  | _ => ok none
+
+/-- [sudo_rs::defaults::setting_named]: loop 0:
+    Source: 'src/defaults/mod.rs', lines 38:0-92:1 -/
+@[rust_loop]
+def defaults.setting_named_loop
+  («name» : Str) (found : Option defaults.Setting) (index : Std.Usize)
+  (more : Bool) :
+  Result (Option defaults.Setting)
+  := do
+  if more
+  then
+    let o ← defaults.setting_at index
+    match o with
+    | none => defaults.setting_named_loop «name» found index false
+    | some p =>
+      let (key, setting) := p
+      let b ← Str.Insts.CoreCmpPartialEqStr.eq key «name»
+      let (found1, more1) ←
+        if b
+        then ok (some setting, false)
+        else ok (found, more)
+      let index1 ← index + 1#usize
+      defaults.setting_named_loop «name» found1 index1 more1
+  else ok found
+partial_fixpoint
+
+/-- [sudo_rs::defaults::setting_named]:
+    Source: 'src/defaults/settings_dsl.rs', lines 318:8-335:9; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 38:0-92:1 -/
+@[reducible]
+def defaults.setting_named
+  («name» : Str) : Result (Option defaults.Setting) := do
+  defaults.setting_named_loop «name» none 0#usize true
+
+/-- [sudo_rs::defaults::set]:
+    Source: 'src/defaults/settings_dsl.rs', lines 351:8-358:9; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 38:0-92:1 -/
+def defaults.set («name» : Str) : Result (Option defaults.SettingKind) := do
+  let o ← defaults.setting_named «name»
+  match o with
+  | none => ok none
+  | some s =>
+    match s with
+    | defaults.Setting.always_query_group_plugin =>
+      ok (some (defaults.SettingKind.Flag
+        (defaults.SettingsModifier.always_query_group_plugin true)))
+    | defaults.Setting.always_set_home =>
+      ok (some (defaults.SettingKind.Flag
+        (defaults.SettingsModifier.always_set_home true)))
+    | defaults.Setting.env_reset =>
+      ok (some (defaults.SettingKind.Flag (defaults.SettingsModifier.env_reset
+        true)))
+    | defaults.Setting.fqdn =>
+      ok (some (defaults.SettingKind.Flag (defaults.SettingsModifier.fqdn
+        true)))
+    | defaults.Setting.ignore_dot =>
+      ok (some (defaults.SettingKind.Flag (defaults.SettingsModifier.ignore_dot
+        true)))
+    | defaults.Setting.lecture =>
+      ok (some (defaults.SettingKind.Text defaults.TextSetting.lecture))
+    | defaults.Setting.mailerpath =>
+      ok (some (defaults.SettingKind.Text defaults.TextSetting.mailerpath))
+    | defaults.Setting.mail_badpass =>
+      ok (some (defaults.SettingKind.Flag
+        (defaults.SettingsModifier.mail_badpass true)))
+    | defaults.Setting.match_group_by_gid =>
+      ok (some (defaults.SettingKind.Flag
+        (defaults.SettingsModifier.match_group_by_gid true)))
+    | defaults.Setting.use_pty =>
+      ok (some (defaults.SettingKind.Flag (defaults.SettingsModifier.use_pty
+        true)))
+    | defaults.Setting.visiblepw =>
+      ok (some (defaults.SettingKind.Flag (defaults.SettingsModifier.visiblepw
+        true)))
+    | defaults.Setting.pwfeedback =>
+      ok (some (defaults.SettingKind.Flag (defaults.SettingsModifier.pwfeedback
+        true)))
+    | defaults.Setting.rootpw =>
+      ok (some (defaults.SettingKind.Flag (defaults.SettingsModifier.rootpw
+        true)))
+    | defaults.Setting.targetpw =>
+      ok (some (defaults.SettingKind.Flag (defaults.SettingsModifier.targetpw
+        true)))
+    | defaults.Setting.noexec =>
+      ok (some (defaults.SettingKind.Flag (defaults.SettingsModifier.noexec
+        true)))
+    | defaults.Setting.noninteractive_auth =>
+      ok (some (defaults.SettingKind.Flag
+        (defaults.SettingsModifier.noninteractive_auth true)))
+    | defaults.Setting.log_allowed =>
+      ok (some (defaults.SettingKind.Flag
+        (defaults.SettingsModifier.log_allowed true)))
+    | defaults.Setting.log_denied =>
+      ok (some (defaults.SettingKind.Flag (defaults.SettingsModifier.log_denied
+        true)))
+    | defaults.Setting.insults =>
+      ok (some (defaults.SettingKind.Flag (defaults.SettingsModifier.insults
+        true)))
+    | defaults.Setting.setenv =>
+      ok (some (defaults.SettingKind.Flag (defaults.SettingsModifier.setenv
+        true)))
+    | defaults.Setting.runcwd =>
+      ok (some (defaults.SettingKind.Text defaults.TextSetting.runcwd))
+    | defaults.Setting.apparmor_profile =>
+      ok (some (defaults.SettingKind.Text
+        defaults.TextSetting.apparmor_profile))
+    | defaults.Setting.umask =>
+      ok (some (defaults.SettingKind.Integer defaults.IntegerSetting.umask))
+    | defaults.Setting.umask_override =>
+      ok (some (defaults.SettingKind.Flag
+        (defaults.SettingsModifier.umask_override true)))
+    | defaults.Setting.passwd_tries =>
+      ok (some (defaults.SettingKind.Integer
+        defaults.IntegerSetting.passwd_tries))
+    | defaults.Setting.secure_path =>
+      ok (some (defaults.SettingKind.Text defaults.TextSetting.secure_path))
+    | defaults.Setting.verifypw =>
+      ok (some (defaults.SettingKind.Text defaults.TextSetting.verifypw))
+    | defaults.Setting.passwd_timeout =>
+      ok (some (defaults.SettingKind.Integer
+        defaults.IntegerSetting.passwd_timeout))
+    | defaults.Setting.timestamp_timeout =>
+      ok (some (defaults.SettingKind.Integer
+        defaults.IntegerSetting.timestamp_timeout))
+    | defaults.Setting.timestamp_type =>
+      ok (some (defaults.SettingKind.Text defaults.TextSetting.timestamp_type))
+    | defaults.Setting.editor =>
+      ok (some (defaults.SettingKind.Text defaults.TextSetting.editor))
+    | defaults.Setting.env_editor =>
+      ok (some (defaults.SettingKind.Flag (defaults.SettingsModifier.env_editor
+        true)))
+    | defaults.Setting.env_keep =>
+      ok (some (defaults.SettingKind.List defaults.ListSetting.env_keep))
+    | defaults.Setting.env_check =>
+      ok (some (defaults.SettingKind.List defaults.ListSetting.env_check))
+    | defaults.Setting.env_delete =>
+      ok (some (defaults.SettingKind.List defaults.ListSetting.env_delete))
+
+/-- [sudo_rs::defaults::negate]:
+    Source: 'src/defaults/settings_dsl.rs', lines 337:8-349:9; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 38:0-92:1 -/
+def defaults.negate
+  («name» : Str) : Result (Option defaults.SettingsModifier) := do
+  let o ← defaults.setting_named «name»
+  match o with
+  | none => ok none
+  | some s =>
+    match s with
+    | defaults.Setting.always_query_group_plugin =>
+      ok (some (defaults.SettingsModifier.always_query_group_plugin false))
+    | defaults.Setting.always_set_home =>
+      ok (some (defaults.SettingsModifier.always_set_home false))
+    | defaults.Setting.env_reset =>
+      ok (some (defaults.SettingsModifier.env_reset false))
+    | defaults.Setting.fqdn => ok (some (defaults.SettingsModifier.fqdn false))
+    | defaults.Setting.ignore_dot =>
+      ok (some (defaults.SettingsModifier.ignore_dot false))
+    | defaults.Setting.lecture =>
+      ok (some (defaults.SettingsModifier.lecture
+        defaults.enums.lecture.never))
+    | defaults.Setting.mailerpath =>
+      ok (some (defaults.SettingsModifier.mailerpath none))
+    | defaults.Setting.mail_badpass =>
+      ok (some (defaults.SettingsModifier.mail_badpass false))
+    | defaults.Setting.match_group_by_gid =>
+      ok (some (defaults.SettingsModifier.match_group_by_gid false))
+    | defaults.Setting.use_pty =>
+      ok (some (defaults.SettingsModifier.use_pty false))
+    | defaults.Setting.visiblepw =>
+      ok (some (defaults.SettingsModifier.visiblepw false))
+    | defaults.Setting.pwfeedback =>
+      ok (some (defaults.SettingsModifier.pwfeedback false))
+    | defaults.Setting.rootpw =>
+      ok (some (defaults.SettingsModifier.rootpw false))
+    | defaults.Setting.targetpw =>
+      ok (some (defaults.SettingsModifier.targetpw false))
+    | defaults.Setting.noexec =>
+      ok (some (defaults.SettingsModifier.noexec false))
+    | defaults.Setting.noninteractive_auth =>
+      ok (some (defaults.SettingsModifier.noninteractive_auth false))
+    | defaults.Setting.log_allowed =>
+      ok (some (defaults.SettingsModifier.log_allowed false))
+    | defaults.Setting.log_denied =>
+      ok (some (defaults.SettingsModifier.log_denied false))
+    | defaults.Setting.insults =>
+      ok (some (defaults.SettingsModifier.insults false))
+    | defaults.Setting.setenv =>
+      ok (some (defaults.SettingsModifier.setenv false))
+    | defaults.Setting.runcwd =>
+      ok (some (defaults.SettingsModifier.runcwd none))
+    | defaults.Setting.apparmor_profile =>
+      ok (some (defaults.SettingsModifier.apparmor_profile none))
+    | defaults.Setting.umask =>
+      ok (some (defaults.SettingsModifier.umask 511#u64))
+    | defaults.Setting.umask_override =>
+      ok (some (defaults.SettingsModifier.umask_override false))
+    | defaults.Setting.passwd_tries => ok none
+    | defaults.Setting.secure_path =>
+      ok (some (defaults.SettingsModifier.secure_path none))
+    | defaults.Setting.verifypw =>
+      ok (some (defaults.SettingsModifier.verifypw
+        defaults.enums.verifypw.never))
+    | defaults.Setting.passwd_timeout =>
+      ok (some (defaults.SettingsModifier.passwd_timeout 0#u64))
+    | defaults.Setting.timestamp_timeout =>
+      ok (some (defaults.SettingsModifier.timestamp_timeout 0#u64))
+    | defaults.Setting.timestamp_type => ok none
+    | defaults.Setting.editor => ok none
+    | defaults.Setting.env_editor =>
+      ok (some (defaults.SettingsModifier.env_editor false))
+    | defaults.Setting.env_keep =>
+      ok (some (defaults.SettingsModifier.env_keep (defaults.ListMode.Set,
+        alloc.vec.Vec.new String)))
+    | defaults.Setting.env_check =>
+      ok (some (defaults.SettingsModifier.env_check (defaults.ListMode.Set,
+        alloc.vec.Vec.new String)))
+    | defaults.Setting.env_delete =>
+      ok (some (defaults.SettingsModifier.env_delete (defaults.ListMode.Set,
+        alloc.vec.Vec.new String)))
+
+/-- [sudo_rs::defaults::decimal]:
+    Source: 'src/defaults/mod.rs', lines 148:0-150:1 -/
+def defaults.decimal (input : Str) : Result (Option Std.U64) := do
+  let r ← core.num.U64.from_str_radix input 10#u32
+  core.result.Result.ok r
+
+/-- [sudo_rs::defaults::find_dot]: loop 0:
+    Source: 'src/defaults/mod.rs', lines 136:4-141:5 -/
+@[rust_loop]
+def defaults.find_dot_loop
+  (input : Slice Std.U8) (dot : Std.Usize) (i : Std.Usize) :
+  Result Std.Usize
+  := do
+  let i1 := Slice.len input
+  if i < i1
+  then
+    let i2 := Slice.len input
+    if dot = i2
+    then
+      let i3 ← Slice.index_usize input i
+      let dot1 ← if i3 = 46#u8
+                   then ok i
+                   else ok dot
+      let i4 ← i + 1#usize
+      defaults.find_dot_loop input dot1 i4
+    else ok dot
+  else ok dot
+partial_fixpoint
+
+/-- [sudo_rs::defaults::find_dot]:
+    Source: 'src/defaults/mod.rs', lines 133:0-143:1 -/
+def defaults.find_dot (input : Slice Std.U8) : Result Std.Usize := do
+  let dot := Slice.len input
+  defaults.find_dot_loop input dot 0#usize
+
+/-- [sudo_rs::defaults::fractional_minutes]:
+    Source: 'src/defaults/mod.rs', lines 169:0-200:1 -/
+def defaults.fractional_minutes (input : Str) : Result (Option Std.U64) := do
+  let s ← core.str.Str.as_bytes input
+  let dot ← defaults.find_dot s
+  let i ← core.str.Str.len input
+  if dot < i
+  then
+    let (integral, rest) ← core.str.Str.split_at input dot
+    let (_, fractional) ← core.str.Str.split_at rest 1#usize
+    let i1 ← core.str.Str.len fractional
+    let r ← core.convert.num.ptr_try_from_impls.TryFromU32Usize.try_from i1
+    match r with
+    | core.result.Result.Ok digits =>
+      let shift ← core.num.U64.pow 10#u64 digits
+      let o ← defaults.decimal integral
+      match o with
+      | none => ok none
+      | some integral1 =>
+        let scaled ← integral1 * shift
+        let o1 ← defaults.decimal fractional
+        match o1 with
+        | none => ok none
+        | some fractional1 =>
+          let seconds ← scaled + fractional1
+          let i2 ← seconds * 60#u64
+          let i3 ← i2 / shift
+          ok (some i3)
+    | core.result.Result.Err _ => ok none
+  else
+    let o ← defaults.decimal input
+    match o with
+    | none => ok none
+    | some minutes => ok (U64.checked_mul minutes 60#u64)
+
+/-- [sudo_rs::defaults::octal_mode]:
+    Source: 'src/defaults/mod.rs', lines 152:0-163:1 -/
+def defaults.octal_mode (input : Str) : Result (Option Std.U64) := do
+  let bytes ← core.str.Str.as_bytes input
+  let b ← core.slice.Slice.is_empty bytes
+  if b
+  then ok none
+  else
+    let i ← Slice.index_usize bytes 0#usize
+    if i != 48#u8
+    then ok none
+    else
+      let (_, digits) ← core.str.Str.split_at input 1#usize
+      let r ← core.num.U32.from_str_radix digits 8#u32
+      match r with
+      | core.result.Result.Ok mode =>
+        let i1 ← lift (core.convert.num.FromU64U32.from mode)
+        ok (some i1)
+      | core.result.Result.Err _ => ok none
+
+/-- [sudo_rs::defaults::integer_in_range]:
+    Source: 'src/defaults/mod.rs', lines 119:0-130:1 -/
+def defaults.integer_in_range
+  (text : Str) (radix : Std.U32) (first : Std.U64) (last : Std.U64) :
+  Result (Option Std.U64)
+  := do
+  let r ← core.num.U64.from_str_radix text radix
+  match r with
+  | core.result.Result.Ok value =>
+    if first <= value
+    then if value <= last
+         then ok (some value)
+         else ok none
+    else ok none
+  | core.result.Result.Err _ => ok none
+
+/-- [sudo_rs::defaults::check_integer]:
+    Source: 'src/defaults/settings_dsl.rs', lines 169:8-173:9; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 38:0-92:1 -/
+def defaults.check_integer
+  (setting : defaults.IntegerSetting) (text : Str) :
+  Result (Option defaults.SettingsModifier)
+  := do
+  match setting with
+  | defaults.IntegerSetting.umask =>
+    let o ← defaults.octal_mode text
+    match o with
+    | none => ok none
+    | some value => ok (some (defaults.SettingsModifier.umask value))
+  | defaults.IntegerSetting.passwd_tries =>
+    let o ← defaults.integer_in_range text 10#u32 0#u64 1000#u64
+    match o with
+    | none => ok none
+    | some value => ok (some (defaults.SettingsModifier.passwd_tries value))
+  | defaults.IntegerSetting.passwd_timeout =>
+    let o ← defaults.fractional_minutes text
+    match o with
+    | none => ok none
+    | some value => ok (some (defaults.SettingsModifier.passwd_timeout value))
+  | defaults.IntegerSetting.timestamp_timeout =>
+    let o ← defaults.fractional_minutes text
+    match o with
+    | none => ok none
+    | some value =>
+      ok (some (defaults.SettingsModifier.timestamp_timeout value))
+
+/-- [sudo_rs::defaults::check_text]:
+    Source: 'src/defaults/settings_dsl.rs', lines 176:8-180:9; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 38:0-92:1 -/
+def defaults.check_text
+  (setting : defaults.TextSetting) (text : Str) :
+  Result (Option defaults.SettingsModifier)
+  := do
+  match setting with
+  | defaults.TextSetting.lecture =>
+    let b ← Str.Insts.CoreCmpPartialEqStr.eq text (toStr "always")
+    if b
+    then
+      ok (some (defaults.SettingsModifier.lecture
+        defaults.enums.lecture.always))
+    else
+      let b1 ← Str.Insts.CoreCmpPartialEqStr.eq text (toStr "once")
+      if b1
+      then
+        ok (some (defaults.SettingsModifier.lecture
+          defaults.enums.lecture.once))
+      else
+        let b2 ← Str.Insts.CoreCmpPartialEqStr.eq text (toStr "never")
+        if b2
+        then
+          ok (some (defaults.SettingsModifier.lecture
+            defaults.enums.lecture.never))
+        else ok none
+  | defaults.TextSetting.mailerpath =>
+    let s ←
+      core.convert.IntoFrom.into BoxStr.Insts.CoreConvertFromShared0Str text
+    ok (some (defaults.SettingsModifier.mailerpath (some s)))
+  | defaults.TextSetting.runcwd =>
+    let s ←
+      core.convert.IntoFrom.into BoxStr.Insts.CoreConvertFromShared0Str text
+    ok (some (defaults.SettingsModifier.runcwd (some s)))
+  | defaults.TextSetting.apparmor_profile =>
+    let s ←
+      core.convert.IntoFrom.into BoxStr.Insts.CoreConvertFromShared0Str text
+    ok (some (defaults.SettingsModifier.apparmor_profile (some s)))
+  | defaults.TextSetting.secure_path =>
+    let s ←
+      core.convert.IntoFrom.into BoxStr.Insts.CoreConvertFromShared0Str text
+    ok (some (defaults.SettingsModifier.secure_path (some s)))
+  | defaults.TextSetting.verifypw =>
+    let b ← Str.Insts.CoreCmpPartialEqStr.eq text (toStr "all")
+    if b
+    then
+      ok (some (defaults.SettingsModifier.verifypw
+        defaults.enums.verifypw.all))
+    else
+      let b1 ← Str.Insts.CoreCmpPartialEqStr.eq text (toStr "always")
+      if b1
+      then
+        ok (some (defaults.SettingsModifier.verifypw
+          defaults.enums.verifypw.always))
+      else
+        let b2 ← Str.Insts.CoreCmpPartialEqStr.eq text (toStr "any")
+        if b2
+        then
+          ok (some (defaults.SettingsModifier.verifypw
+            defaults.enums.verifypw.any))
+        else
+          let b3 ← Str.Insts.CoreCmpPartialEqStr.eq text (toStr "never")
+          if b3
+          then
+            ok (some (defaults.SettingsModifier.verifypw
+              defaults.enums.verifypw.never))
+          else ok none
+  | defaults.TextSetting.timestamp_type =>
+    let b ← Str.Insts.CoreCmpPartialEqStr.eq text (toStr "tty")
+    if b
+    then
+      ok (some (defaults.SettingsModifier.timestamp_type
+        defaults.enums.timestamp_type.tty))
+    else
+      let b1 ← Str.Insts.CoreCmpPartialEqStr.eq text (toStr "ppid")
+      if b1
+      then
+        ok (some (defaults.SettingsModifier.timestamp_type
+          defaults.enums.timestamp_type.ppid))
+      else ok none
+  | defaults.TextSetting.editor =>
+    let s ←
+      core.convert.IntoFrom.into BoxStr.Insts.CoreConvertFromShared0Str text
+    ok (some (defaults.SettingsModifier.editor s))
+
+/-- [sudo_rs::defaults::build_list]:
+    Source: 'src/defaults/settings_dsl.rs', lines 183:8-187:9; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 38:0-92:1 -/
+def defaults.build_list
+  (setting : defaults.ListSetting) (mode : defaults.ListMode)
+  (items : alloc.vec.Vec String) :
+  Result defaults.SettingsModifier
+  := do
+  match setting with
+  | defaults.ListSetting.env_keep =>
+    ok (defaults.SettingsModifier.env_keep (mode, items))
+  | defaults.ListSetting.env_check =>
+    ok (defaults.SettingsModifier.env_check (mode, items))
+  | defaults.ListSetting.env_delete =>
+    ok (defaults.SettingsModifier.env_delete (mode, items))
 
 /-- [sudo_rs::defaults::{sudo_rs::defaults::Settings}::apparmor_profile]:
     Source: 'src/defaults/settings_dsl.rs', lines 243:16-245:17; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 38:0-92:1 -/

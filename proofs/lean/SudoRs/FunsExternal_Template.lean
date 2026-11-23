@@ -121,6 +121,33 @@ axiom core.num.error.TryFromIntError.Insts.CoreFmtDebug.fmt
   core.num.error.TryFromIntError → core.fmt.Formatter → Result
     ((core.result.Result Unit core.fmt.Error) × core.fmt.Formatter)
 
+/-- [core::num::{u64}::pow]:
+    Source: '/rustc/library/core/src/num/uint_macros.rs', lines 3664:8-3664:48; this code is generated from a macro invocation at: '/rustc/library/core/src/num/mod.rs', lines 1324:4-1348:5
+    Name pattern: [core::num::{u64}::pow]
+    Visibility: public -/
+@[rust_fun "core::num::{u64}::pow"]
+axiom core.num.U64.pow : Std.U64 → Std.U32 → Result Std.U64
+
+/-- [core::num::{u32}::from_str_radix]:
+    Source: '/rustc/library/core/src/num/mod.rs', lines 1683:12-1683:96; this code is generated from a macro invocation at: '/rustc/library/core/src/num/mod.rs', lines 1869:0-1869:57
+    Name pattern: [core::num::{u32}::from_str_radix]
+    Visibility: public -/
+@[rust_fun "core::num::{u32}::from_str_radix"]
+axiom core.num.U32.from_str_radix
+  :
+  Str → Std.U32 → Result (core.result.Result Std.U32
+    core.num.error.ParseIntError)
+
+/-- [core::num::{u64}::from_str_radix]:
+    Source: '/rustc/library/core/src/num/mod.rs', lines 1683:12-1683:96; this code is generated from a macro invocation at: '/rustc/library/core/src/num/mod.rs', lines 1869:0-1869:57
+    Name pattern: [core::num::{u64}::from_str_radix]
+    Visibility: public -/
+@[rust_fun "core::num::{u64}::from_str_radix"]
+axiom core.num.U64.from_str_radix
+  :
+  Str → Std.U32 → Result (core.result.Result Std.U64
+    core.num.error.ParseIntError)
+
 /-- [core::option::{core::option::Option<T>}::as_ref]:
     Source: '/rustc/library/core/src/option.rs', lines 743:4-743:44
     Name pattern: [core::option::{core::option::Option<@T>}::as_ref]
@@ -194,6 +221,27 @@ axiom core.slice.Slice.starts_with
   {T : Type _} (cmpPartialEqInst : core.cmp.PartialEq T T) :
   Slice T → Slice T → Result Bool
 
+/-- [core::str::{str}::len]:
+    Source: '/rustc/library/core/src/str/mod.rs', lines 155:4-155:36
+    Name pattern: [core::str::{str}::len]
+    Visibility: public -/
+@[rust_fun "core::str::{str}::len"]
+axiom core.str.Str.len : Str → Result Std.Usize
+
+/-- [core::str::{str}::as_bytes]:
+    Source: '/rustc/library/core/src/str/mod.rs', lines 514:4-514:41
+    Name pattern: [core::str::{str}::as_bytes]
+    Visibility: public -/
+@[rust_fun "core::str::{str}::as_bytes"]
+axiom core.str.Str.as_bytes : Str → Result (Slice Std.U8)
+
+/-- [core::str::{str}::split_at]:
+    Source: '/rustc/library/core/src/str/mod.rs', lines 860:4-860:60
+    Name pattern: [core::str::{str}::split_at]
+    Visibility: public -/
+@[rust_fun "core::str::{str}::split_at"]
+axiom core.str.Str.split_at : Str → Std.Usize → Result (Str × Str)
+
 /-- [core::str::traits::{impl core::cmp::PartialEq<str> for str}::eq]:
     Source: '/rustc/library/core/src/str/traits.rs', lines 29:4-29:37
     Name pattern: [core::str::traits::{core::cmp::PartialEq<str, str>}::eq]
@@ -230,6 +278,21 @@ axiom std.collections.hash.set.HashSet.insert
   (corecmpEqInst : core.cmp.Eq T) (corehashHashInst : core.hash.Hash T)
   (corehashBuildHasherInst : core.hash.BuildHasher S Clause2_Hasher) :
   std.collections.hash.set.HashSet T S A → T → Result (Bool ×
+    (std.collections.hash.set.HashSet T S A))
+
+/-- [std::collections::hash::set::{std::collections::hash::set::HashSet<T, S, A>}::remove]:
+    Source: '/rustc/library/std/src/collections/hash/set.rs', lines 1081:4-1084:21
+    Name pattern: [std::collections::hash::set::{std::collections::hash::set::HashSet<@T, @S, @A>}::remove]
+    Visibility: public -/
+@[rust_fun
+  "std::collections::hash::set::{std::collections::hash::set::HashSet<@T, @S, @A>}::remove"]
+axiom std.collections.hash.set.HashSet.remove
+  {T : Type _} {S : Type _} {A : Type _} {Q : Type _} {Clause2_Hasher : Type _}
+  (corecmpEqInst : core.cmp.Eq T) (corehashHashInst : core.hash.Hash T)
+  (corehashBuildHasherInst : core.hash.BuildHasher S Clause2_Hasher)
+  (coreborrowBorrowInst : core.borrow.Borrow T Q) (corehashHashInst1 :
+  core.hash.Hash Q) (corecmpEqInst1 : core.cmp.Eq Q) :
+  std.collections.hash.set.HashSet T S A → Q → Result (Bool ×
     (std.collections.hash.set.HashSet T S A))
 
 /-- [std::ffi::os_str::{impl core::ops::deref::Deref<std::ffi::os_str::OsStr> for std::ffi::os_str::OsString}::deref]:
@@ -315,6 +378,14 @@ axiom std.path.Path.new
   {S : Type _} (coreconvertAsRefSOsStrInst : core.convert.AsRef S
   std.ffi.os_str.OsStr) :
   S → Result std.path.Path
+
+/-- [alloc::boxed::convert::{impl core::convert::From<&'_0 str> for alloc::boxed::Box<str>}::from]:
+    Source: '/rustc/library/alloc/src/boxed/convert.rs', lines 137:4-137:32
+    Name pattern: [alloc::boxed::convert::{core::convert::From<Box<str>, &'0 str>}::from]
+    Visibility: public -/
+@[rust_fun
+  "alloc::boxed::convert::{core::convert::From<Box<str>, &'0 str>}::from"]
+axiom BoxStr.Insts.CoreConvertFromShared0Str.from : Str → Result Str
 
 /-- [alloc::boxed::{impl core::convert::AsRef<T> for alloc::boxed::Box<T>}::as_ref]:
     Source: '/rustc/library/alloc/src/boxed.rs', lines 2429:4-2429:26

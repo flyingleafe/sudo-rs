@@ -46,6 +46,45 @@ structure glob.MatchOptions where
 structure common.path.SudoPath where
   inner : String
 
+/-- [sudo_rs::defaults::ListMode]
+    Source: 'src/defaults/mod.rs', lines 5:0-9:1
+    Visibility: public -/
+@[discriminant isize]
+inductive defaults.ListMode where
+| Set : defaults.ListMode
+| Add : defaults.ListMode
+| Del : defaults.ListMode
+
+/-- [sudo_rs::defaults::ListSetting]
+    Source: 'src/defaults/settings_dsl.rs', lines 166:8-166:50; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 38:0-92:1 -/
+@[discriminant isize]
+inductive defaults.ListSetting where
+| env_keep : defaults.ListSetting
+| env_check : defaults.ListSetting
+| env_delete : defaults.ListSetting
+
+/-- [sudo_rs::defaults::IntegerSetting]
+    Source: 'src/defaults/settings_dsl.rs', lines 154:8-154:52; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 38:0-92:1 -/
+@[discriminant isize]
+inductive defaults.IntegerSetting where
+| umask : defaults.IntegerSetting
+| passwd_tries : defaults.IntegerSetting
+| passwd_timeout : defaults.IntegerSetting
+| timestamp_timeout : defaults.IntegerSetting
+
+/-- [sudo_rs::defaults::TextSetting]
+    Source: 'src/defaults/settings_dsl.rs', lines 160:8-160:50; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 38:0-92:1 -/
+@[discriminant isize]
+inductive defaults.TextSetting where
+| lecture : defaults.TextSetting
+| mailerpath : defaults.TextSetting
+| runcwd : defaults.TextSetting
+| apparmor_profile : defaults.TextSetting
+| secure_path : defaults.TextSetting
+| verifypw : defaults.TextSetting
+| timestamp_type : defaults.TextSetting
+| editor : defaults.TextSetting
+
 /-- [sudo_rs::defaults::enums::timestamp_type]
     Source: 'src/defaults/settings_dsl.rs', lines 229:16-229:62; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 38:0-92:1 -/
 @[discriminant isize]
@@ -69,6 +108,62 @@ inductive defaults.enums.lecture where
 | always : defaults.enums.lecture
 | once : defaults.enums.lecture
 | never : defaults.enums.lecture
+
+/-- [sudo_rs::defaults::SettingsModifier]
+    Source: 'src/defaults/settings_dsl.rs', lines 280:8-282:9; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 38:0-92:1 -/
+@[discriminant isize]
+inductive defaults.SettingsModifier where
+| always_query_group_plugin : Bool → defaults.SettingsModifier
+| always_set_home : Bool → defaults.SettingsModifier
+| env_reset : Bool → defaults.SettingsModifier
+| fqdn : Bool → defaults.SettingsModifier
+| ignore_dot : Bool → defaults.SettingsModifier
+| lecture : defaults.enums.lecture → defaults.SettingsModifier
+| mailerpath : Option Str → defaults.SettingsModifier
+| mail_badpass : Bool → defaults.SettingsModifier
+| match_group_by_gid : Bool → defaults.SettingsModifier
+| use_pty : Bool → defaults.SettingsModifier
+| visiblepw : Bool → defaults.SettingsModifier
+| pwfeedback : Bool → defaults.SettingsModifier
+| rootpw : Bool → defaults.SettingsModifier
+| targetpw : Bool → defaults.SettingsModifier
+| noexec : Bool → defaults.SettingsModifier
+| noninteractive_auth : Bool → defaults.SettingsModifier
+| log_allowed : Bool → defaults.SettingsModifier
+| log_denied : Bool → defaults.SettingsModifier
+| insults : Bool → defaults.SettingsModifier
+| setenv : Bool → defaults.SettingsModifier
+| runcwd : Option Str → defaults.SettingsModifier
+| apparmor_profile : Option Str → defaults.SettingsModifier
+| umask : Std.U64 → defaults.SettingsModifier
+| umask_override : Bool → defaults.SettingsModifier
+| passwd_tries : Std.U64 → defaults.SettingsModifier
+| secure_path : Option Str → defaults.SettingsModifier
+| verifypw : defaults.enums.verifypw → defaults.SettingsModifier
+| passwd_timeout : Std.U64 → defaults.SettingsModifier
+| timestamp_timeout : Std.U64 → defaults.SettingsModifier
+| timestamp_type : defaults.enums.timestamp_type → defaults.SettingsModifier
+| editor : Str → defaults.SettingsModifier
+| env_editor : Bool → defaults.SettingsModifier
+| env_keep :
+  (defaults.ListMode × (alloc.vec.Vec String)) →
+  defaults.SettingsModifier
+| env_check :
+  (defaults.ListMode × (alloc.vec.Vec String)) →
+  defaults.SettingsModifier
+| env_delete :
+  (defaults.ListMode × (alloc.vec.Vec String)) →
+  defaults.SettingsModifier
+
+/-- [sudo_rs::defaults::SettingKind]
+    Source: 'src/defaults/mod.rs', lines 16:0-21:1
+    Visibility: public -/
+@[discriminant u32 [86649125,181786330,1775640520,371843127]]
+inductive defaults.SettingKind where
+| Flag : defaults.SettingsModifier → defaults.SettingKind
+| Integer : defaults.IntegerSetting → defaults.SettingKind
+| Text : defaults.TextSetting → defaults.SettingKind
+| List : defaults.ListSetting → defaults.SettingKind
 
 /-- [sudo_rs::defaults::Settings]
     Source: 'src/defaults/settings_dsl.rs', lines 235:8-237:9; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 38:0-92:1 -/
@@ -111,6 +206,46 @@ structure defaults.Settings where
     std.hash.random.RandomState alloc.alloc.Global
   env_delete : std.collections.hash.set.HashSet String
     std.hash.random.RandomState alloc.alloc.Global
+
+/-- [sudo_rs::defaults::Setting]
+    Source: 'src/defaults/settings_dsl.rs', lines 296:8-298:9; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 38:0-92:1 -/
+@[discriminant isize]
+inductive defaults.Setting where
+| always_query_group_plugin : defaults.Setting
+| always_set_home : defaults.Setting
+| env_reset : defaults.Setting
+| fqdn : defaults.Setting
+| ignore_dot : defaults.Setting
+| lecture : defaults.Setting
+| mailerpath : defaults.Setting
+| mail_badpass : defaults.Setting
+| match_group_by_gid : defaults.Setting
+| use_pty : defaults.Setting
+| visiblepw : defaults.Setting
+| pwfeedback : defaults.Setting
+| rootpw : defaults.Setting
+| targetpw : defaults.Setting
+| noexec : defaults.Setting
+| noninteractive_auth : defaults.Setting
+| log_allowed : defaults.Setting
+| log_denied : defaults.Setting
+| insults : defaults.Setting
+| setenv : defaults.Setting
+| runcwd : defaults.Setting
+| apparmor_profile : defaults.Setting
+| umask : defaults.Setting
+| umask_override : defaults.Setting
+| passwd_tries : defaults.Setting
+| secure_path : defaults.Setting
+| verifypw : defaults.Setting
+| passwd_timeout : defaults.Setting
+| timestamp_timeout : defaults.Setting
+| timestamp_type : defaults.Setting
+| editor : defaults.Setting
+| env_editor : defaults.Setting
+| env_keep : defaults.Setting
+| env_check : defaults.Setting
+| env_delete : defaults.Setting
 
 /-- [sudo_rs::exec::Umask]
     Source: 'src/exec/mod.rs', lines 54:0-61:1

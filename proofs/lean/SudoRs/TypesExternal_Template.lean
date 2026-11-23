@@ -26,6 +26,13 @@ set_option maxRecDepth 2048
 @[rust_type "core::ffi::c_str::CStr"]
 axiom core.ffi.c_str.CStr : Type
 
+/-- [core::num::error::ParseIntError]
+    Source: '/rustc/library/core/src/num/error.rs', lines 69:0-69:24
+    Name pattern: [core::num::error::ParseIntError]
+    Visibility: public -/
+@[rust_type "core::num::error::ParseIntError"]
+axiom core.num.error.ParseIntError : Type
+
 /-- [core::time::Duration]
     Source: '/rustc/library/core/src/time.rs', lines 81:0-81:19
     Name pattern: [core::time::Duration]
