@@ -48,6 +48,7 @@ pub(super) fn permissions(stream: &mut CharStream) -> Parsed<Permissions> {
 }
 
 /// A generic mapping function (only used for turning `Spec<SimpleCommand>` into `Spec<Command>`)
+#[cfg(test)]
 impl<T> Spec<T> {
     pub fn map<U>(self, f: impl Fn(T) -> U) -> Spec<U> {
         let transform = |meta| match meta {
