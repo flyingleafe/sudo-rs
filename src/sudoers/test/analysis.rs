@@ -240,22 +240,16 @@ fn run(live: bool, path: &Path, text: &str) -> Result<Vec<String>, String> {
         let mut out = Vec::new();
         IGNORED.with_borrow_mut(Vec::clear);
         let (sudoers, errors) = if live {
-            analyze_text(path, &chars)
+            Sudoers::read(text.as_bytes(), path).unwrap()
         } else {
             analyze_side(parse_sudoers(&chars))
         };
         show(&sudoers, &errors, &mut out);
-        // without rules and customisers every request is denied with the default settings
-        let requests = if sudoers.rules.is_empty()
-            && sudoers.customisers.non_cmnd.is_empty()
-            && sudoers.customisers.cmnd.is_empty()
-        {
-            &[]
-        } else {
-            REQUESTS
-        };
-        for &(user, hostname, target, command, args) in requests {
-            let (mut sudoers, _) = analyze_side(parse_sudoers(&chars));
+        let mut first = Some(sudoers);
+        for &(user, hostname, target, command, args) in REQUESTS {
+            let mut sudoers = first
+                .take()
+                .unwrap_or_else(|| analyze_side(parse_sudoers(&chars)).0);
             let user = Named(user);
             let hostname = system::Hostname::fake(hostname);
             let command = Path::new(command);

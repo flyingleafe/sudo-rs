@@ -1196,20 +1196,13 @@ fn ignored_modifiers(cur_path: &Path, modifiers: &[Modifier], diagnostics: &mut 
 }
 
 /// Append the definitions of one alias line to a table, in order.
-fn append_defs<T>(table: &mut Vec<Def<T>>, defs: Defs<T>) {
-    let mut defs = defs.into_iter();
-    let mut more = true;
-    while more {
-        match defs.next() {
-            Some(def) => table.push(def),
-            None => more = false,
-        }
-    }
+fn append_defs<T>(table: &mut Vec<Def<T>>, mut defs: Defs<T>) {
+    table.append(&mut defs);
 }
 
 /// The scope of a `Defaults!` line as commands: every command with any arguments.
 fn command_scope(specs: SpecList<SimpleCommand>) -> SpecList<Command> {
-    let mut result = Vec::new();
+    let mut result = Vec::with_capacity(specs.len());
     let mut specs = specs.into_iter();
     let mut more = true;
     while more {
@@ -1416,15 +1409,15 @@ fn include_dir_files(cur_path: &Path, path: String) -> Result<Vec<PathBuf>, Stri
     Ok(safe_files)
 }
 
-fn resolve_relative(base: &Path, path: impl AsRef<Path>) -> PathBuf {
-    if path.as_ref().is_relative() {
+fn resolve_relative(base: &Path, path: String) -> PathBuf {
+    if Path::new(&path).is_relative() {
         // there should always be a parent since we start with /etc/sudoers, and make every other path
         // absolute based on previous inputs; not having a parent is therefore a serious bug
         base.parent()
             .expect("invalid hardcoded path in sudo-rs")
             .join(path)
     } else {
-        path.as_ref().into()
+        PathBuf::from(path)
     }
 }
 
