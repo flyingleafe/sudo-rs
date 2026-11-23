@@ -26,6 +26,13 @@ set_option maxRecDepth 2048
 @[rust_type "core::ffi::c_str::CStr"]
 axiom core.ffi.c_str.CStr : Type
 
+/-- [core::mem::maybe_uninit::MaybeUninit]
+    Source: '/rustc/library/core/src/mem/maybe_uninit.rs', lines 355:0-355:24
+    Name pattern: [core::mem::maybe_uninit::MaybeUninit]
+    Visibility: public -/
+@[rust_type "core::mem::maybe_uninit::MaybeUninit"]
+axiom core.mem.maybe_uninit.MaybeUninit (T : Type _) : Type
+
 /-- [core::num::error::ParseIntError]
     Source: '/rustc/library/core/src/num/error.rs', lines 69:0-69:24
     Name pattern: [core::num::error::ParseIntError]
