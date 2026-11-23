@@ -131,9 +131,15 @@ Roots added to `Cargo.toml`: `SettingsModifier::apply`, `set`, `negate`, `check_
 | `check_integer` | Aeneas fatal: `Unimplemented`, `core::str::pattern` (from `strip_prefix` and `split_once`) | restyled `octal_mode` and `fractional_minutes`; models of `str::as_bytes`, `str::len`, `str::split_at`, `u32`/`u64::from_str_radix`, `u64::pow`, type `ParseIntError` |
 | `check_text` | extracted | model of `From<&str> for Box<str>` |
 | `build_list` | extracted | none |
+| `Settings::default` | the iterator `map` and `collect` have no Aeneas models | reserve capacity and insert the literal keys directly; model `HashSet::with_capacity` as the empty set at the three fixed capacities |
 
-All models are definitions (`proofs/lean/ASSUMPTIONS.md`). No theorem about these functions
-exists yet.
+The trusted models are documented in `proofs/lean/ASSUMPTIONS.md`. The reference settings are in
+`proofs/spec/SudoersSpec/Settings/`. In `proofs/lean/SudoRsProofs/Defaults/`, the extracted
+constructor, producers and `apply` have checked refinement theorems. The constructor's set
+fields agree by membership; `apply` agrees even on the list representation. The proof of
+`authorization_reachable_eq` uses the producer invariant to discharge `SettingsInRange` for
+states reachable from the constructor. It does not establish reachability for scoped Defaults
+or connect the settings parser to those producers.
 
 ## Table for a Lean model of the settings
 

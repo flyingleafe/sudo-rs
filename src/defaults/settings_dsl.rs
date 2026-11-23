@@ -21,7 +21,13 @@ macro_rules! referent_of {
 macro_rules! initializer_of {
     ($id:ident, true) => { true };
     ($id:ident, false) => { false };
-    ($id:ident, [ $($value: expr),* ]) => { [$($value),*].into_iter().map(|s: &str| s.to_string()).collect::<std::collections::HashSet<_>>() };
+    ($id:ident, [ $($value: expr),* ]) => {{
+        // Reserve for all entries, as collect did, without introducing iterator adapters.
+        const LEN: usize = 0 $(+ { let _ = stringify!($value); 1 })*;
+        let mut keys = std::collections::HashSet::with_capacity(LEN);
+        $(keys.insert(String::from($value));)*
+        keys
+    }};
     ($id:ident, $(=int $check: expr;)+ $value: expr) => { $value };
     ($id:ident, $(=enum $k: ident;)+ $value: ident) => { $crate::defaults::enums::$id::$value };
     ($id:ident, None) => { None };

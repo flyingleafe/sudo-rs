@@ -9,6 +9,7 @@ import SudoRsProofs.Expansion
 import SudoRsProofs.Escape
 import SudoRsProofs.Parser.Examples
 import SudoRsProofs.Parser.Grammar
+import SudoRsProofs.Defaults.Range
 
 /-!
 # Axiom audit
@@ -127,3 +128,17 @@ of `SudoRs/{Types,Funs}External.lean` are definitions or `opaque` constants, nev
 #print axioms SudoRsProofs.Parser.host_list_printed
 #print axioms SudoRsProofs.Parser.parse_lines_recovery
 #print axioms SudoRsProofs.Parser.parse_lines_refines_on
+
+#print axioms SudoRsProofs.Defaults.absDefaults_eq
+#print axioms SudoRsProofs.Defaults.apply_eq
+#print axioms SudoRsProofs.Defaults.set_eq
+#print axioms SudoRsProofs.Defaults.negate_eq
+#print axioms SudoRsProofs.Defaults.fromStrRadix_eq
+#print axioms SudoRsProofs.Defaults.fractional_minutes_run_eq
+#print axioms SudoRsProofs.Defaults.check_integer_eq
+#print axioms SudoRsProofs.Defaults.check_text_eq
+#print axioms SudoRsProofs.Defaults.build_list_eq
+#print axioms SudoRsProofs.Defaults.default_eq
+#print axioms SudoRsProofs.Defaults.initialModel_sets
+#print axioms SudoRsProofs.Defaults.reachable_inRange
+#print axioms SudoRsProofs.Defaults.authorization_reachable_eq

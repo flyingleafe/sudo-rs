@@ -289,6 +289,17 @@ axiom std.collections.hash.set.HashSetTRandomStateGlobal.new
   Result (std.collections.hash.set.HashSet T std.hash.random.RandomState
     alloc.alloc.Global)
 
+/-- [std::collections::hash::set::{std::collections::hash::set::HashSet<T, std::hash::random::RandomState, alloc::alloc::Global>}::with_capacity]:
+    Source: '/rustc/library/std/src/collections/hash/set.rs', lines 169:4-169:68
+    Name pattern: [std::collections::hash::set::{std::collections::hash::set::HashSet<@T, std::hash::random::RandomState, alloc::alloc::Global>}::with_capacity]
+    Visibility: public -/
+@[rust_fun
+  "std::collections::hash::set::{std::collections::hash::set::HashSet<@T, std::hash::random::RandomState, alloc::alloc::Global>}::with_capacity"]
+axiom std.collections.hash.set.HashSetTRandomStateGlobal.with_capacity
+  (T : Type _) :
+  Std.Usize → Result (std.collections.hash.set.HashSet T
+    std.hash.random.RandomState alloc.alloc.Global)
+
 /-- [std::collections::hash::set::{std::collections::hash::set::HashSet<T, S, A>}::insert]:
     Source: '/rustc/library/std/src/collections/hash/set.rs', lines 1034:4-1034:46
     Name pattern: [std::collections::hash::set::{std::collections::hash::set::HashSet<@T, @S, @A>}::insert]
@@ -598,12 +609,6 @@ axiom common.string.SudoString.Insts.CoreOpsDerefDerefStr.deref
     Visibility: public -/
 axiom common.string.SudoString.Insts.CoreCmpPartialEqStr.eq
   : common.string.SudoString → Str → Result Bool
-
-/-- [sudo_rs::defaults::{impl core::default::Default for sudo_rs::defaults::Settings}::default]:
-    Source: 'src/defaults/settings_dsl.rs', lines 269:12-273:13; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 39:0-93:1
-    Visibility: public -/
-axiom defaults.Settings.Insts.CoreDefaultDefault.default
-  : Result defaults.Settings
 
 /-- [sudo_rs::sudoers::char_stream::chars_of]:
     Source: 'src/sudoers/char_stream.rs', lines 95:0-97:1

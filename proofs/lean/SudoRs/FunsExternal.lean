@@ -90,6 +90,12 @@ def std.collections.hash.set.HashSetTRandomStateGlobal.new (T : Type) :
     Result (std.collections.hash.set.HashSet T std.hash.random.RandomState alloc.alloc.Global) :=
   ok []
 
+/-- `HashSet::with_capacity`: its observable set is empty, as for `new`. This model erases
+the allocation and is used only at the small constant capacities of `Settings::default`. -/
+def std.collections.hash.set.HashSetTRandomStateGlobal.with_capacity (T : Type) (_ : Usize) :
+    Result (std.collections.hash.set.HashSet T std.hash.random.RandomState alloc.alloc.Global) :=
+  std.collections.hash.set.HashSetTRandomStateGlobal.new T
+
 /-- Extensional insertion for the lawful key types used here (`usize` and `&String`).
 No caller observes the ordering of these keys. -/
 def std.collections.hash.set.HashSet.insert
@@ -412,21 +418,23 @@ def parseDigits (radix max : Nat) : List Nat → Nat → core.result.Result Nat 
       if acc * radix + x ≤ max then parseDigits radix max rest (acc * radix + x)
       else .Err .PosOverflow
 
+/-- The sign handling and digits of `from_ascii_bytes_radix_impl` on the byte values: the empty
+input is `Empty`; a lone `+` or `-` is `InvalidDigit`; one leading `+` is skipped (a leading `-`
+is not a digit of an unsigned type); then the digits. -/
+def digitsOf (radix max : Nat) : List Nat → core.result.Result Nat core.num.error.IntErrorKind
+  | [] => .Err .Empty
+  | [43] => .Err .InvalidDigit
+  | [45] => .Err .InvalidDigit
+  | 43 :: rest => parseDigits radix max rest 0
+  | bytes => parseDigits radix max bytes 0
+
 /-- `from_ascii_bytes_radix_impl` for an unsigned type (`core/src/num/mod.rs`): panics unless
-`2 ≤ radix ≤ 36`; the empty input is `Empty`; a lone `+` or `-` is `InvalidDigit`; one leading
-`+` is skipped (a leading `-` is not a digit of an unsigned type); then the digits. -/
+`2 ≤ radix ≤ 36`, then `digitsOf`. -/
 def fromStrRadix (ty : UScalarTy) (src : Str) (radix : U32) :
     Result (core.result.Result (UScalar ty) core.num.error.ParseIntError) :=
   if radix.val < 2 ∨ 36 < radix.val then fail .panic
   else
-    let digits : core.result.Result Nat core.num.error.IntErrorKind :=
-      match src.val.map (·.val) with
-      | [] => .Err .Empty
-      | [43] => .Err .InvalidDigit
-      | [45] => .Err .InvalidDigit
-      | 43 :: rest => parseDigits radix.val (UScalar.max ty) rest 0
-      | bytes => parseDigits radix.val (UScalar.max ty) bytes 0
-    match digits with
+    match digitsOf radix.val (UScalar.max ty) (src.val.map (·.val)) with
     | .Err kind => ok (.Err { kind })
     | .Ok n => do
       -- `n ≤ UScalar.max ty` by `parseDigits`, so this cannot fail
@@ -518,12 +526,6 @@ Total: `Display for ErrorKind` writes into a `String` and cannot fail; its text 
 `errorKindText`. -/
 def sudoers.fatal_message (kind : sudoers.basic_parser.ErrorKind) : Result String :=
   ok (sudo_rs.errorKindText kind)
-
-/-- [sudo_rs::defaults::{impl Default for Settings}::default], kept opaque for Charon: the
-initializers of the list settings (`[..].into_iter().map(..).collect::<HashSet<_>>()` in
-`initializer_of!`, `src/defaults/settings_dsl.rs`) have no Aeneas model. Opaque (no axiom): a
-theorem about the settings in force starts from `Settings::default()` as a hypothesis. -/
-opaque defaults.Settings.Insts.CoreDefaultDefault.default : Result defaults.Settings
 
 /-- [alloc::boxed::{impl Default for Box<[T]>}::default]: the empty slice; boxes are erased. -/
 def BoxSlice.Insts.CoreDefaultDefault.default (T : Type _) : Result (Slice T) :=
