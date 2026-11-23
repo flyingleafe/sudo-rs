@@ -58,3 +58,4 @@ import SudoRsProofs.Parser.DefaultsParse.Main
 import SudoRsProofs.Parser.Scoping.Functions
 import SudoRsProofs.Parser.Scoping.Clone
 import SudoRsProofs.Parser.Scoping.Check
+import SudoRsProofs.Parser.Directives.Main
