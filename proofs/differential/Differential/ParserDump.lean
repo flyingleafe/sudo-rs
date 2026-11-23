@@ -15,6 +15,8 @@ namespace Differential.ParserDump
 open SudoersSpec SudoersSpec.Syntax
 open Differential.Quote (quote)
 
+def formatHeader : String := "parser-dump 2"
+
 def list (f : α → String) (l : List α) : String := "[" ++ " ".intercalate (l.map f) ++ "]"
 def span (s : Span) : String := s!"{s.start.1}:{s.start.2}-{s.stop.1}:{s.stop.2}"
 
@@ -77,51 +79,36 @@ def scope : ConfigScope → String
   | .runAs l => s!"(runas {specList user l})"
   | .command l => s!"(command {specList quote l})"
 
-/-! ## Settings (DUMP.md section 3), on the shared model `SudoersSpec.Settings` -/
+/-! ## Settings modifiers (DUMP.md section 3) -/
 
-/-- `[(name value) ...]` of `Settings::dump_fields`. -/
-def fields (s : Settings.Settings) : String :=
-  "[" ++ " ".intercalate (s.dumpFields.map fun (n, v) => s!"({n} {v})") ++ "]"
+def listMode : Settings.ListMode → String
+  | .Set => "set"
+  | .Add => "add"
+  | .Del => "del"
 
-/-- How base B sets a field (`BASE_B` in `parser_dump.rs`). -/
-inductive BaseB where
-  | flag
-  | negate
-  | text (v : String)
-  | integer (v : String)
-  | list (v : List String)
-
-def baseBTable : List (String × BaseB) :=
-  [("always_query_group_plugin", .flag), ("always_set_home", .flag), ("env_reset", .negate),
-   ("fqdn", .flag), ("ignore_dot", .negate), ("lecture", .text "always"),
-   ("mailerpath", .text "/b/mailer"), ("mail_badpass", .negate), ("match_group_by_gid", .flag),
-   ("use_pty", .negate), ("visiblepw", .flag), ("pwfeedback", .negate), ("rootpw", .flag),
-   ("targetpw", .flag), ("noexec", .flag), ("noninteractive_auth", .flag),
-   ("log_allowed", .negate), ("log_denied", .negate), ("insults", .flag), ("setenv", .flag),
-   ("runcwd", .text "/b/cwd"), ("apparmor_profile", .text "b_profile"),
-   ("umask", .integer "077"), ("umask_override", .flag), ("passwd_tries", .integer "7"),
-   ("secure_path", .text "/b/bin"), ("verifypw", .text "any"), ("passwd_timeout", .integer "2"),
-   ("timestamp_timeout", .integer "3"), ("timestamp_type", .text "ppid"),
-   ("editor", .text "/b/editor"), ("env_editor", .negate), ("env_keep", .list ["B_KEEP"]),
-   ("env_check", .list ["B_CHECK"]), ("env_delete", .list ["B_DELETE"])]
-
-/-- Base B: base A with the modifiers of `baseBTable` applied in order. -/
-def baseB : Settings.Settings :=
-  baseBTable.foldl (fun s (name, how) =>
-    let m : Option Settings.SettingsModifier := match how, Settings.set name with
-      | .negate, _ => Settings.negate name
-      | .flag, some (.Flag f) => some f
-      | .text v, some (.Text t) => Settings.checkText t v
-      | .integer v, some (.Integer i) => Settings.checkInteger i v
-      | .list v, some (.List l) => some (Settings.buildList l .Set v)
-      | _, _ => none
-    match m with
-    | some m => m.apply s
-    | none => s) Settings.Settings.default
-
-/-- A settings modifier, by its effect on base A and base B. -/
+/-- The setting name and exact parsed payload, without applying the modifier. -/
 def setting (m : Settings.SettingsModifier) : String :=
-  s!"(setting {fields (m.apply Settings.Settings.default)} {fields (m.apply baseB)})"
+  s!"(setting {m.setting.name} {payload m})"
+where
+  payload : Settings.SettingsModifier → String
+    | .always_query_group_plugin v | .always_set_home v | .env_reset v | .fqdn v | .ignore_dot v
+    | .mail_badpass v | .match_group_by_gid v | .use_pty v | .visiblepw v | .pwfeedback v
+    | .rootpw v | .targetpw v | .noexec v | .noninteractive_auth v | .log_allowed v | .log_denied v
+    | .insults v | .setenv v | .umask_override v | .env_editor v => Settings.dumpBool v
+    | .umask v | .passwd_tries v | .passwd_timeout v | .timestamp_timeout v => toString v
+    | .lecture v => v.dump
+    | .verifypw v => v.dump
+    | .timestamp_type v => Settings.dumpTimestampType v
+    | .editor v => quote v
+    | .mailerpath v | .runcwd v | .apparmor_profile v | .secure_path v =>
+        match v with
+        | none => "none"
+        | some s => s!"(some {quote s})"
+    | .env_keep (mode, items) | .env_check (mode, items) | .env_delete (mode, items) =>
+        s!"({listMode mode} {list quote items})"
+
+#guard setting (.mailerpath none) == "(setting mailerpath none)"
+#guard setting (.mailerpath (some "")) == "(setting mailerpath (some \"\"))"
 
 def sudo : Sudo → String
   | .spec p => s!"(spec {specList user p.users} {list perm p.permissions})"

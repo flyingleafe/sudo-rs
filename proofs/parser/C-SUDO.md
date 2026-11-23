@@ -4,6 +4,7 @@ Evidence kind: test. The numbers below hold for the corpus they were measured on
 cases per category, 5,824 cases) and for nothing else. The comparison is between the legacy
 sudo-rs parser (`parse_lines::<Sudo>` at `70fdb56b`, read through the dump of `DUMP.md`) and the
 sudoers parser of C sudo 1.9.18, at the level both expose.
+All reported counts use the historical v1 dump, not the current v2 format.
 
 ## 1. Method
 
@@ -24,8 +25,8 @@ text to `sudoers` in a private directory and runs, with `LC_ALL=C`:
 `parse_lines`; each iteration starts at a physical line, which is reconstructed from the spans
 and the rules of `parse_lines` (after an error the rest of the physical line is skipped; a
 comment or newline at the stopping point is consumed; otherwise the next iteration reads the
-newline as a comment). The reconstruction is checked against the records: 0 inconsistencies on
-the corpus.
+newline as a comment). The reconstruction is checked against the records; the historical
+run had 0 inconsistencies.
 
 **Lines.** Both sides are mapped to logical lines: physical lines joined where a line ends in a
 backslash and optional blanks outside a comment, which is C sudo's continuation rule. A logical
@@ -35,10 +36,11 @@ logical line is one difference.
 
 **Content.** Where both accept the whole file, the entries are compared as multisets: rules as
 (users, hosts, commands with their argument semantics), the members of each alias, and each
-`Defaults` line as (binding, setting names). sudo-rs setting names are the fields a modifier
-changes on base A or base B (`DUMP.md` section 3). Not compared: tags, options and runas lists
-of rules (C attaches them per command group, sudo-rs per entry), setting values, and whether a
-binding is `:` or `>` (the JSON does not record it).
+`Defaults` line as (binding, setting names). With dump v2, the comparator takes each name
+directly from the parsed modifier (`DUMP.md` section 3); the historical v1 run inferred names
+from fields changed on either of two fixed bases. Neither version compares tags, options
+and runas lists of rules (C attaches them per command group, sudo-rs per entry), setting
+values or list modes, or whether a binding is `:` or `>` (the JSON does not record it).
 
 **Classification.** Each difference gets the first matching rule of `parser_compare.py`, in this
 order:
@@ -81,7 +83,7 @@ inputs of PLAN.md, 5,824 cases.
 sudo-rs panicked on none of them. One case names an existing host path outside the fixture
 (`<OUT>.hostdep`).
 
-## 3. Results
+## 3. Historical results (dump v1)
 
 | sudo-rs | C sudo (`visudo -c`) | Cases |
 |---|---|---|
@@ -204,9 +206,10 @@ entries.
 | token class: C stops at `,`, `=`, `s` (2 each), `#`, `)`, `a` (1 each) where sudo-rs continues | 9 | 9 |
 | token class: end of line (sudo-rs stops) | 1 | 1 |
 
-"Defaults: list removal without effect on either settings base" is a limit of the comparison,
-not of either parser: such a removal leaves both settings bases unchanged, so the dump does not
-name the setting (`DUMP.md` section 3).
+The listed Defaults category is an observation of the v1 dump: a modifier whose effect
+left both fixed bases unchanged did not reveal its setting name. Version 2 records the
+name directly and no longer needs this classification. The counts above are unchanged
+historical observations.
 
 ## 4. PLAN.md section 3.3 and findings F-P1 to F-P6
 

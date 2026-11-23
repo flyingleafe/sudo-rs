@@ -1,9 +1,7 @@
-//! Canonical text dump of the legacy parser `parse_lines::<Sudo>`.
+//! Canonical text dump of `parse_lines::<Sudo>`.
 //!
-//! The format, the escaping rule, the two settings bases, the character-class table and the
-//! corpus conventions are specified in `proofs/parser/DUMP.md`; keep the two in step. The dump is
-//! a contract with the Lean reference parser (which prints the same format) and with the
-//! restyled parser (which must produce the same dump as the legacy one).
+//! The format, the escaping rule, the character-class table and the corpus conventions are
+//! specified in `proofs/parser/DUMP.md`; keep the Rust and Lean observers in step.
 
 use std::fmt::Write as _;
 use std::io::Write as _;
@@ -13,33 +11,15 @@ use super::super::ast::*;
 use super::super::basic_parser::{Span, Status, parse_lines};
 use super::super::char_stream::CharStream;
 use super::super::tokens::*;
-use crate::defaults::{self, ListMode, SettingKind, Settings, SettingsModifier};
+use crate::defaults::SettingsModifier;
+
+pub(super) use crate::defaults::quote_for_dump as quote;
 
 /// Root of the file-system fixture used by the `fixture` corpus category.
 pub(super) const FIXTURE_ROOT: &str = "/tmp/sudo-rs-parser-dump-fixture";
 
 /// Command-path prefix of the generated corpus; it must not exist on the host.
 pub(super) const ABSENT_PREFIX: &str = "/sudoers-nx";
-
-/// Quoted string: `"` + escaped characters + `"`. Printable ASCII (U+0020 to U+007E) other than
-/// `"` and `\` is written as is; `"` and `\` are written as `\"` and `\\`; every other code point
-/// as `\u{h}` with `h` its lowercase hexadecimal value without leading zeros.
-pub(super) fn quote(s: &str) -> String {
-    let mut out = String::with_capacity(s.len() + 2);
-    out.push('"');
-    for c in s.chars() {
-        match c {
-            '"' => out.push_str("\\\""),
-            '\\' => out.push_str("\\\\"),
-            ' '..='~' => out.push(c),
-            _ => {
-                let _ = write!(out, "\\u{{{:x}}}", c as u32);
-            }
-        }
-    }
-    out.push('"');
-    out
-}
 
 /// Inverse of [quote] on its image: decodes one quoted string at the start of `s` and returns it
 /// with the remaining input.
@@ -195,148 +175,54 @@ fn scope(s: &ConfigScope) -> String {
     }
 }
 
-/// How base B sets one field away from its default (see `DUMP.md`, "Settings bases").
-enum BaseB {
-    Flag,
-    Negate,
-    Text(&'static str),
-    Integer(&'static str),
-    List(&'static [&'static str]),
-}
-
-/// Base B, in field declaration order: every field differs from `Settings::default()`.
-const BASE_B: &[(&str, BaseB)] = &[
-    ("always_query_group_plugin", BaseB::Flag),
-    ("always_set_home", BaseB::Flag),
-    ("env_reset", BaseB::Negate),
-    ("fqdn", BaseB::Flag),
-    ("ignore_dot", BaseB::Negate),
-    ("lecture", BaseB::Text("always")),
-    ("mailerpath", BaseB::Text("/b/mailer")),
-    ("mail_badpass", BaseB::Negate),
-    ("match_group_by_gid", BaseB::Flag),
-    ("use_pty", BaseB::Negate),
-    ("visiblepw", BaseB::Flag),
-    ("pwfeedback", BaseB::Negate),
-    ("rootpw", BaseB::Flag),
-    ("targetpw", BaseB::Flag),
-    ("noexec", BaseB::Flag),
-    ("noninteractive_auth", BaseB::Flag),
-    ("log_allowed", BaseB::Negate),
-    ("log_denied", BaseB::Negate),
-    ("insults", BaseB::Flag),
-    ("setenv", BaseB::Flag),
-    ("runcwd", BaseB::Text("/b/cwd")),
-    ("apparmor_profile", BaseB::Text("b_profile")),
-    ("umask", BaseB::Integer("077")),
-    ("umask_override", BaseB::Flag),
-    ("passwd_tries", BaseB::Integer("7")),
-    ("secure_path", BaseB::Text("/b/bin")),
-    ("verifypw", BaseB::Text("any")),
-    ("passwd_timeout", BaseB::Integer("2")),
-    ("timestamp_timeout", BaseB::Integer("3")),
-    ("timestamp_type", BaseB::Text("ppid")),
-    ("editor", BaseB::Text("/b/editor")),
-    ("env_editor", BaseB::Negate),
-    ("env_keep", BaseB::List(&["B_KEEP"])),
-    ("env_check", BaseB::List(&["B_CHECK"])),
-    ("env_delete", BaseB::List(&["B_DELETE"])),
-];
-
-fn base_b() -> Settings {
-    let mut settings = Settings::default();
-    for (name, how) in BASE_B {
-        let modifier: SettingsModifier = match (how, defaults::set(name)) {
-            (BaseB::Negate, _) => defaults::negate(name).expect("negatable"),
-            (BaseB::Flag, Some(SettingKind::Flag(f))) => f,
-            (BaseB::Text(v), Some(SettingKind::Text(s))) => {
-                defaults::check_text(s, v).expect("valid text")
-            }
-            (BaseB::Integer(v), Some(SettingKind::Integer(s))) => {
-                defaults::check_integer(s, v).expect("valid integer")
-            }
-            (BaseB::List(v), Some(SettingKind::List(s))) => {
-                defaults::build_list(s, ListMode::Set, v.iter().map(|s| s.to_string()).collect())
-            }
-            _ => panic!("base B: wrong kind for {name}"),
-        };
-        modifier.apply(&mut settings);
-    }
-    settings
-}
-
-fn fields(settings: &Settings) -> String {
-    let fields: Vec<String> = settings
-        .dump_fields()
-        .into_iter()
-        .map(|(name, value)| format!("({name} {value})"))
-        .collect();
-    format!("[{}]", fields.join(" "))
-}
-
-/// A settings modifier, by its effect on base A (`Settings::default()`) and on base B.
-fn setting(on_a: SettingsModifier, on_b: SettingsModifier) -> String {
-    let mut a = Settings::default();
-    on_a.apply(&mut a);
-    let mut b = base_b();
-    on_b.apply(&mut b);
-    format!("(setting {} {})", fields(&a), fields(&b))
-}
-
-fn sudo(item: Sudo, second: &mut impl Iterator<Item = SettingsModifier>) -> String {
+fn sudo(item: &Sudo) -> String {
     match item {
         Sudo::Spec(PermissionSpec { users, permissions }) => {
-            format!("(spec {} {})", spec_list(&users, user), list(&permissions, perm))
+            format!(
+                "(spec {} {})",
+                spec_list(users, user),
+                list(permissions, perm)
+            )
         }
-        Sudo::Decl(Directive::UserAlias(d)) => format!("(user_alias {})", defs(&d, user)),
-        Sudo::Decl(Directive::HostAlias(d)) => format!("(host_alias {})", defs(&d, host)),
-        Sudo::Decl(Directive::CmndAlias(d)) => format!("(cmnd_alias {})", defs(&d, command)),
-        Sudo::Decl(Directive::RunasAlias(d)) => format!("(runas_alias {})", defs(&d, user)),
+        Sudo::Decl(Directive::UserAlias(d)) => format!("(user_alias {})", defs(d, user)),
+        Sudo::Decl(Directive::HostAlias(d)) => format!("(host_alias {})", defs(d, host)),
+        Sudo::Decl(Directive::CmndAlias(d)) => format!("(cmnd_alias {})", defs(d, command)),
+        Sudo::Decl(Directive::RunasAlias(d)) => format!("(runas_alias {})", defs(d, user)),
         Sudo::Decl(Directive::Defaults(mods, s)) => {
-            let settings: Vec<String> = mods
-                .into_iter()
-                .map(|m| setting(m, second.next().expect("deterministic parse")))
-                .collect();
-            format!("(defaults {} [{}])", scope(&s), settings.join(" "))
+            format!(
+                "(defaults {} {})",
+                scope(s),
+                list(mods, SettingsModifier::dump_modifier)
+            )
         }
-        Sudo::Include(path, s) => format!("(include {} {})", quote(&path), span(&s)),
-        Sudo::IncludeDir(path, s) => format!("(includedir {} {})", quote(&path), span(&s)),
+        Sudo::Include(path, s) => format!("(include {} {})", quote(path), span(s)),
+        Sudo::IncludeDir(path, s) => format!("(includedir {} {})", quote(path), span(s)),
         #[cfg(feature = "unstable-remote-sudoers")]
         Sudo::Remote(path, PeerSpec { user, group }, s) => {
             let group = match group {
                 None => "none".to_string(),
-                Some(g) => format!("(some {})", ident(&g)),
+                Some(g) => format!("(some {})", ident(g)),
             };
             format!(
                 "(remote {} (peer {} {group}) {})",
-                quote(&path),
-                ident(&user),
-                span(&s)
+                quote(path),
+                ident(user),
+                span(s)
             )
         }
         Sudo::LineComment => "comment".to_string(),
     }
 }
 
-/// Dump of two parses of the same text: everything is taken from `first`, except that each
-/// settings modifier of `first` is applied to base A and its counterpart in `second` to base B.
-fn dump_items(first: Vec<Result<Sudo, Status>>, second: Vec<Result<Sudo, Status>>) -> String {
-    let mut second = second
-        .into_iter()
-        .flat_map(|item| match item {
-            Ok(Sudo::Decl(Directive::Defaults(mods, _))) => mods,
-            _ => Vec::new(),
-        })
-        .collect::<Vec<_>>()
-        .into_iter();
+fn dump_items(items: &[Result<Sudo, Status>]) -> String {
     let mut out = String::new();
-    for item in first {
+    for item in items {
         match item {
             Ok(item) => {
-                let _ = writeln!(out, "ok {}", sudo(item, &mut second));
+                let _ = writeln!(out, "ok {}", sudo(item));
             }
             Err(Status::Fatal(s, msg)) => {
-                let _ = writeln!(out, "fatal {} {}", span(&s), quote(&msg.to_string()));
+                let _ = writeln!(out, "fatal {} {}", span(s), quote(&msg.to_string()));
             }
             Err(Status::Reject) => out.push_str("reject\n"),
         }
@@ -346,17 +232,19 @@ fn dump_items(first: Vec<Result<Sudo, Status>>, second: Vec<Result<Sudo, Status>
 
 /// The dump of `text`: one line per item returned by `parse_lines::<Sudo>`, in order.
 pub(super) fn dump(text: &str) -> String {
-    CharStream::with_text(text, |cursor| {
-        let first = parse_lines::<Sudo>(&mut cursor.clone());
-        let second = parse_lines::<Sudo>(cursor);
-        dump_items(first, second)
-    })
+    dump_items(&CharStream::with_text(text, parse_lines::<Sudo>))
 }
 
-/// [dump], with a panic of the parser recorded as the single line `panic <quoted message>`.
-pub(super) fn dump_catching(text: &str) -> String {
-    match std::panic::catch_unwind(|| dump(text)) {
-        Ok(out) => out,
+/// Dump and report host-dependent paths from the same parse, or only a panic record.
+fn dump_catching(text: &str, on_host_path: impl FnMut(&str)) -> String {
+    match std::panic::catch_unwind(|| {
+        let items = CharStream::with_text(text, parse_lines::<Sudo>);
+        (dump_items(&items), items)
+    }) {
+        Ok((out, items)) => {
+            host_paths(&items, on_host_path);
+            out
+        }
         Err(payload) => {
             let msg = if let Some(s) = payload.downcast_ref::<&str>() {
                 s.to_string()
@@ -370,11 +258,19 @@ pub(super) fn dump_catching(text: &str) -> String {
     }
 }
 
-/// Command patterns of the accepted items of `text` that name an existing path outside the
-/// fixture root: evidence that `SimpleCommand::construct` canonicalized against the host.
-fn host_paths(text: &str) -> Vec<String> {
-    let mut patterns = Vec::new();
-    let mut push_cmd = |c: &SimpleCommand| patterns.push(c.as_str().to_string());
+/// Report command patterns naming an existing path outside the fixture root: evidence that
+/// `SimpleCommand::construct` canonicalized against the host.
+fn host_paths(items: &[Result<Sudo, Status>], mut on_host_path: impl FnMut(&str)) {
+    let mut push_cmd = |c: &SimpleCommand| {
+        let pattern = c.as_str();
+        let path = pattern.strip_suffix("/*").unwrap_or(pattern);
+        if path.starts_with('/')
+            && !path.starts_with(FIXTURE_ROOT)
+            && std::fs::metadata(path).is_ok()
+        {
+            on_host_path(pattern);
+        }
+    };
     let commands = |l: &[Spec<Command>], push: &mut dyn FnMut(&SimpleCommand)| {
         for s in l {
             if let Qualified::Allow(Meta::Only((c, _))) | Qualified::Forbid(Meta::Only((c, _))) = s
@@ -383,25 +279,22 @@ fn host_paths(text: &str) -> Vec<String> {
             }
         }
     };
-    for item in CharStream::with_text(text, parse_lines::<Sudo>)
-        .into_iter()
-        .flatten()
-    {
+    for item in items.iter().filter_map(|item| item.as_ref().ok()) {
         match item {
             Sudo::Spec(PermissionSpec { permissions, .. }) => {
-                for (_, entries) in &permissions {
+                for (_, entries) in permissions {
                     for (_, CommandSpec(_, cmd)) in entries {
                         commands(std::slice::from_ref(cmd), &mut push_cmd);
                     }
                 }
             }
             Sudo::Decl(Directive::CmndAlias(d)) => {
-                for Def(_, items) in &d {
+                for Def(_, items) in d {
                     commands(items, &mut push_cmd);
                 }
             }
             Sudo::Decl(Directive::Defaults(_, ConfigScope::Command(l))) => {
-                for s in &l {
+                for s in l {
                     if let Qualified::Allow(Meta::Only(c)) | Qualified::Forbid(Meta::Only(c)) = s {
                         push_cmd(c);
                     }
@@ -410,15 +303,6 @@ fn host_paths(text: &str) -> Vec<String> {
             _ => {}
         }
     }
-    patterns
-        .into_iter()
-        .filter(|p| {
-            let path = p.strip_suffix("/*").unwrap_or(p);
-            path.starts_with('/')
-                && !path.starts_with(FIXTURE_ROOT)
-                && std::fs::metadata(path).is_ok()
-        })
-        .collect()
 }
 
 /// Create the documented tree once. On reuse, verify its layout without writing into it.
@@ -526,7 +410,7 @@ fn read_corpus(path: &Path) -> Vec<(String, String)> {
 /// Writes the dump of a corpus. Does nothing unless `SUDO_PARSER_DUMP_CORPUS` is set.
 ///
 /// - `SUDO_PARSER_DUMP_CORPUS`: corpus file or directory (see [read_corpus]).
-/// - `SUDO_PARSER_DUMP_OUT`: output file; per case the line `case <label>`, then its dump.
+/// - `SUDO_PARSER_DUMP_OUT`: versioned output file; per case `case <label>`, then its dump.
 ///   Next to it, `<OUT>.hostdep` lists `<label> <quoted pattern>` for every command pattern that
 ///   names an existing host path outside the fixture root.
 #[test]
@@ -548,17 +432,15 @@ fn dump_corpus() {
     let cases = read_corpus(Path::new(&corpus));
     let hook = std::panic::take_hook();
     std::panic::set_hook(Box::new(|_| {}));
-    let mut dump_text = String::new();
+    let mut dump_text = String::from("parser-dump 2\n");
     let mut hostdep = String::new();
     let mut panics = 0usize;
     for (label, text) in &cases {
-        let d = dump_catching(text);
+        let d = dump_catching(text, |p| {
+            let _ = writeln!(hostdep, "{label} {}", quote(p));
+        });
         if d.starts_with("panic ") {
             panics += 1;
-        } else {
-            for p in host_paths(text) {
-                let _ = writeln!(hostdep, "{label} {}", quote(&p));
-            }
         }
         let _ = writeln!(dump_text, "case {label}");
         dump_text.push_str(&d);
@@ -568,17 +450,6 @@ fn dump_corpus() {
     let mut hostdep_path = out.clone();
     hostdep_path.push(".hostdep");
     std::fs::write(hostdep_path, hostdep).expect("write hostdep");
-    let mut bases_path = out.clone();
-    bases_path.push(".bases");
-    std::fs::write(
-        bases_path,
-        format!(
-            "a {}\nb {}\n",
-            fields(&Settings::default()),
-            fields(&base_b())
-        ),
-    )
-    .expect("write bases");
     let _ = writeln!(
         std::io::stderr(),
         "parser dump: {} cases, {panics} panics",
@@ -645,36 +516,43 @@ fn quote_round_trip() {
 }
 
 #[test]
-fn base_b_differs_from_default_everywhere() {
-    let a = Settings::default().dump_fields();
-    let b = base_b().dump_fields();
-    assert_eq!(a.len(), BASE_B.len());
-    for ((name_a, va), ((name_b, vb), (name, _))) in a.iter().zip(b.iter().zip(BASE_B)) {
-        assert_eq!(name_a, name_b);
-        assert_eq!(name_a, name);
-        assert_ne!(va, vb, "{name} equal in both bases");
-    }
-}
-
-#[test]
 fn dump_is_deterministic() {
     let text = "Defaults env_keep += \"A B\", !use_pty\nalice ALL = (root) NOPASSWD: /bin/x\n";
     assert_eq!(dump(text), dump(text));
 }
 
 #[test]
-fn dump_defaults_setting_by_effect() {
-    let mut a = Settings::default();
-    defaults::negate("use_pty").unwrap().apply(&mut a);
-    let mut b = base_b();
-    defaults::negate("use_pty").unwrap().apply(&mut b);
+fn dump_defaults_setting_by_payload() {
+    // These removals had the same dump in v1: neither name was in either fixed base.
+    assert_dump(
+        "Defaults env_keep -= DUMP_A\nDefaults env_keep -= DUMP_B\n",
+        &[
+            r#"ok (defaults generic [(setting env_keep (del ["DUMP_A"]))])"#,
+            r#"ok (defaults generic [(setting env_keep (del ["DUMP_B"]))])"#,
+        ],
+    );
+    assert_dump(
+        concat!(
+            "Defaults env_check = \"B A B\"\n",
+            "Defaults env_check += \"B A B\"\n",
+            "Defaults env_check += \"A B B\"\n",
+            "Defaults !mailerpath, !env_delete\n",
+            "Defaults !use_pty, lecture=once, umask=077, editor=\"a b\"\n",
+        ),
+        &[
+            r#"ok (defaults generic [(setting env_check (set ["B" "A" "B"]))])"#,
+            r#"ok (defaults generic [(setting env_check (add ["B" "A" "B"]))])"#,
+            r#"ok (defaults generic [(setting env_check (add ["A" "B" "B"]))])"#,
+            r#"ok (defaults generic [(setting mailerpath none) (setting env_delete (set []))])"#,
+            concat!(
+                "ok (defaults generic [(setting use_pty false) (setting lecture once) ",
+                "(setting umask 63) (setting editor \"a b\")])",
+            ),
+        ],
+    );
     assert_eq!(
-        dump("Defaults!/sudoers-nx/x !use_pty\n"),
-        format!(
-            "ok (defaults (command [(allow (only \"/sudoers-nx/x\"))]) [(setting {} {})])\n",
-            fields(&a),
-            fields(&b)
-        )
+        SettingsModifier::mailerpath(Some("".into())).dump_modifier(),
+        r#"(setting mailerpath (some ""))"#,
     );
 }
 

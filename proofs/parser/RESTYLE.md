@@ -230,12 +230,12 @@ Fuzz smoke run: `parser_equiv` built with `fuzz/run.sh build parser_equiv`, seed
 no difference, no crash. The campaign belongs on the cluster:
 `FUZZ_SECONDS=1800 fuzz/run.sh campaign parser_equiv`.
 
-Dump comparison (`proofs/parser/DUMP.md` section 6, the dump agent's harness): the corpus of
+Historical dump comparison (v1; `proofs/parser/DUMP.md`): the corpus of
 `parser corpus 20260101 25` (749 cases: every grammar, mutation and `known` category) dumped by
 `SUDO_PARSER_DUMP_CORPUS=… SUDO_PARSER_DUMP_OUT=… cargo test --lib sudoers::test::parser_dump::`
-at the merge base (`b6a9bbdb`) and at this head is **byte-identical** — 3,153 dump lines, and the
-`.bases` and chartable outputs too. This compares the *live* parser before and after the rewrite
-on the dump's own corpus, independently of `equiv.rs`.
+at the merge base (`b6a9bbdb`) and at the restyle revision was **byte-identical** — 3,153 dump
+lines, plus the v1 `.bases` and chartable outputs. This compared the live parser before and after the
+rewrite independently of `equiv.rs`, with settings observed only by their effect on two bases.
 
 The existing unit tests pass unchanged, apart from `assert_remote_failure` (feature
 `unstable-remote-sudoers`, compares the rendered kind) and the test-only `impl Token for

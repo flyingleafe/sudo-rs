@@ -296,6 +296,22 @@ macro_rules! defaults {
             }
         }
 
+        #[cfg(test)]
+        pub(crate) use $crate::defaults::settings_dsl::dump_quoted as quote_for_dump;
+
+        #[cfg(test)]
+        impl SettingsModifier {
+            /// A parsed modifier's setting name and payload, without applying it.
+            pub(crate) fn dump_modifier(&self) -> String {
+                use $crate::defaults::settings_dsl::DumpValue;
+                match self {
+                    $(Self::$name(value) => format!(
+                        "(setting {} {})", stringify!($name), value.dump_value()
+                    ),)*
+                }
+            }
+        }
+
         /// Every setting.
         #[allow(non_camel_case_types)]
         #[derive(Clone, Copy)]
@@ -447,6 +463,29 @@ impl DumpValue for std::collections::HashSet<String> {
         items.sort();
         let items: Vec<String> = items.into_iter().map(|s| dump_quoted(s)).collect();
         format!("[{}]", items.join(" "))
+    }
+}
+
+#[cfg(test)]
+impl DumpValue for (super::ListMode, Vec<String>) {
+    fn dump_value(&self) -> String {
+        use super::ListMode;
+
+        let (mode, items) = self;
+        let mode = match mode {
+            ListMode::Set => "set",
+            ListMode::Add => "add",
+            ListMode::Del => "del",
+        };
+        let mut out = format!("({mode} [");
+        for (i, item) in items.iter().enumerate() {
+            if i != 0 {
+                out.push(' ');
+            }
+            out.push_str(&dump_quoted(item));
+        }
+        out.push_str("])");
+        out
     }
 }
 

@@ -55,6 +55,7 @@ def main (args : List String) : IO UInt32 := do
       | .error e => throw (IO.userError s!"chartable: {e}")
     let O := ParserOracles.oracles char Quote.quote
     let out ← IO.getStdout
+    out.putStrLn ParserDump.formatHeader
     for c in ← ParserCSudo.readCorpus corpus do
       out.putStr s!"case {c.label}\n{ParserDump.dump O c.text}"
     return 0

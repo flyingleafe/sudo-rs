@@ -9,7 +9,7 @@
 # Environment: PARSER_SCRATCH (default /tmp/sudo-parser-p0) holds the corpus, the outputs, the
 # cargo target dir (CARGO_TARGET_DIR overrides) and the C build (CSUDO_BUILD overrides);
 # JOBS (default 4) parallel C workers; SUDO_SRC the sudo 1.9.18 sources (default /tmp/fi/src/sudo).
-# Outputs in $PARSER_SCRATCH: corpus.txt, sudo-rs.dump (+ .hostdep, .bases), chartable.txt,
+# Outputs in $PARSER_SCRATCH: corpus.txt, sudo-rs.dump (+ .hostdep), chartable.txt,
 # c-sudo.out, differences.tsv, report.md.
 set -euo pipefail
 

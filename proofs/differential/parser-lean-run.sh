@@ -7,7 +7,7 @@
 #
 # N cases per corpus category and per mutation operator (default 200), for each SEED (default 1).
 # Environment: PARSER_SCRATCH (default /tmp/sudo-parser-p0-lean) holds, per seed, corpus.txt,
-# sudo-rs.dump (+ .hostdep, .bases), chartable.txt, lean.dump, differences.txt, report.md; and the
+# sudo-rs.dump (+ .hostdep), chartable.txt, lean.dump, differences.txt, report.md; and the
 # cargo target dir (CARGO_TARGET_DIR overrides). Exit status 1 if a case disagrees.
 set -euo pipefail
 

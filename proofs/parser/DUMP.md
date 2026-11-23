@@ -1,18 +1,18 @@
 # Parser dump: format, conventions, harness
 
-Stage P0 of `PLAN.md`. The dump is a canonical text rendering of what the legacy parser
-(`parse_lines::<Sudo>` at `70fdb56b`) returns for a sudoers text. It is a contract between three
-producers:
-
-1. the legacy parser, through `src/sudoers/test/parser_dump.rs` (`cfg(test)`);
-2. the Lean reference parser (`Syntax.parseLines`), through a Lean printer of the same format;
-3. the restyled Rust parser, which must produce the same dump as the legacy one.
+Stage P0 of `PLAN.md`. The current parser dump is a canonical text rendering of what
+`parse_lines::<Sudo>` returns for a sudoers text. It is a contract between the Rust parser,
+through `src/sudoers/test/parser_dump.rs` (`cfg(test)`), and the Lean reference parser
+(`Syntax.parseSudoersWith`), through a Lean printer of the same format.
 
 Two dumps of the same text are compared byte for byte. Evidence kind: test (only the inputs run).
 
-## 1. Format
+## 1. Format (version 2)
 
 ASCII, one record per line, one record per item of the vector `parse_lines` returns, in order.
+Corpus files start with `parser-dump 2` on its own line, then each case starts with a
+`case <label>` line. The comparators reject a missing or different header and a file with no
+cases. Individual case dumps do not have headers.
 Grammar (EBNF; `" "` is one space, `"\n"` one line feed; nothing else is whitespace):
 
 ```
@@ -53,11 +53,9 @@ scope      = "generic"
            | "(user " list(spec(user)) ")"
            | "(runas " list(spec(user)) ")"
            | "(command " list(spec(simplecmd)) ")" ;
-setting    = "(setting " fields " " fields ")" ;
-fields     = "[" field { " " field } "]" ;          (* all 35 fields, section 3 *)
-field      = "(" fieldname " " value ")" ;
-value      = "true" | "false" | nat | enumname | string | "none" | "(some " string ")"
-           | "[" [ string { " " string } ] "]" ;
+setting    = "(setting " settingname " " payload ")" ;
+payload    = "true" | "false" | nat | enumname | string | "none" | "(some " string ")"
+           | "(" ("set" | "add" | "del") " " list(string) ")" ;
 
 span       = nat ":" nat "-" nat ":" nat ;          (* start line:col - end line:col, 1-based *)
 nat        = "0" | digit1-9 { digit } ;             (* decimal *)
@@ -85,10 +83,10 @@ Mapping from the AST (`src/sudoers/ast.rs`, `tokens.rs`):
 | `Err(Status::Reject)` | `reject` (not produced by `parse_lines`, which turns a rejection into a fatal error) |
 | a panic of the parser | the whole dump of the text is the single record `panic "message"` |
 
-Injectivity: the format is a prefix-free tree encoding with injective string quoting, so two
-values with different dumps differ, and every field of every AST node is printed, with one
-exception: a settings modifier is printed by its effect on two fixed bases (section 3), not by
-its identity.
+`Defaults` modifiers are encoded injectively: the setting name identifies the variant and
+the syntax for its payload identifies every value of that variant (section 3). Other records
+retain the same observations as before, such as the rendered diagnostic message together with
+its span, and command-pattern text after canonicalization.
 
 ## 2. Strings
 
@@ -96,59 +94,35 @@ its identity.
 `"` is written `\"`, `\` is written `\\`; every other Unicode scalar value `c` is written
 `\u{h}` where `h` is the hexadecimal value of `c`, lowercase, without leading zeros (`\u{a}` for
 a line feed, `\u{e9}` for `é`, `\u{10ffff}`). The output is printable ASCII; decoding is
-unambiguous. Implementations: `quote` in `parser_dump.rs`, `dump_quoted` in
-`src/defaults/settings_dsl.rs`, `Differential.Quote` in `proofs/differential`, `unquote` in
+unambiguous. Implementations: `dump_quoted` in `src/defaults/settings_dsl.rs` (used as `quote`
+in `parser_dump.rs`), `Differential.Quote` in `proofs/differential`, and `unquote` in
 `parser_compare.py`.
 
 ## 3. Settings modifiers
 
-`defaults::SettingsModifier` is data (`proofs/parser/DEFAULTS.md`); it was a
-`Box<dyn FnOnce(&mut Settings)>` in the legacy parser, so the format describes a modifier by
-what both forms can show. A modifier is dumped by its effect: `(setting A B)`, where `A` is
-`Settings::default()` after `apply` and `B` is base B after `apply`. `apply` consumes the
-modifier and the type is not `Clone`, so the harness parses the text twice and applies the n-th
-modifier of the first parse to base A and the n-th of the second parse to base B.
+Version 2 prints each `defaults::SettingsModifier` directly as `(setting name payload)`
+from one parse, without calling `apply`. The Rust observer is generated from the `defaults!`
+DSL in `src/defaults/settings_dsl.rs`; the Lean observer matches on the corresponding
+constructors of `SudoersSpec.Settings.SettingsModifier`.
 
-Fields are printed by `Settings::dump_fields` (`cfg(any(test, fuzzing))`,
-`src/defaults/settings_dsl.rs`), every field in declaration order (that of `defaults!` in
-`src/defaults/mod.rs`): `true`/`false`; integers in decimal; enums by variant name; `Box<str>`
-as a string; `Option<Box<str>>` as `none` or `(some "...")`; `HashSet<String>` as `[...]` of
-strings in ascending order (Rust `String` order, i.e. by bytes).
+- Booleans are `true` or `false`; integers are decimal; enums use the variant name.
+- A text value is quoted. An optional text value is `none` or `(some "...")`, so `(some "")`
+  is distinct from `none`.
+- A list modifier carries its mode and the parsed strings in order, including duplicates:
+  `(set ["B" "A" "B"])`, `(add ["B" "A" "B"])` or `(del ["B" "A" "B"])`. No set
+  operations, sorting or deduplication are performed by the observer.
 
-**Base A** is `Settings::default()`. On Linux:
+The dump observes parsed values, not source spellings that produce the same value.
 
-```
-always_query_group_plugin false, always_set_home false, env_reset true, fqdn false,
-ignore_dot true, lecture never, mailerpath none, mail_badpass true, match_group_by_gid false,
-use_pty true, visiblepw false, pwfeedback true, rootpw false, targetpw false, noexec false,
-noninteractive_auth false, log_allowed true, log_denied true, insults false, setenv false,
-runcwd none, apparmor_profile none, umask 18, umask_override false, passwd_tries 3,
-secure_path none, verifypw all, passwd_timeout 300, timestamp_timeout 900, timestamp_type tty,
-editor "/usr/bin/editor:/usr/bin/nano:/usr/bin/vi" (other targets: "/usr/bin/vi"),
-env_editor true, env_keep (11 names), env_check (7 names), env_delete (37 names)
-```
+**Historical format (version 1, no header).** The legacy parser used closures instead of
+data. Its modifier record `(setting A B)` printed every field after applying the modifier
+to two fixed bases, the default settings and a base chosen to differ from the default in
+every field. The v1 harness parsed twice and emitted a separate `.bases` file. Two
+modifiers that had the same effect on both bases were indistinguishable in that format.
+Historical results using it do not establish identity of parsed modifiers.
 
-**Base B** differs from base A in every field. It is base A with these modifiers applied, in
-this order (`BASE_B` in `parser_dump.rs`; flags set, `!` negated, others assigned, lists set):
-
-```
-always_query_group_plugin, always_set_home, !env_reset, fqdn, !ignore_dot, lecture=always,
-mailerpath=/b/mailer, !mail_badpass, match_group_by_gid, !use_pty, visiblepw, !pwfeedback,
-rootpw, targetpw, noexec, noninteractive_auth, !log_allowed, !log_denied, insults, setenv,
-runcwd=/b/cwd, apparmor_profile=b_profile, umask=077, umask_override, passwd_tries=7,
-secure_path=/b/bin, verifypw=any, passwd_timeout=2, timestamp_timeout=3, timestamp_type=ppid,
-editor=/b/editor, !env_editor, env_keep="B_KEEP", env_check="B_CHECK", env_delete="B_DELETE"
-```
-
-giving `umask 63`, `passwd_timeout 120`, `timestamp_timeout 180` and the lists `["B_KEEP"]`,
-`["B_CHECK"]`, `["B_DELETE"]`. The test `base_b_differs_from_default_everywhere` checks the
-"every field differs" property. The corpus harness writes both bases to `<OUT>.bases`
-(`a [fields]`, `b [fields]`).
-
-Limit: two modifiers that agree on both bases have the same dump. This happens only for list
-removals (`-=`) of names that are in neither base: `env_keep -= "FOO"` and `env_keep -= "BAR"`
-both leave both bases unchanged. Every other modifier of the 35 settings is identified by its
-two effects.
+`Settings::dump_fields` remains available to tests of effective settings; it prints booleans,
+integers, enums and text as above and sets as lists of quoted strings in ascending order.
 
 ## 4. Character classes
 
@@ -226,8 +200,8 @@ Corpus conventions that make the dump reproducible elsewhere:
 | Item | Use |
 |---|---|
 | `dump(text)` | the dump of a text |
-| `dump_catching(text)` | the same, a panic recorded as `panic "message"` |
-| test `dump_corpus` | with `SUDO_PARSER_DUMP_CORPUS` set: reads the corpus (a file of lines `<label> <quoted text>`, or a directory with one case per file, label = file name, in name order), writes `SUDO_PARSER_DUMP_OUT` (per case `case <label>` and its dump), `<OUT>.hostdep`, `<OUT>.bases`; creates the fixture. Does nothing when unset |
+| `dump_catching(text, on_host_path)` | the same, reporting host-dependent paths from that parse or recording a panic as `panic "message"` |
+| test `dump_corpus` | with `SUDO_PARSER_DUMP_CORPUS` set: reads the corpus (a file of lines `<label> <quoted text>`, or a directory with one case per file, label = file name, in name order), writes the versioned `SUDO_PARSER_DUMP_OUT` and `<OUT>.hostdep`; creates the fixture. Does nothing when unset |
 | test `write_char_table` | `SUDO_PARSER_DUMP_CHARTABLE` |
 | tests `plan_3_3_recovery_rows`, `finding_f_p3_quoted_non_user`, `finding_f_p4_hash_identifier` | the rows of PLAN.md 3.3 (first table) and F-P3, F-P4 pinned as dump expectations |
 

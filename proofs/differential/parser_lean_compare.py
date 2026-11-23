@@ -3,22 +3,28 @@
 
     parser_lean_compare.py RUST_DUMP LEAN_DUMP [DIFFERENCES]
 
-Both dumps are in the format of proofs/parser/DUMP.md: per case a line `case <label>` and its
-records. Cases are compared byte for byte. A case listed in `RUST_DUMP.hostdep` (it names an
-existing host path, so its Rust dump depends on the host's file system, which the Lean test
-oracle does not model) is counted apart. Prints a summary per category (the label up to the
-first `:`); DIFFERENCES, if given, receives every disagreeing case with both dumps. Exit status
-1 if a case that is not host-dependent disagrees.
+Both dumps are in the format of proofs/parser/DUMP.md: the header `parser-dump 2`, then per case
+a line `case <label>` and its records. Cases are compared byte for byte. A case listed in
+`RUST_DUMP.hostdep` (it names an existing host path, so its Rust dump depends on the host's
+file system, which the Lean test oracle does not model) is counted apart. Prints a summary per
+category (the label up to the first `:`); DIFFERENCES, if given, receives every disagreeing case
+with both dumps. Exit status 1 if a case that is not host-dependent disagrees.
 """
 import os
 import sys
 from collections import OrderedDict
 
 
+def check_dump_header(f):
+    if f.readline() != "parser-dump 2\n":
+        raise SystemExit(f"{f.name}: expected parser-dump 2 header")
+
+
 def read_dump(path):
     cases = OrderedDict()
     label = None
     with open(path, encoding="ascii") as f:
+        check_dump_header(f)
         for line in f:
             if line.startswith("case "):
                 label = line[5:].rstrip("\n")
@@ -29,6 +35,8 @@ def read_dump(path):
                 raise SystemExit(f"{path}: record before the first case")
             else:
                 cases[label].append(line)
+    if not cases:
+        raise SystemExit(f"{path}: no cases")
     return OrderedDict((k, "".join(v)) for k, v in cases.items())
 
 

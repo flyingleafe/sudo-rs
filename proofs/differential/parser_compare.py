@@ -5,7 +5,7 @@ every difference. proofs/parser/C-SUDO.md describes the method and the categorie
 usage: parser_compare.py CORPUS RUST_DUMP C_OUT [DETAILS]
 
   CORPUS     `parser corpus` output (`<label> <quoted text>` per line)
-  RUST_DUMP  `dump_corpus` output (`case <label>` + dump records); RUST_DUMP.bases must exist
+  RUST_DUMP  `dump_corpus` output (`parser-dump 2` header, then `case <label>` + dump records)
   C_OUT      `parser csudo` output
   DETAILS    optional output: one line per difference (label, line, category, messages)
 
@@ -28,6 +28,8 @@ import json
 import os
 import re
 import sys
+
+from parser_lean_compare import check_dump_header
 
 FIXTURE = "/tmp/sudo-rs-parser-dump-fixture"
 
@@ -70,6 +72,7 @@ def read_dump(path):
     out = {}
     cur = None
     with open(path, encoding="ascii") as f:
+        check_dump_header(f)
         for line in f:
             line = line.rstrip("\n")
             if line.startswith("case "):
@@ -77,6 +80,8 @@ def read_dump(path):
                 out[cur] = []
             else:
                 out[cur].append(line)
+    if not out:
+        raise SystemExit(f"{path}: no cases")
     return out
 
 
@@ -532,25 +537,14 @@ def srt(xs):
     return tuple(sorted(xs, key=repr))
 
 
-class Bases:
-    def __init__(self, path):
-        with open(path, encoding="ascii") as f:
-            a, b = f.read().split("\n")[:2]
-        self.a = dict(self.fields(sexp(a[2:])))
-        self.b = dict(self.fields(sexp(b[2:])))
-
-    @staticmethod
-    def fields(lst):
-        return [(f[0], f[1]) for f in lst]
-
-    def names(self, setting):
-        """Field names a settings modifier changes on base A or base B."""
-        fa = dict(self.fields(setting[1]))
-        fb = dict(self.fields(setting[2]))
-        return {k for k in fa if fa[k] != self.a[k] or fb[k] != self.b[k]}
+def rs_setting_name(setting):
+    tag, name, _ = setting
+    if tag != "setting" or not isinstance(name, str):
+        raise ValueError("expected a version 2 setting record")
+    return name
 
 
-def rs_entries(items, bases):
+def rs_entries(items):
     out = []
     for it in items:
         t = sexp(it)
@@ -569,7 +563,7 @@ def rs_entries(items, bases):
             for d in t[1]:
                 out.append((tag, S(d[1]), srt(rs_spec(x, f) for x in d[2])))
         elif tag == "defaults":
-            names = srt(n for s in t[2] for n in sorted(bases.names(s)))
+            names = srt(rs_setting_name(s) for s in t[2])
             out.append(("defaults", rs_scope(t[1]), names))
     return out
 
@@ -682,12 +676,6 @@ def rs_quoted_alias(part):
     return part
 
 
-def drop_list_names(e):
-    if e[0] == "defaults":
-        return ("defaults", e[1], srt(n for n in e[2] if n not in ("env_keep", "env_check", "env_delete")))
-    return e
-
-
 def c_hash_rule(e):
     """C rules whose user list holds a '#' word that is not a u32: sudo-rs reads the line as a
     comment (F-P4)."""
@@ -708,8 +696,6 @@ EXPLANATIONS = [
     ("command: '=' inside a path (C ends the path there)", None, lambda e: map_parts(e, c_equals_path)),
     ("quoted upper-case word: a user name for sudo-rs, an alias for C",
      lambda e: map_parts(e, rs_quoted_alias), None),
-    ("Defaults: list removal without effect on either settings base (the dump records effects)",
-     drop_list_names, drop_list_names),
 ]
 
 
@@ -756,8 +742,9 @@ def category_of(label):
 
 def main():
     corpus = read_corpus(sys.argv[1])
+    if not corpus:
+        raise SystemExit(f"{sys.argv[1]}: no cases")
     dump = read_dump(sys.argv[2])
-    bases = Bases(sys.argv[2] + ".bases")
     cres = read_c(sys.argv[3])
     details = open(sys.argv[4], "w", encoding="utf-8") if len(sys.argv) > 4 else None
 
@@ -894,7 +881,7 @@ def main():
 
         if rs_clean and c_clean and c.get("cvt") and c["cvt"][0] == 0:
             items = [r[3:] for r in recs if r.startswith("ok ")]
-            mine = collections.Counter(e for e in rs_entries(items, bases))
+            mine = collections.Counter(rs_entries(items))
             js = json.loads(c["cvt"][1]) if c["cvt"][1].strip() else {}
             theirs = collections.Counter(c_entries(js))
             content["compared"] += 1
