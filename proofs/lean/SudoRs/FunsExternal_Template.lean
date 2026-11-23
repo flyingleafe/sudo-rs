@@ -610,12 +610,6 @@ axiom common.string.SudoString.Insts.CoreOpsDerefDerefStr.deref
 axiom common.string.SudoString.Insts.CoreCmpPartialEqStr.eq
   : common.string.SudoString → Str → Result Bool
 
-/-- [sudo_rs::defaults::{impl core::default::Default for sudo_rs::defaults::Settings}::default]:
-    Source: 'src/defaults/settings_dsl.rs', lines 269:12-273:13; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 39:0-93:1
-    Visibility: public -/
-axiom defaults.Settings.Insts.CoreDefaultDefault.default
-  : Result defaults.Settings
-
 /-- [sudo_rs::sudoers::char_stream::chars_of]:
     Source: 'src/sudoers/char_stream.rs', lines 95:0-97:1
     Visibility: public -/

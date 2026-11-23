@@ -1640,7 +1640,7 @@ def defaults.Settings.impl.log_allowed
   ok self.log_allowed
 
 /-- [sudo_rs::defaults::enums::{impl core::clone::Clone for sudo_rs::defaults::enums::timestamp_type}::clone]:
-    Source: 'src/defaults/settings_dsl.rs', lines 227:25-227:30; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 39:0-93:1
+    Source: 'src/defaults/settings_dsl.rs', lines 233:25-233:30; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 39:0-93:1
     Visibility: public -/
 def defaults.enums.timestamp_type.Insts.CoreCloneClone.clone
   (self : defaults.enums.timestamp_type) :
@@ -1649,21 +1649,21 @@ def defaults.enums.timestamp_type.Insts.CoreCloneClone.clone
   ok self
 
 /-- [sudo_rs::defaults::enums::{impl core::clone::Clone for sudo_rs::defaults::enums::verifypw}::clone]:
-    Source: 'src/defaults/settings_dsl.rs', lines 227:25-227:30; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 39:0-93:1
+    Source: 'src/defaults/settings_dsl.rs', lines 233:25-233:30; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 39:0-93:1
     Visibility: public -/
 def defaults.enums.verifypw.Insts.CoreCloneClone.clone
   (self : defaults.enums.verifypw) : Result defaults.enums.verifypw := do
   ok self
 
 /-- [sudo_rs::defaults::enums::{impl core::clone::Clone for sudo_rs::defaults::enums::lecture}::clone]:
-    Source: 'src/defaults/settings_dsl.rs', lines 227:25-227:30; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 39:0-93:1
+    Source: 'src/defaults/settings_dsl.rs', lines 233:25-233:30; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 39:0-93:1
     Visibility: public -/
 def defaults.enums.lecture.Insts.CoreCloneClone.clone
   (self : defaults.enums.lecture) : Result defaults.enums.lecture := do
   ok self
 
 /-- [sudo_rs::defaults::{impl core::clone::Clone for sudo_rs::defaults::Settings}::clone]:
-    Source: 'src/defaults/settings_dsl.rs', lines 233:17-233:22; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 39:0-93:1
+    Source: 'src/defaults/settings_dsl.rs', lines 239:17-239:22; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 39:0-93:1
     Visibility: public -/
 def defaults.Settings.Insts.CoreCloneClone.clone
   (self : defaults.Settings) : Result defaults.Settings := do
