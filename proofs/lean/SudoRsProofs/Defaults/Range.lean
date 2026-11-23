@@ -107,7 +107,7 @@ theorem produced_inRange {m : defaults.SettingsModifier} (h : Produced m) : Modi
     cases id <;> simp only [defaults.check_text, Str.Insts.CoreCmpPartialEqStr.eq, bind_ok,
       core.convert.IntoFrom.into, BoxStr.Insts.CoreConvertFromShared0Str.from] at h
     all_goals try split_ifs at h
-    all_goals (simp at h; subst m; trivial)
+    all_goals (simp at h <;> subst m <;> trivial)
   | list h =>
     rename_i id mode items
     cases id <;> simp [defaults.build_list] at h <;> subst m <;> trivial
