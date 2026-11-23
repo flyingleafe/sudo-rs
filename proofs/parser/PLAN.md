@@ -294,6 +294,26 @@ Results the later stages build on, proved since this plan was written: P4 uses
 `sanitize_alias_tables_sorted` (no diagnostic implies sorted and duplicate-free tables) and
 `sanitize_alias_tables_returns`; P5 uses `authorization_eq`.
 
+### Regression evidence for the rewritten parser
+
+The [hosted gate at `c0f8b8bc`](https://github.com/flyingleafe/sudo-rs/actions/runs/45242565203)
+passed tokens, spec, Lean, axioms, Quint and the sudoers Rust unit tests. A separate
+`proofs/check.sh extract` at `59e02c6b` reported no drift.
+
+- `uni-cpu` job `parser-regression-combin-89f00a` at `2b92e45d` passed all **36**
+  [Kani harnesses](../kani/README.md) within their specified bounds. The parser itself
+  is covered by the Lean refinement; Kani is not a second proof of the parser.
+- The same job passed six parser tests in each of debug, AddressSanitizer and Miri,
+  and the [positive-only v2 differential corpus](P0.md#format-v2-check). The Rust source,
+  Cargo manifest and lockfile, and Kani and fuzz harnesses match `c0f8b8bc` exactly.
+- At `73db0a38`, all nine libFuzzer harnesses executed a fixed ordinary file each,
+  with mutation disabled. This is a replay smoke test, not a new coverage-guided
+  campaign on the final parser.
+- The 863-test A/B compliance suite **did not run**: the `uni-cpu` preflight
+  `parser-conformance-safe-fce65f` at `c0f8b8bc` found no Docker executable. The
+  [older complete test logs](../compliance/README.md) predate the parser rewrite;
+  they are not results for this revision.
+
 ## 8. Risks and open decisions
 
 | Risk | Consequence | Mitigation |
