@@ -92,6 +92,27 @@ axiom core.char.methods.Char.is_ascii_alphanumeric : Char → Result Bool
 @[rust_fun "core::char::methods::{char}::is_ascii_digit"]
 axiom core.char.methods.Char.is_ascii_digit : Char → Result Bool
 
+/-- [core::char::methods::{char}::is_ascii_hexdigit]:
+    Source: '/rustc/library/core/src/char/methods.rs', lines 2286:4-2286:49
+    Name pattern: [core::char::methods::{char}::is_ascii_hexdigit]
+    Visibility: public -/
+@[rust_fun "core::char::methods::{char}::is_ascii_hexdigit"]
+axiom core.char.methods.Char.is_ascii_hexdigit : Char → Result Bool
+
+/-- [core::cmp::impls::{impl core::cmp::PartialEq<char> for char}::ne]:
+    Source: '/rustc/library/core/src/cmp.rs', lines 2188:16-2188:50; this code is generated from a macro invocation at: '/rustc/library/core/src/cmp.rs', lines 2193:4-2195:5
+    Name pattern: [core::cmp::impls::{core::cmp::PartialEq<char, char>}::ne]
+    Visibility: public -/
+@[rust_fun "core::cmp::impls::{core::cmp::PartialEq<char, char>}::ne"]
+axiom Char.Insts.CoreCmpPartialEqChar.ne : Char → Char → Result Bool
+
+/-- [core::cmp::impls::{impl core::cmp::PartialEq<char> for char}::eq]:
+    Source: '/rustc/library/core/src/cmp.rs', lines 2185:16-2185:50; this code is generated from a macro invocation at: '/rustc/library/core/src/cmp.rs', lines 2193:4-2195:5
+    Name pattern: [core::cmp::impls::{core::cmp::PartialEq<char, char>}::eq]
+    Visibility: public -/
+@[rust_fun "core::cmp::impls::{core::cmp::PartialEq<char, char>}::eq"]
+axiom Char.Insts.CoreCmpPartialEqChar.eq : Char → Char → Result Bool
+
 /-- [core::convert::num::{impl core::convert::TryFrom<u64, core::num::error::TryFromIntError> for u32}::try_from]:
     Source: '/rustc/library/core/src/convert/num.rs', lines 383:12-383:64; this code is generated from a macro invocation at: '/rustc/library/core/src/convert/num.rs', lines 479:0-479:49
     Name pattern: [core::convert::num::{core::convert::TryFrom<u32, u64, core::num::error::TryFromIntError>}::try_from]
@@ -225,6 +246,16 @@ axiom core.option.Option.Insts.CoreCloneClone.clone
   "core::option::{core::default::Default<core::option::Option<@T>>}::default"]
 axiom core.option.Option.Insts.CoreDefaultDefault.default
   (T : Type _) : Result (Option T)
+
+/-- [core::option::{impl core::cmp::PartialEq<core::option::Option<T>> for core::option::Option<T>}::eq]:
+    Source: '/rustc/library/core/src/option.rs', lines 2441:4-2441:38
+    Name pattern: [core::option::{core::cmp::PartialEq<core::option::Option<@T>, core::option::Option<@T>>}::eq]
+    Visibility: public -/
+@[rust_fun
+  "core::option::{core::cmp::PartialEq<core::option::Option<@T>, core::option::Option<@T>>}::eq"]
+axiom core.option.Option.Insts.CoreCmpPartialEqOption.eq
+  {T : Type _} (cmpPartialEqInst : core.cmp.PartialEq T T) :
+  Option T → Option T → Result Bool
 
 /-- [core::result::{core::result::Result<T, E>}::ok]:
     Source: '/rustc/library/core/src/result.rs', lines 709:4-712:28
@@ -616,7 +647,7 @@ axiom common.string.SudoString.Insts.CoreCmpPartialEqStr.eq
 axiom sudoers.char_stream.chars_of : String → Result (alloc.vec.Vec Char)
 
 /-- [sudo_rs::sudoers::basic_parser::escape_char]:
-    Source: 'src/sudoers/basic_parser.rs', lines 234:0-236:1
+    Source: 'src/sudoers/basic_parser.rs', lines 293:0-295:1
     Visibility: public -/
 axiom sudoers.basic_parser.escape_char : Result Char
 
@@ -628,31 +659,36 @@ axiom sudoers.tokens.sudo_string
     sudoers.basic_parser.ErrorKind)
 
 /-- [sudo_rs::sudoers::tokens::compile_pattern]:
-    Source: 'src/sudoers/tokens.rs', lines 582:0-587:1 -/
+    Source: 'src/sudoers/tokens.rs', lines 587:0-592:1 -/
 axiom sudoers.tokens.compile_pattern
   :
   String → Result (core.result.Result glob.Pattern
     sudoers.basic_parser.ErrorKind)
 
 /-- [sudo_rs::sudoers::tokens::canonical]:
-    Source: 'src/sudoers/tokens.rs', lines 569:0-577:1 -/
+    Source: 'src/sudoers/tokens.rs', lines 574:0-582:1 -/
 axiom sudoers.tokens.canonical : String → Result sudoers.tokens.Canonical
 
 /-- [sudo_rs::sudoers::tokens::os_string]:
-    Source: 'src/sudoers/tokens.rs', lines 496:0-498:1 -/
+    Source: 'src/sudoers/tokens.rs', lines 501:0-503:1 -/
 axiom sudoers.tokens.os_string : String → Result std.ffi.os_str.OsString
 
 /-- [sudo_rs::sudoers::tokens::sudo_path]:
-    Source: 'src/sudoers/tokens.rs', lines 760:0-769:1 -/
+    Source: 'src/sudoers/tokens.rs', lines 765:0-774:1 -/
 axiom sudoers.tokens.sudo_path
   :
   String → Result (core.result.Result common.path.SudoPath
     sudoers.basic_parser.ErrorKind)
 
 /-- [sudo_rs::sudoers::tokens::classify_chdir]:
-    Source: 'src/sudoers/tokens.rs', lines 749:0-757:1 -/
+    Source: 'src/sudoers/tokens.rs', lines 754:0-762:1 -/
 axiom sudoers.tokens.classify_chdir
   : String → Result sudoers.tokens.ChDirForm
+
+/-- [sudo_rs::sudoers::tokens::sudo_string_text]:
+    Source: 'src/sudoers/tokens.rs', lines 103:0-105:1 -/
+axiom sudoers.tokens.sudo_string_text
+  : common.string.SudoString → Result String
 
 /-- [sudo_rs::sudoers::warn_ignored]:
     Source: 'src/sudoers/mod.rs', lines 940:0-950:1 -/

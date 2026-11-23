@@ -386,7 +386,18 @@ mod test {
             ("alice host = TIMEOUT=5 /tools/example\n", TagNotSupported(String::new())),
             ("alice host = ROLE=example /tools/example\n", SelinuxNotSupported),
             ("alice host = CUSTOM=value /tools/example\n", UnsupportedModifier(String::new())),
-            ("Defaults unknown_option\n", Message(String::new())),
+            ("Defaults unknown_option\n", UnknownSetting(String::new())),
+            ("User_Alias,alice ADMIN = bob\n", AmbiguousSyntax),
+            ("@unknown directive\n", UnknownDirective),
+            ("@include /a b\n", QuotesAroundFilenames),
+            ("User_Alias CWD = alice\n", ReservedAlias(String::new())),
+            ("Defaults !passwd_tries\n", CannotUseInBoolean(String::new())),
+            ("Defaults use_pty += \"A\"\n", NotAListParameter(String::new())),
+            ("Defaults use_pty = true\n", CannotAssignBoolean(String::new())),
+            ("Defaults secure_path\n", NotABooleanSetting(String::new())),
+            ("Defaults passwd_tries = 2000\n", InvalidSettingValue(String::new(), String::new())),
+            ("Defaults env_keep = \"\"\n", EmptyStringNotAllowed),
+            ("Defaults env_keep = FOO=bar\n", QuotesRequiredForVarValue),
         ];
         for (text, kind) in cases {
             check_kind(text, kind);
@@ -502,6 +513,19 @@ mod test {
             SelinuxNotSupported => "SelinuxNotSupported",
             UnsupportedModifier(..) => "UnsupportedModifier",
             TooManyTags => "TooManyTags",
+            AmbiguousSyntax => "AmbiguousSyntax",
+            UnknownDirective => "UnknownDirective",
+            QuotesAroundFilenames => "QuotesAroundFilenames",
+            ReservedAlias(..) => "ReservedAlias",
+            CannotUseInBoolean(..) => "CannotUseInBoolean",
+            UnknownSetting(..) => "UnknownSetting",
+            NotAListParameter(..) => "NotAListParameter",
+            CannotAssignBoolean(..) => "CannotAssignBoolean",
+            NotABooleanSetting(..) => "NotABooleanSetting",
+            InvalidSettingValue(..) => "InvalidSettingValue",
+            EnvironmentListTooLong => "EnvironmentListTooLong",
+            EmptyStringNotAllowed => "EmptyStringNotAllowed",
+            QuotesRequiredForVarValue => "QuotesRequiredForVarValue",
             Message(..) => "Message",
         }
     }
@@ -540,7 +564,8 @@ mod test {
         // is the sentinel of `parse_lines` (it stops the line loop, so it never reaches a result)
         // and is covered by `basic_parser::test::superfluous_whitespace_at_eof`; the two NUL kinds
         // are unreachable from text, because every token class that can reach those constructors
-        // rejects control characters (`nul_in_constructor_arguments` covers them).
+        // rejects control characters (`nul_in_constructor_arguments` covers them). `Message` is
+        // not in the table: no live production produces it any more (test scaffolding only).
         let exceptional = [
             "NonUtf8Path",
             "SuperfluousWhitespace",
@@ -586,7 +611,19 @@ mod test {
             kind_name(&SelinuxNotSupported),
             kind_name(&UnsupportedModifier(String::new())),
             kind_name(&TooManyTags),
-            kind_name(&Message(String::new())),
+            kind_name(&AmbiguousSyntax),
+            kind_name(&UnknownDirective),
+            kind_name(&QuotesAroundFilenames),
+            kind_name(&ReservedAlias(String::new())),
+            kind_name(&CannotUseInBoolean(String::new())),
+            kind_name(&UnknownSetting(String::new())),
+            kind_name(&NotAListParameter(String::new())),
+            kind_name(&CannotAssignBoolean(String::new())),
+            kind_name(&NotABooleanSetting(String::new())),
+            kind_name(&InvalidSettingValue(String::new(), String::new())),
+            kind_name(&EnvironmentListTooLong),
+            kind_name(&EmptyStringNotAllowed),
+            kind_name(&QuotesRequiredForVarValue),
         ]
     }
 

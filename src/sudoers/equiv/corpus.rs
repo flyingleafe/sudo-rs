@@ -289,6 +289,7 @@ const SETTINGS: &[&str] = &[
     "secure_path=\"/bin:/usr/bin\"", "passwd_tries=5", "timestamp_timeout=1.5", "!!use_pty",
     "!env_keep", "env_keep = \"A\"", "env_keep=\"\"", "env_check += \"LC_*\"",
     "env_keep += FOO=bar", "secure_path=/bin", "!secure_path", "passwd_tries=1001",
+    "use_pty += \"A\"", "secure_path -= \"/bin\"", "env_keep = \"\"",
     "passwd_tries=x", "passwd_tries=0x10", "umask=077", "umask=0777", "umask=8",
     "timestamp_timeout=-1", "timestamp_timeout=.", "editor=/usr/bin/vi", "editor=\"/a b\"",
     "runcwd=*", "runcwd=~", "logfile=/x", "!passwd_tries", "use_pty=1", "secure_path",
@@ -446,6 +447,19 @@ fn defaults_line(rng: &mut Rng) -> String {
     let mut out = rng.pick(DEFAULTS_HEADS).to_string();
     out.push(' ');
     out.push_str(spaces(rng));
+    if rng.chance(2) {
+        // around the 127-entry limit of a quoted variable list
+        let n = [126, 127, 128, 129][rng.below(4)];
+        out.push_str("env_keep = \"");
+        for k in 0..n {
+            if k > 0 {
+                out.push(' ');
+            }
+            out.push_str("VAR");
+        }
+        out.push('"');
+        return out;
+    }
     let n = 1 + rng.below(3);
     out.push_str(&join_list(rng, SETTINGS, n));
     out

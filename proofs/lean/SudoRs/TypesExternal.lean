@@ -69,3 +69,7 @@ inductive core.num.error.IntErrorKind where
 (`core/src/num/error.rs`). -/
 structure core.num.error.ParseIntError where
   kind : core.num.error.IntErrorKind
+
+/-- [core::mem::maybe_uninit::MaybeUninit]: named by the extraction but not used by the generated
+definitions; nothing is known about it. -/
+opaque core.mem.maybe_uninit.MaybeUninit (T : Type _) : Type

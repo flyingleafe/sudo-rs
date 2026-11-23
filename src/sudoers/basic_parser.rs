@@ -101,8 +101,38 @@ pub enum ErrorKind {
     UnsupportedModifier(String),
     /// `CommandSpec::parse`: more than 127 tags
     TooManyTags,
-    /// An already formatted message: the productions not yet rewritten in the restricted style
-    /// (`unrecoverable!`, the `construct` functions of their tokens).
+    /// `Sudo::parse`: a directive keyword after other users (`User_Alias,foo ALIAS=def`)
+    AmbiguousSyntax,
+    /// `parse_include`: a directive other than `include`/`includedir` (`socket`)
+    UnknownDirective,
+    /// `parse_include`: blanks after an unquoted path
+    QuotesAroundFilenames,
+    /// `Def<T>::parse`: a reserved word as the alias name; the word
+    ReservedAlias(String),
+    /// `SettingsModifier::parse`: `!name` for a setting that has no negation; the name
+    CannotUseInBoolean(String),
+    /// `SettingsModifier::parse`: an unknown setting name; the name
+    UnknownSetting(String),
+    /// `SettingsModifier::parse`: `name+=`/`name-=` for a setting that is not a list; the name
+    NotAListParameter(String),
+    /// `SettingsModifier::parse`: `name=` for a flag; the name
+    CannotAssignBoolean(String),
+    /// `SettingsModifier::parse`: `name` without a value for a setting that is not a flag;
+    /// the name
+    NotABooleanSetting(String),
+    /// `SettingsModifier::parse`: a value a checker rejected; the value and the setting name
+    InvalidSettingValue(String, String),
+    /// `SettingsModifier::parse`: more than 127 entries in a quoted variable list
+    EnvironmentListTooLong,
+    /// `SettingsModifier::parse`: `""`
+    EmptyStringNotAllowed,
+    /// `SettingsModifier::parse`: an unquoted `VAR=value`
+    QuotesRequiredForVarValue,
+    /// An already formatted message. No production of the live parser produces it: it is test
+    /// scaffolding for the legacy `Defaults` parser copy in `test/legacy_defaults.rs` (which
+    /// compares the closure-based modifiers with the data-based ones) and for the test-only
+    /// `expect_complete`.
+    #[allow(dead_code)]
     Message(String),
 }
 
@@ -149,6 +179,33 @@ impl fmt::Display for ErrorKind {
             }
             ErrorKind::UnsupportedModifier(alias) => write!(f, "unsupported modifier '{alias}'"),
             ErrorKind::TooManyTags => f.write_str("too many tags for command specifier"),
+            ErrorKind::AmbiguousSyntax => f.write_str("ambiguous syntax"),
+            ErrorKind::UnknownDirective => f.write_str("unknown directive"),
+            ErrorKind::QuotesAroundFilenames => {
+                f.write_str("use quotes around filenames or escape whitespace")
+            }
+            ErrorKind::ReservedAlias(name) => {
+                write!(f, "reserved word {name} used as an alias name")
+            }
+            ErrorKind::CannotUseInBoolean(name) => {
+                write!(f, "'{name}' cannot be used in a boolean context")
+            }
+            ErrorKind::UnknownSetting(name) => write!(f, "unknown setting: '{name}'"),
+            ErrorKind::NotAListParameter(name) => write!(f, "{name} is not a list parameter"),
+            ErrorKind::CannotAssignBoolean(name) => {
+                write!(f, "can't assign to boolean setting '{name}'")
+            }
+            ErrorKind::NotABooleanSetting(name) => write!(f, "'{name}' is not a boolean setting"),
+            ErrorKind::InvalidSettingValue(value, name) => {
+                write!(f, "'{value}' is not a valid value for {name}")
+            }
+            ErrorKind::EnvironmentListTooLong => {
+                f.write_str("environment variable list too long")
+            }
+            ErrorKind::EmptyStringNotAllowed => f.write_str("empty string not allowed"),
+            ErrorKind::QuotesRequiredForVarValue => {
+                f.write_str("double quotes are required for VAR=value pairs")
+            }
             ErrorKind::Message(message) => f.write_str(message),
         }
     }
@@ -185,8 +242,9 @@ pub fn fatal_here<T>(stream: &CharStream, kind: ErrorKind) -> Parsed<T> {
     ))
 }
 
-/// Return a fatal error with a formatted message (`ErrorKind::Message`); for the productions not
-/// yet rewritten in the restricted style.
+/// Return a fatal error with a formatted message (`ErrorKind::Message`); test scaffolding only
+/// (`test/legacy_defaults.rs`, `expect_complete`).
+#[allow(unused_macros)]
 macro_rules! unrecoverable {
     (pos=$pos:expr, $stream:ident, $($str:expr),*) => {
         return crate::sudoers::basic_parser::fatal_from($pos, $stream, crate::sudoers::basic_parser::ErrorKind::Message(format!($($str),*)))
@@ -196,6 +254,7 @@ macro_rules! unrecoverable {
     };
 }
 
+#[allow(unused_imports)]
 pub(super) use unrecoverable;
 
 /// This recovers from a failed parsing.
