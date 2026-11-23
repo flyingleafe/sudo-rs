@@ -21,6 +21,55 @@ set_option maxHeartbeats 1000000
 set_option maxRecDepth 2048
 open sudo_rs
 
+/-- [core::char::methods::{char}::len_utf8]:
+    Source: '/rustc/library/core/src/char/methods.rs', lines 665:4-665:40
+    Name pattern: [core::char::methods::{char}::len_utf8]
+    Visibility: public -/
+@[rust_fun "core::char::methods::{char}::len_utf8"]
+axiom core.char.methods.Char.len_utf8 : Char → Result Std.Usize
+
+/-- [core::char::methods::{char}::is_uppercase]:
+    Source: '/rustc/library/core/src/char/methods.rs', lines 980:4-980:43
+    Name pattern: [core::char::methods::{char}::is_uppercase]
+    Visibility: public -/
+@[rust_fun "core::char::methods::{char}::is_uppercase"]
+axiom core.char.methods.Char.is_uppercase : Char → Result Bool
+
+/-- [core::char::methods::{char}::is_numeric]:
+    Source: '/rustc/library/core/src/char/methods.rs', lines 1024:4-1024:35
+    Name pattern: [core::char::methods::{char}::is_numeric]
+    Visibility: public -/
+@[rust_fun "core::char::methods::{char}::is_numeric"]
+axiom core.char.methods.Char.is_numeric : Char → Result Bool
+
+/-- [core::char::methods::{char}::is_whitespace]:
+    Source: '/rustc/library/core/src/char/methods.rs', lines 1088:4-1088:44
+    Name pattern: [core::char::methods::{char}::is_whitespace]
+    Visibility: public -/
+@[rust_fun "core::char::methods::{char}::is_whitespace"]
+axiom core.char.methods.Char.is_whitespace : Char → Result Bool
+
+/-- [core::char::methods::{char}::is_ascii_uppercase]:
+    Source: '/rustc/library/core/src/char/methods.rs', lines 2113:4-2113:50
+    Name pattern: [core::char::methods::{char}::is_ascii_uppercase]
+    Visibility: public -/
+@[rust_fun "core::char::methods::{char}::is_ascii_uppercase"]
+axiom core.char.methods.Char.is_ascii_uppercase : Char → Result Bool
+
+/-- [core::char::methods::{char}::is_ascii_alphanumeric]:
+    Source: '/rustc/library/core/src/char/methods.rs', lines 2184:4-2184:53
+    Name pattern: [core::char::methods::{char}::is_ascii_alphanumeric]
+    Visibility: public -/
+@[rust_fun "core::char::methods::{char}::is_ascii_alphanumeric"]
+axiom core.char.methods.Char.is_ascii_alphanumeric : Char → Result Bool
+
+/-- [core::char::methods::{char}::is_ascii_digit]:
+    Source: '/rustc/library/core/src/char/methods.rs', lines 2218:4-2218:46
+    Name pattern: [core::char::methods::{char}::is_ascii_digit]
+    Visibility: public -/
+@[rust_fun "core::char::methods::{char}::is_ascii_digit"]
+axiom core.char.methods.Char.is_ascii_digit : Char → Result Bool
+
 /-- [core::convert::num::{impl core::convert::TryFrom<u64, core::num::error::TryFromIntError> for u32}::try_from]:
     Source: '/rustc/library/core/src/convert/num.rs', lines 383:12-383:64; this code is generated from a macro invocation at: '/rustc/library/core/src/convert/num.rs', lines 479:0-479:49
     Name pattern: [core::convert::num::{core::convert::TryFrom<u32, u64, core::num::error::TryFromIntError>}::try_from]
@@ -284,12 +333,33 @@ axiom Box.Insts.CoreConvertAsRef.as_ref
 axiom alloc.string.String.Insts.CoreCmpPartialEqString.eq
   : String → String → Result Bool
 
+/-- [alloc::string::{alloc::string::String}::new]:
+    Source: '/rustc/library/alloc/src/string.rs', lines 446:4-446:32
+    Name pattern: [alloc::string::{alloc::string::String}::new]
+    Visibility: public -/
+@[rust_fun "alloc::string::{alloc::string::String}::new"]
+axiom alloc.string.String.new : Result String
+
 /-- [alloc::string::{alloc::string::String}::as_str]:
     Source: '/rustc/library/alloc/src/string.rs', lines 1073:4-1073:38
     Name pattern: [alloc::string::{alloc::string::String}::as_str]
     Visibility: public -/
 @[rust_fun "alloc::string::{alloc::string::String}::as_str"]
 axiom alloc.string.String.as_str : String → Result Str
+
+/-- [alloc::string::{alloc::string::String}::push]:
+    Source: '/rustc/library/alloc/src/string.rs', lines 1451:4-1451:36
+    Name pattern: [alloc::string::{alloc::string::String}::push]
+    Visibility: public -/
+@[rust_fun "alloc::string::{alloc::string::String}::push"]
+axiom alloc.string.String.push : String → Char → Result String
+
+/-- [alloc::string::{alloc::string::String}::len]:
+    Source: '/rustc/library/alloc/src/string.rs', lines 1902:4-1902:36
+    Name pattern: [alloc::string::{alloc::string::String}::len]
+    Visibility: public -/
+@[rust_fun "alloc::string::{alloc::string::String}::len"]
+axiom alloc.string.String.len : String → Result Std.Usize
 
 /-- [alloc::string::{impl core::clone::Clone for alloc::string::String}::clone]:
     Source: '/rustc/library/alloc/src/string.rs', lines 2425:4-2425:27
@@ -367,20 +437,32 @@ axiom common.string.SudoString.Insts.CoreOpsDerefDerefStr.deref
 axiom common.string.SudoString.Insts.CoreCmpPartialEqStr.eq
   : common.string.SudoString → Str → Result Bool
 
+/-- [sudo_rs::sudoers::char_stream::chars_of]:
+    Source: 'src/sudoers/char_stream.rs', lines 95:0-97:1
+    Visibility: public -/
+axiom sudoers.char_stream.chars_of : String → Result (alloc.vec.Vec Char)
+
+/-- [sudo_rs::sudoers::basic_parser::escape_char]:
+    Source: 'src/sudoers/basic_parser.rs', lines 175:0-177:1
+    Visibility: public -/
+axiom sudoers.basic_parser.escape_char : Result Char
+
 /-- [sudo_rs::sudoers::warn_ignored]:
-    Source: 'src/sudoers/mod.rs', lines 912:0-922:1 -/
+    Source: 'src/sudoers/mod.rs', lines 917:0-927:1 -/
 axiom sudoers.warn_ignored : sudoers.Ignored → Result Unit
 
 /-- [sudo_rs::sudoers::alias_diagnostic]:
-    Source: 'src/sudoers/mod.rs', lines 1298:0-1309:1 -/
+    Source: 'src/sudoers/mod.rs', lines 1303:0-1314:1 -/
 axiom sudoers.alias_diagnostic
   :
   alloc.vec.Vec sudoers.Error → sudoers.AliasDiagnostic → Str → Result
     (alloc.vec.Vec sudoers.Error)
 
 /-- [sudo_rs::sudoers::tokens::{impl sudo_rs::sudoers::basic_parser::Token for sudo_rs::sudoers::tokens::ChDir}::construct]:
-    Source: 'src/sudoers/tokens.rs', lines 440:4-450:5
+    Source: 'src/sudoers/tokens.rs', lines 521:4-531:5
     Visibility: public -/
 axiom sudoers.tokens.ChDir.Insts.Sudo_rsSudoersBasic_parserToken.construct
-  : String → Result (core.result.Result sudoers.tokens.ChDir String)
+  :
+  String → Result (core.result.Result sudoers.tokens.ChDir
+    sudoers.basic_parser.ErrorKind)
 

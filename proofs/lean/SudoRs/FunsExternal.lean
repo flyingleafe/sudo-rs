@@ -267,14 +267,74 @@ def alloc.string.String.Insts.CoreConvertFromShared0Str.from (s : Str) : Result 
   ok (stringOfStr s)
 
 /-- [sudo_rs::sudoers::tokens::{impl Token for ChDir}::construct] (`src/sudoers/tokens.rs`
-lines 440-450), kept opaque for Charon (it reaches `str::contains`, whose `Pattern` trait Aeneas
+lines 521-531), kept opaque for Charon (it reaches `str::contains`, whose `Pattern` trait Aeneas
 cannot translate). `"*"` is `Any`; any other text with a `*` is rejected; otherwise
 `SudoPath::try_from` (`src/common/path.rs` lines 19-34, 86-92) rejects text with a NUL byte
 (the UTF-8 check cannot fail on a `String`) and keeps the text unchanged. In UTF-8 the bytes
-`*` and NUL only occur as the characters `'*'` and `'\x00'`. -/
+`*` and NUL only occur as the characters `'*'` and `'\x00'`. The errors are formatted messages
+(`ErrorKind::Message`). -/
 def sudoers.tokens.ChDir.Insts.Sudo_rsSudoersBasic_parserToken.construct (s : String) :
-    Result (core.result.Result sudoers.tokens.ChDir String) :=
+    Result (core.result.Result sudoers.tokens.ChDir sudoers.basic_parser.ErrorKind) :=
   if s = "*" then ok (.Ok .Any)
-  else if s.toList.contains '*' then ok (.Err "path cannot contain '*'")
-  else if s.toList.contains (Char.ofNat 0) then ok (.Err (chdirPathErrorText s))
+  else if s.toList.contains '*' then ok (.Err (.Message "path cannot contain '*'"))
+  else if s.toList.contains (Char.ofNat 0) then ok (.Err (.Message (chdirPathErrorText s)))
   else ok (.Ok (.Path ⟨s⟩))
+
+/-! ## Sudoers parser: characters and strings
+
+Externals of the restricted-style lexical layer (`proofs/parser/RESTYLE.md`). ASCII classes and
+string building are definitions; the Unicode classes are `opaque`. -/
+
+/-- [core::char::methods::{char}::is_ascii_uppercase]: `matches!(*self, 'A'..='Z')`. -/
+def core.char.methods.Char.is_ascii_uppercase (c : Char) : Result Bool := ok c.isUpper
+
+/-- [core::char::methods::{char}::is_ascii_digit]: `matches!(*self, '0'..='9')`. -/
+def core.char.methods.Char.is_ascii_digit (c : Char) : Result Bool := ok c.isDigit
+
+/-- [core::char::methods::{char}::is_ascii_alphanumeric]:
+`matches!(*self, '0'..='9') | matches!(*self, 'A'..='Z') | matches!(*self, 'a'..='z')`. -/
+def core.char.methods.Char.is_ascii_alphanumeric (c : Char) : Result Bool := ok c.isAlphanum
+
+/-- [core::char::methods::{char}::len_utf8]: `len_utf8(self as u32)`, i.e. 1 below `0x80`, 2
+below `0x800`, 3 below `0x10000`, otherwise 4 (`core/src/char/methods.rs`). -/
+def core.char.methods.Char.len_utf8 (c : Char) : Result Std.Usize :=
+  ok (if c.val < 0x80 then 1#usize
+    else if c.val < 0x800 then 2#usize
+    else if c.val < 0x10000 then 3#usize
+    else 4#usize)
+
+/-- [core::char::methods::{char}::is_uppercase]: the Unicode `Uppercase` property. Opaque: a
+theorem that depends on it takes its values as a hypothesis (character oracle). -/
+opaque core.char.methods.Char.is_uppercase : Char → Result Bool
+
+/-- [core::char::methods::{char}::is_numeric]: general categories `Nd`, `Nl`, `No`. Opaque. -/
+opaque core.char.methods.Char.is_numeric : Char → Result Bool
+
+/-- [core::char::methods::{char}::is_whitespace]: the Unicode `White_Space` property. Opaque. -/
+opaque core.char.methods.Char.is_whitespace : Char → Result Bool
+
+/-- [alloc::string::{alloc::string::String}::new]: the empty string. -/
+def alloc.string.String.new : Result String := ok ""
+
+/-- [alloc::string::{alloc::string::String}::push]: appends the character (its UTF-8 bytes).
+Rust panics only when the capacity would exceed `isize::MAX` bytes; the model does not fail, and
+`String::len` below fails instead once the length leaves `usize`. -/
+def alloc.string.String.push (s : String) (c : Char) : Result String := ok (s.push c)
+
+/-- [alloc::string::{alloc::string::String}::len]: the length in bytes (UTF-8). A Rust `String`
+never exceeds `isize::MAX` bytes; a longer Lean `String` has no Rust counterpart and fails. -/
+def alloc.string.String.len (s : String) : Result Std.Usize :=
+  if h : s.utf8ByteSize < 2 ^ UScalarTy.Usize.numBits then ok (Usize.ofNatCore s.utf8ByteSize h)
+  else fail .maximumSizeExceeded
+
+/-- [sudo_rs::sudoers::char_stream::chars_of]: `text.chars().collect()`, kept opaque for Charon
+(`str::chars` and `collect` have no Aeneas model). The characters of the text, in order: Rust
+`char` and Lean `Char` are both Unicode scalar values. A text with more than `usize::MAX`
+characters has no Rust counterpart and fails. -/
+def sudoers.char_stream.chars_of (s : String) : Result (alloc.vec.Vec Char) :=
+  if h : s.toList.length ≤ Usize.max then ok ⟨Slice.from s.toList h⟩
+  else fail .maximumSizeExceeded
+
+/-- [sudo_rs::sudoers::basic_parser::escape_char]: `'\\'`, kept opaque for Charon because the
+pinned Aeneas prints this literal as `'\'`, which Lean rejects. -/
+def sudoers.basic_parser.escape_char : Result Char := ok '\\'
