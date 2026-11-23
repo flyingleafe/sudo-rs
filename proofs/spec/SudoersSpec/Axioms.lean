@@ -6,6 +6,7 @@ import SudoersSpec.Expansion
 import SudoersSpec.Escape
 import SudoersSpec.Syntax.Ast
 import SudoersSpec.Settings.Properties
+import SudoersSpec.Syntax.Sudo
 
 /-! Axiom audit: every main result depends on at most `propext`, `Classical.choice` and
 `Quot.sound`. `lake build` prints the lists. -/
@@ -163,3 +164,5 @@ open SudoersSpec
 #print axioms SudoersSpec.Syntax.userSpecifier_consumes
 #print axioms SudoersSpec.Syntax.parseMeta_consumes
 #print axioms SudoersSpec.Syntax.metaOrTag_consumes
+#print axioms SudoersSpec.Syntax.parseSudoersWith_ne_reject
+#print axioms SudoersSpec.Syntax.parseSudoers_ne_reject

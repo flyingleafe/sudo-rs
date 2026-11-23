@@ -30,3 +30,6 @@ import SudoersSpec.Settings.Dump
 import SudoersSpec.Settings.Tests
 import SudoersSpec.Syntax.Oracles
 import SudoersSpec.Syntax.TestsGrammar
+import SudoersSpec.Syntax.SettingsParser
+import SudoersSpec.Syntax.Sudo
+import SudoersSpec.Syntax.TestsSudo
