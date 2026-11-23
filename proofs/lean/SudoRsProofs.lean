@@ -49,3 +49,6 @@ import SudoRsProofs.Parser.Words
 import SudoRsProofs.Parser.CommandArgs
 import SudoRsProofs.Parser.SimpleCommand
 import SudoRsProofs.Parser.Command
+import SudoRsProofs.Parser.Scoping.Modifiers
+import SudoRsProofs.Parser.Scoping.NonCommand
+import SudoRsProofs.Parser.Scoping.Command
