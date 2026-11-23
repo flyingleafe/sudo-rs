@@ -6,13 +6,11 @@ The latter includes the root/self password-tag adjustment from `Sudoers::check`.
 The same is proved for the tags behind `sudo -v` and `sudo -l` (`validate_flags`, `list_flags`)
 and for the mapping from a decision and the Defaults in force to the terms of execution
 (`Judgement::authorization`).
-Policy-level security properties (P1-P9) and alias flattening are proved for every policy and
-request and carried over to the extracted code; where sudo-rs differs from the documented
-behaviour the exact rule is proved instead. Shell-mode argument escaping is proved for every
-input, and the compiled AArch64 code of the `-u '#uid'` parser is proved at machine level.
-The proofs start with a parsed policy and a resolved request, not an invocation of `sudo`;
-the parser and the rest of the program are covered by tests and bounded proofs only
-(differential testing against C sudo, property search, sanitizers, fuzzing, Kani).
+The policy proofs (P1–P9) start from a parsed policy and a resolved request, not an invocation
+of `sudo`. They transfer to the extracted code under the oracle and representation assumptions
+below. Alias flattening preserves decisions and tags under the stated conditions, not
+unconditionally. Separate proofs cover shell-mode argument escaping for every input and
+the compiled AArch64 `-u '#uid'` parser. The sudoers text parser is tested, not proved.
 
 ## Verification boundary
 
@@ -129,7 +127,7 @@ The fork changes alias-membership storage from a hash table to a linear list for
 extraction. Resolving many dependent aliases can therefore be quadratic. Treat
 this branch as a verification PoC, not a production performance replacement.
 
-## Evidence that is not a proof
+## Bounded proofs and tests
 
 Each item says what kind of evidence it is. A test covers only the inputs it ran.
 
@@ -150,15 +148,20 @@ Each item says what kind of evidence it is. A test covers only the inputs it ran
 - **Runtime unit tests** (`src/sudoers/test/runtime.rs`, test): command paths match after
   canonicalisation (`..`, `//`, `.`, directory symlinks); time windows, `CHROOT`,
   `INTERCEPT`, `ROLE`, `TYPE` and digests are rejected at parse.
-- **Sanitizers** ([`sanitizers/`](sanitizers/README.md), test): all 191 unit tests in debug
-  mode (overflow checks), under AddressSanitizer and under Miri, one process per test:
-  0 ASan memory errors, 0 Miri undefined behaviour. The failures are the 12 host-dependent
-  tests that also fail without a sanitizer, plus 4 timestamp tests under Miri, which answers
-  `clock_gettime(CLOCK_BOOTTIME)` with `EINVAL`; Miri skips the 30 tests that cross FFI.
+- **Sanitizers** ([`sanitizers/`](sanitizers/README.md), test): the 191-test baseline ran in
+  debug mode, under AddressSanitizer and under Miri. ASan found no invalid memory access;
+  LeakSanitizer reported one leak attributed to the forking test harness. Miri reported no
+  undefined behaviour on the paths it ran. The results include host-dependent failures,
+  four unsupported-clock failures and 30 Miri skips; they are not 191 clean passes. The
+  eight tests added since then pass in all three modes at `f20cfeb7`.
 - **Fuzzing** ([`../fuzz/`](../fuzz/README.md), test): eight libFuzzer targets on the real
   code (sudoers parser, decision, Defaults, sudo/su/visudo command lines, timestamp records,
   `NameOrId` and shell-mode argument escaping) through the `cfg(fuzzing)`-only
-  `src/fuzz_api.rs`, with AddressSanitizer, debug assertions and property assertions.
+  `src/fuzz_api.rs`, with AddressSanitizer, debug assertions and property assertions. All
+  runs total 475,017,869 executions. A cluster campaign ran every target for at least
+  2,700 seconds at `f20cfeb7`; seven targets reported no crash, timeout or out-of-memory
+  input. Every `timestamp` crash replayed from a 900-second rerun comes from the two
+  corrupt-file defects in the fuzz README; both fail closed.
 - **Kani** ([`kani/`](kani/README.md), bounded proof): 36 harnesses on the real functions
   (`#[cfg(kani)]` modules), all passing in one run at `f20cfeb7`. They cover shell-mode
   escaping (exact output up to one 5-byte argument or two 2-byte arguments; injectivity for

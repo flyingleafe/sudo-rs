@@ -74,6 +74,35 @@ Triage (every saved input replayed against the same build):
   a record; that run was discarded and the target fixed (commit "fuzz: timestamp target reads
   the file from its start").
 
+### Extended runs
+
+The initial campaign contributed 64,289,802 executions. Fifteen additional local runs
+contributed 235,116,307: `visudo_cli` 85,233,885; `name_escape` 66,740,624; `su_cli`
+39,746,343; `sudo_cli` 32,424,440; `timestamp` 10,971,015. The later local `timestamp` run
+completed 3,600 seconds. For interrupted runs the count stops at the last libFuzzer
+fork-mode status line.
+
+A separate cluster campaign at `f20cfeb7` ran all eight targets concurrently for 2,700-2,755
+seconds each, from seed corpora, on one 8-CPU Slurm node (GCC 11.5, cargo-fuzz 0.13.2):
+
+| Target | Seconds | Executions | Edges | Corpus | Crashes |
+|---|---:|---:|---:|---:|---:|
+| `sudoers_parse` | 2743 | 8,802,978 | 4349 | 2640 | 0 |
+| `sudoers_decide` | 2752 | 824,980 | 5788 | 2607 | 0 |
+| `sudoers_defaults` | 2755 | 940,002 | 4922 | 2440 | 0 |
+| `sudo_cli` | 2737 | 23,189,656 | 1107 | 801 | 0 |
+| `su_cli` | 2731 | 23,269,066 | 663 | 393 | 0 |
+| `visudo_cli` | 2731 | 40,421,718 | 388 | 430 | 0 |
+| `timestamp` | 2700 | 19,155,335 | 453 | 212 | 5138 crashes, 4980 artifacts |
+| `name_escape` | 2723 | 59,008,025 | 322 | 175 | 0 |
+
+The cluster campaign contributed 175,611,760 executions, for 475,017,869 across all runs.
+Seven targets reported no crash, timeout or out-of-memory input. The `timestamp` artifacts of
+that campaign were not replayed. A second 900-second `timestamp` run at `f20cfeb7` on the cluster
+(5,807,309 executions, 3,815 crashes) saved 3,738 crash inputs; every one was replayed. All
+of them reproduce one of the two corrupt-file defects described above (3,630 one defect, 108
+the other); no other cause appeared. Executions are not distinct inputs.
+
 ## Commands
 
 From the repository root, inside the dev shell (`nix develop`, or `/tmp/sudo-rs-wt/dev` on the

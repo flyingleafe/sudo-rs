@@ -23,9 +23,9 @@ missing file) it is the largest process's maximum resident set (GNU `time`). Res
 FAIL (Kani reports a failed check); VACUOUS (a `kani::cover!` is not satisfied, so a path
 verified nothing); TIME, OOM; ERROR (no verdict: build error or Kani/CBMC stopped).
 
-The results below are one complete run of every harness at `f20cfeb7`, on one 8-CPU Slurm node
-(377 GB; GCC 11.5), three groups of harnesses side by side, each harness alone in its group, no
-memory limit, 3600 s per harness:
+At `f20cfeb7` all 36 harnesses passed in one Slurm job (8 CPUs, 24 GB requested, GCC 11.5).
+Three groups ran concurrently; each group ran its harnesses serially with a 3600 s timeout.
+The job had no additional per-harness memory limit.
 
 ```sh
 KANI_LIMITED=/nonexistent KANI_TIMEOUT=3600 proofs/kani/run.sh common::command::
@@ -33,9 +33,7 @@ KANI_LIMITED=/nonexistent KANI_TIMEOUT=3600 proofs/kani/run.sh system::timestamp
 KANI_LIMITED=/nonexistent KANI_TIMEOUT=3600 proofs/kani/run.sh cutils:: exec::noexec:: pam::securemem:: system::signal::
 ```
 
-The whole run took 12 minutes. Every harness had also passed on the shared 4-CPU slice of the
-verification machine (at `da94693a`; `common::command` and the rootpw harness at `fc4a086a`),
-2-6 times slower.
+The complete job took 12 minutes, including setup and checks on the planted copies.
 
 ## Replaced functions (`#[kani::stub]`)
 

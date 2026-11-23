@@ -14,11 +14,11 @@ Rust has no UndefinedBehaviorSanitizer counterpart to C's: integer overflow is t
 mode's overflow checks, every other kind of undefined behaviour is Miri's job.
 MemorySanitizer is not used: it needs every linked library (glibc, PAM) built with it.
 
-## Results
+## Baseline results
 
-Run of 2026-11-20 (`results/{debug,asan,miri}.tsv` hold every test with its outcome and, for a
-failure or a Miri skip, the reason). The suite has 191 tests, all in the library; the three
-binaries have none, and the crate's single doctest is marked `ignore`.
+The 2026-11-20 baseline had 191 library tests. `results/{debug,asan,miri}.tsv` record each
+outcome, including the reason for each failure or Miri skip. The three binaries had no unit
+tests, and the crate's single doctest was marked `ignore`.
 
 | Mode | Tests | Pass | Fail | of which host-dependent | Sanitizer / Miri reports | Miri skips |
 |---|---:|---:|---:|---:|---|---:|
@@ -52,6 +52,11 @@ binaries have none, and the crate's single doctest is marked `ignore`.
 The Miri run was stopped once by systemd-oomd (memory pressure of the shared machine) after 70
 tests and continued with `SAN_RESUME=1`; each test runs in its own process, so the recorded
 outcomes are unaffected.
+
+The eight library tests added since that baseline (`common::command::test::escaped_*` and
+`sudoers::test::runtime::*`) were run at `f20cfeb7` on a Slurm CPU node with the same
+toolchain (`nightly-2026-11-20`): 8/8 pass in `debug`, under ASan with leak detection, and
+under Miri, with no sanitizer or Miri report.
 
 ## Commands
 
