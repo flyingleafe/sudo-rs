@@ -16,10 +16,10 @@ oracle (`HostOracle`, below).
 | `Token.lean` | `EscUnit`, `EscStop`, `EscRejects`, `TokTail`, `LenOK`, `TokenG` for any `TokenSpec`; the no-escape form `tokenG_noEsc` |
 | `List.lean` | `Bangs`, `QualG` (`Qualified<T>`), `ListTail`, `ListG` (`parse_list`), `SpecListG` |
 | `IPv4.lean` | `IPv4Like`, `looksLikeIPv4_iff` (the `rsplitn` test of `Hostname::construct`, declaratively) |
-| `Hostname.lean` | `hostChar`, `AliasShape`, `MetaHostVal`, `HostItemG`, `HostListG`; PT2 to PT4 for `SpecList<Hostname>` |
+| `Hostname.lean` | `AliasNameG`, `HostnameG`, `hostChar`, `MetaHostVal`, `HostItemG`, `HostListG`; PT2 to PT4 for the standalone name tokens and `SpecList<Hostname>` |
 | `RoundTrip.lean` | `HostOracle`, the printer, `Printable`, PT5, `printable_iff_derivable` |
 | `Follow.lean` | `HeadOnly`; the exact follow condition of a host list (`hostList_follow_iff`) |
-| `Examples.lean` | non-vacuity: derivations, every theorem on concrete inputs, `HostOracle CharOracle.latin1`, the PT2 counterexample, negative controls |
+| `Examples.lean` | non-vacuity: derivations, applications of PT2 to PT5 on concrete inputs, `HostOracle CharOracle.latin1`, the PT2 counterexample, negative controls |
 
 ## Shape of the grammar and of the theorems
 
@@ -62,8 +62,8 @@ Positions come for free from `Parser.reaches`: `Sound.pos` adds
   code fails (`stray escape sequence`), so a derivation of `W` never stops in front of `\`:
   `Ws.stop` requires `NextNot (fun d => blank d = true ∨ d = '\\') rest`. Comments are not
   whitespace.
-* Every terminal swallows the `W` after it: `try_syntax(ch)` is `ch W` (`SynG`), a nonterminal
-  under `try_nonterminal`/`expect_nonterminal` is `X W` (`NontermG`).
+* `try_syntax(ch)` consumes `ch W` (`SynG`); `try_nonterminal` and `expect_nonterminal`
+  consume `X W` (`NontermG`). A raw `token` does not take this extra whitespace pass.
 * Token: units read by `accept_escaped`, maximal (table in `Token.lean`): plain `c`
   (`pred c`, and `c ≠ \` if escapes are allowed), escaped `\ d` (`T.escaped d`), a literal `\`
   (`pred '\'`, next character not `T.escaped`), continuation `\ newline` read as `' '`
@@ -73,8 +73,9 @@ Positions come for free from `Parser.reaches`: `Sound.pos` adds
   nor `' '` (`TokTail.term`; those two characters are consumed).
 * Length: `str.len() >= MAX_LEN` is checked on the UTF-8 length of the characters read so far,
   before each further character is appended (`LenOK`, closed form `lenOK_iff`): a token of
-  `n` characters is accepted iff its first `n - 1` characters take fewer than `MAX_LEN` bytes,
-  so it can be up to `MAX_LEN + 3` bytes long.
+  `n` decoded characters passes the length check iff `n = 1` or its first `n - 1`
+  characters take fewer than `MAX_LEN` bytes. For `MAX_LEN ≥ 1`, the result can be up to
+  `MAX_LEN + 3` bytes long.
 
 ## The generic layer
 
@@ -88,9 +89,9 @@ Positions come for free from `Parser.reaches`: `Sound.pos` adds
 | `expect_nonterminal(p)` | `NontermG G` | `expectNonterminal_sound/complete` | never rejects |
 | `accept_escaped(T, pred)` | `EscUnit T pred` | `acceptEscaped_sound/complete` | exact: `acceptEscaped_reject` (+ converses `acceptEscaped_stop`, `acceptEscaped_rejects`) |
 | `impl<T: Token> Parse for T` | `TokenG T` | `token_sound/complete` | exact: `token_reject`, `token_rejectPure_iff`; fails outside the condition (below) |
-| `Qualified<T>` | `QualG G` | `qualified_sound/complete` | exact transfer: `qualified_reject` |
-| `parse_list(sep, max)`, `Vec<T>` | `ListG G sep max` | `parseList_sound/complete` | exact transfer: `parseList_reject` |
-| `SpecList<T>` | `SpecListG G m` | `specList_sound/complete` | `specList_reject` (rejects iff `Meta<T>` rejects) |
+| `Qualified<T>` | `QualG G` | `qualified_sound/complete` | `qualified_reject_iff`: the element rejects and no `!` is next |
+| `parse_list(sep, max)`, `Vec<T>` | `ListG G sep max` | `parseList_sound/complete` | `parseList_reject_iff`: same reject as the element |
+| `SpecList<T>` | `SpecListG G m` | `specList_sound/complete` | `specList_reject_iff`: `Meta<T>` rejects and no `!` is next |
 | `pure a`, `p >>= f` | `PureG a`, `SeqG G H` | `pure_sound/complete`, `bind_sound/complete` | |
 
 The relations, abbreviated (`Lexical.lean`, `Token.lean`, `List.lean` have them in full):
@@ -130,8 +131,13 @@ rejects on every input starting with `\ newline`, having consumed both character
 instance: `Examples.escTok` (escapes allowed, `\` and space escaped, class ASCII alphanumeric),
 `(token escTok).run (Stream.ofString "\\\nab") = (.error .reject, ⟨"ab".toList, 2, 1⟩)` and
 `escTok_not_rejectPure`; the same input makes `parse_list` over `Qualified` of that token reject
-after consuming. Through `tryNonterminal_reject`, `qualified_reject` and `parseList_reject`, a
-production built on a token rejects without consuming exactly when the token does.
+after consuming. The transfer lemmas preserve the element's remaining stream on a rejection
+that reaches the caller; a qualifying `!` converts a later element rejection to a fatal error.
+
+`AliasNameG` uses `AliasShape`, the standalone name's 255-byte check and maximal munch. It
+does not reserve `ALL`; that check belongs to alias declarations. `HostnameG` uses the ASCII
+host class, the same byte check, maximal munch and the non-IPv4 condition. Their PT2 to PT4
+lemmas are `aliasName_rejectPure/sound/complete` and `hostname_rejectPure/sound/complete`.
 
 ## The instance: `SpecList<Hostname>` (`Host_List`)
 
@@ -317,20 +323,20 @@ definitions counted at the start of a line):
 
 | File | Lean lines | theorems + examples | definitions |
 |---|---|---|---|
-| `Basic.lean` | 177 | 20 | 10 |
+| `Basic.lean` | 178 | 22 | 10 |
 | `Lexical.lean` | 360 | 45 | 5 |
 | `Token.lean` | 581 | 29 | 7 |
-| `List.lean` | 583 | 31 | 9 |
+| `List.lean` | 602 | 34 | 9 |
 | `IPv4.lean` | 193 | 10 | 4 |
-| `Hostname.lean` | 147 | 17 | 7 |
+| `Hostname.lean` | 208 | 26 | 9 |
 | `RoundTrip.lean` | 299 | 26 | 10 |
 | `Follow.lean` | 292 | 23 | 5 |
-| `Examples.lean` | 147 | 33 | 3 |
-| total | 2779 | 234 | 60 |
+| `Examples.lean` | 158 | 36 | 3 |
+| total | 2871 | 251 | 62 |
 
 The Rust it describes (legacy `70fdb56b`, code lines without comments): `char_stream.rs` 47,
 `basic_parser.rs` without tests 233 (of which `parse_lines` and `Comment`, about 35, are not part
 of this fragment), `Hostname`/`Meta<T>`/`AliasName` in `tokens.rs` 73, `Qualified<T>` in `ast.rs`
 23: about 340 lines, so about 8 lines of grammar proof per Rust line. The generic layer
-(`Basic`, `Lexical`, `Token`, `List`: 1701 lines) is reused by P2 and P3; the host-list instance
-with PT5 and the follow condition is 931 lines.
+(`Basic`, `Lexical`, `Token`, `List`: 1721 lines) is reused by P2 and P3; the name and host-list
+instances with PT5 and the follow condition are 992 lines.

@@ -19,12 +19,13 @@ front of a character that `pred` refuses and that is not a `\` opening an escape
 (`EscStop`); it also rejects *after* consuming `\ newline` when escapes are allowed, newline is
 not `T.escaped`, and `pred` accepts neither `\` nor `' '` (`EscRejects`). In the second case
 the two characters are gone: inside a token they end it silently (`TokTail.term`), at the
-start of a token the token rejects having consumed input (PT2 fails: `token_reject`,
-`token_rejectPure_counterexample`).
+start of a token the token rejects having consumed input (`token_rejectPure_iff`,
+`Examples.escTok_not_rejectPure`).
 
 Length: the check `str.len() >= MAX_LEN` runs on the UTF-8 length of the characters read so
 far, before each character after the first is appended (`LenOK`): a token of `n` characters is
-accepted iff its first `n - 1` characters take fewer than `MAX_LEN` bytes.
+accepted by the length check iff `n = 1` or its first `n - 1` characters take fewer than
+`MAX_LEN` bytes.
 -/
 
 namespace SudoersSpec.Grammar

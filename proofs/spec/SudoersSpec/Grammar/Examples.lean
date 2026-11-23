@@ -51,6 +51,23 @@ example : Ws [' ', '\\', '\n', '\t'] ['='] :=
 /-- No whitespace derivation stops in front of a blank or a backslash. -/
 example : ¬ Ws [' '] [' '] := fun h => h.stopAt ' ' rfl (.inl rfl)
 
+/-- The standalone alias-name token reads `ALL` as a name, not as a wildcard. -/
+example : (token aliasNameToken).run (Stream.ofString "ALL=") =
+    (.ok "ALL", ⟨['='], 1, 4⟩) :=
+  aliasName_complete.run_eq
+    (show AliasNameG ['A', 'L', 'L'] "ALL" ['='] from ⟨by decide, by decide, by decide, rfl⟩) 1 1
+
+/-- The standalone hostname token does not classify uppercase text as an alias. -/
+example : (token (hostnameToken O)).run (Stream.ofString "WEB1,") =
+    (.ok "WEB1", ⟨[','], 1, 5⟩) :=
+  (hostname_complete O).run_eq
+    (show HostnameG O ['W', 'E', 'B', '1'] "WEB1" [','] from
+      ⟨by decide, by decide, by decide, by decide, by decide, rfl⟩) 1 1
+
+/-- The check counts bytes before the final character, not bytes after it. -/
+example : LenOK 3 ['a'] ['€'] ∧ utf8Len ['a', '€'] = 4 := by
+  exact ⟨⟨by decide, trivial⟩, by decide⟩
+
 /-- `web1` is a host item before `,`. -/
 example : HostItemG O "web1".toList (.only "web1") [','] where
   ne := by decide

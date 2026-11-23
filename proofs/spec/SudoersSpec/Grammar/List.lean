@@ -298,11 +298,15 @@ theorem qualified_complete {p : Parser α} {G : Gram α} (hp : Complete p G) (de
         cases h : m % 2 == 0 <;> simp_all <;> omega
       rw [hv]
 
-/-- PT2 for `Qualified<T>`, exactly: it rejects iff the element production rejects on the
-same input with the same result (no `!` was read). -/
-theorem qualified_reject {description : String} {p : Parser α} {s s' : Stream}
-    (h : (qualified description p).run s = (.error .reject, s')) :
-    p.run s = (.error .reject, s') := by
+/-- PT2 for `Qualified<T>`, exactly: it rejects iff no `!` is next and the element
+production rejects on the same input with the same result. -/
+theorem qualified_reject_iff {description : String} {p : Parser α} {s s' : Stream} :
+    (qualified description p).run s = (.error .reject, s') ↔
+      NextNot (· = '!') s.rest ∧ p.run s = (.error .reject, s') := by
+  refine Iff.intro ?_ (fun ⟨hn, hp⟩ => by
+    rw [qualified_run, isSyntax_false_iff.mpr ⟨rfl, hn⟩]
+    simp only [tryNonterminal_reject.mpr hp])
+  intro h
   rw [qualified_run] at h
   revert h
   have hne := isSyntax_ne_reject '!' s
@@ -316,7 +320,7 @@ theorem qualified_reject {description : String} {p : Parser α} {s s' : Stream}
     | ok b =>
       cases b with
       | false =>
-        obtain ⟨hs1, -⟩ := isSyntax_false_iff.mp h₁
+        obtain ⟨hs1, hn⟩ := isSyntax_false_iff.mp h₁
         subst s₁
         simp only
         cases h₂ : (tryNonterminal p).run s with
@@ -327,7 +331,7 @@ theorem qualified_reject {description : String} {p : Parser α} {s s' : Stream}
             intro h
             simp only [Prod.mk.injEq, Except.error.injEq] at h
             obtain ⟨rfl, rfl⟩ := h
-            exact tryNonterminal_reject.mp h₂
+            exact ⟨hn, tryNonterminal_reject.mp h₂⟩
       | true =>
         simp only
         have hne2 := bangLoop_ne_reject true s₁
@@ -349,6 +353,11 @@ theorem qualified_reject {description : String} {p : Parser α} {s s' : Stream}
               | error e =>
                 intro h; simp only [Prod.mk.injEq] at h
                 exact absurd h.1 (by simpa using hne3)
+
+theorem qualified_reject {description : String} {p : Parser α} {s s' : Stream}
+    (h : (qualified description p).run s = (.error .reject, s')) :
+    p.run s = (.error .reject, s') :=
+  (qualified_reject_iff.mp h).2
 
 theorem qualified_rejectPure {p : Parser α} (hp : RejectPure p) (description : String) :
     RejectPure (qualified description p) :=
@@ -633,6 +642,13 @@ theorem parseList_reject {sep : Char} {max : Nat} {description : String} {p : Pa
       simp only at h
       rw [h] at this; exact absurd rfl this
 
+theorem parseList_reject_iff {sep : Char} {max : Nat} {description : String} {p : Parser α}
+    {s s' : Stream} :
+    (parseList sep max description p).run s = (.error .reject, s') ↔
+      p.run s = (.error .reject, s') := by
+  refine ⟨parseList_reject, fun h => ?_⟩
+  rw [parseList_run, tryNonterminal_reject.mpr h]
+
 theorem parseList_rejectPure {p : Parser α} (hp : RejectPure p) (sep : Char) (max : Nat)
     (description : String) : RejectPure (parseList sep max description p) :=
   fun s s' h => hp s s' (parseList_reject h)
@@ -659,6 +675,12 @@ theorem specList_reject {m : Many} {description : String} {p : Parser (Meta α)}
     (h : (specList m description p).run s = (.error .reject, s')) :
     p.run s = (.error .reject, s') :=
   qualified_reject (parseList_reject h)
+
+theorem specList_reject_iff {m : Many} {description : String} {p : Parser (Meta α)}
+    {s s' : Stream} :
+    (specList m description p).run s = (.error .reject, s') ↔
+      NextNot (· = '!') s.rest ∧ p.run s = (.error .reject, s') := by
+  rw [specList_eq, parseList_reject_iff, qualified_reject_iff]
 
 theorem SpecListG.trunc {G : Gram (Meta α)} (hG : Trunc G) (m : Many) : Trunc (SpecListG G m) :=
   ListG.trunc (QualG.trunc hG) _ _

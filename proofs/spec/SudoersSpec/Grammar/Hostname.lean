@@ -50,6 +50,89 @@ instance (n : List Char) : Decidable (AliasShape n) := decidable_of_iff _ (alias
 
 theorem aliasShape_ALL : AliasShape "ALL".toList := by decide
 
+/-! ## Standalone `AliasName` and `Hostname` tokens -/
+
+/-- The `NAME` token used in a declaration. Reservation of `ALL` is a check of the
+enclosing declaration; the standalone token itself can produce `"ALL"`. -/
+structure AliasNameG (c : List Char) (a : String) (rest : List Char) : Prop where
+  shape : AliasShape c
+  len : utf8Len c.dropLast < 255
+  stop : NextNot (fun d => AliasName.accept d = true) rest
+  value : a = String.ofList c
+
+/-- The standalone `Hostname` token, without the wider `Meta<Hostname>` character class
+or its `ALL` and alias classification. -/
+structure HostnameG (O : CharOracle) (c : List Char) (a : Hostname) (rest : List Char) :
+    Prop where
+  ne : c ≠ []
+  chars : ∀ x ∈ c, Hostname.accept x = true
+  len : utf8Len c.dropLast < 255
+  stop : NextNot (fun d => Hostname.accept d = true) rest
+  notIPv4 : ¬ IPv4Like O c
+  value : a = String.ofList c
+
+private theorem nameLength {x : Char} {xs : List Char}
+    (h : xs = [] ∨ utf8Len (x :: xs).dropLast < 255) :
+    utf8Len (x :: xs).dropLast < 255 := by
+  rcases h with rfl | h
+  · show 0 < 255; decide
+  · exact h
+
+theorem tokenG_aliasName_iff {c : List Char} {a : String} {rest : List Char} :
+    TokenG aliasNameToken c a rest ↔ AliasNameG c a rest := by
+  rw [tokenG_noEsc (rfl : aliasNameToken.allowEscape = false)]
+  constructor
+  · rintro ⟨x, xs, rfl, hx, hxs, hs, hl, hv⟩
+    exact ⟨⟨x, xs, rfl, hx, hxs⟩, nameLength hl, hs, (Except.ok.inj hv).symm⟩
+  · rintro ⟨⟨x, xs, rfl, hx, hxs⟩, hl, hs, rfl⟩
+    exact ⟨x, xs, rfl, hx, hxs, hs, .inr hl, rfl⟩
+
+theorem tokenG_hostname_iff (O : CharOracle) {c : List Char} {a : Hostname} {rest : List Char} :
+    TokenG (hostnameToken O) c a rest ↔ HostnameG O c a rest := by
+  rw [tokenG_noEsc (rfl : (hostnameToken O).allowEscape = false)]
+  have construct {r : List Char} :
+      Hostname.construct O r = .ok a ↔ ¬ IPv4Like O r ∧ a = String.ofList r := by
+    unfold Hostname.construct
+    cases hb : Hostname.looksLikeIPv4 O r
+    · have hn := mt (looksLikeIPv4_iff O r).mpr (by simp [hb])
+      simp [hn, eq_comm]
+    · have hi := (looksLikeIPv4_iff O r).mp hb
+      simp [hi]
+  constructor
+  · rintro ⟨x, xs, rfl, hx, hxs, hs, hl, hv⟩
+    obtain ⟨hi, hv⟩ := construct.mp hv
+    refine ⟨by simp, ?_, nameLength hl, hs, hi, hv⟩
+    intro y hy
+    rcases List.mem_cons.mp hy with rfl | hy
+    · exact hx
+    · exact hxs y hy
+  · rintro ⟨hne, hc, hl, hs, hi, hv⟩
+    cases c with
+    | nil => exact absurd rfl hne
+    | cons x xs =>
+      exact ⟨x, xs, rfl, hc x (by simp), fun y hy => hc y (List.mem_cons_of_mem _ hy),
+        hs, .inr hl, construct.mpr ⟨hi, hv⟩⟩
+
+theorem aliasName_rejectPure : RejectPure (token aliasNameToken) :=
+  token_rejectPure _ (fun h => by have := h.1; cases this)
+
+theorem aliasName_sound : Sound (token aliasNameToken) AliasNameG :=
+  (token_sound _).mono fun _ _ _ h => tokenG_aliasName_iff.mp h
+
+theorem aliasName_complete : Complete (token aliasNameToken) AliasNameG :=
+  (token_complete _).mono fun _ _ _ h => tokenG_aliasName_iff.mpr h
+
+theorem hostname_rejectPure (O : CharOracle) : RejectPure (token (hostnameToken O)) :=
+  token_rejectPure _ (fun h => by have := h.1; cases this)
+
+theorem hostname_sound (O : CharOracle) : Sound (token (hostnameToken O)) (HostnameG O) :=
+  (token_sound _).mono fun _ _ _ h => (tokenG_hostname_iff O).mp h
+
+theorem hostname_complete (O : CharOracle) : Complete (token (hostnameToken O)) (HostnameG O) :=
+  (token_complete _).mono fun _ _ _ h => (tokenG_hostname_iff O).mpr h
+
+/-! ## `Meta<Hostname>` -/
+
 /-- The classification of a `Meta<Hostname>` token text `raw` (`Meta::construct`). The decision
 between `ALL`, an alias and a host name is made on `trimEnd O raw` (the text without trailing
 `char::is_whitespace` characters); a host name is the raw text, and must not be IPv4-like. -/
@@ -126,15 +209,12 @@ theorem tokenG_metaHost_iff (O : CharOracle) {c : List Char} {a : Meta Hostname}
   rw [tokenG_noEsc (rfl : (metaHostToken O).allowEscape = false)]
   constructor
   · rintro ⟨x, xs, rfl, h1, hall, hn, hl, hc⟩
-    refine ⟨by simp, ?_, ?_, hn, (metaConstruct_iff O _ a).mp hc⟩
+    refine ⟨by simp, ?_, nameLength hl, hn, (metaConstruct_iff O _ a).mp hc⟩
     · intro y hy
       simp only [List.mem_cons] at hy
       rcases hy with rfl | hy
       · exact h1
       · exact hall y hy
-    · rcases hl with rfl | hl
-      · simp [utf8Len]
-      · exact hl
   · rintro ⟨hne, hall, hl, hn, hv⟩
     obtain ⟨x, xs, rfl⟩ : ∃ x xs, c = x :: xs := by
       cases c with
