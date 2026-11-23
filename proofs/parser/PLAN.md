@@ -194,8 +194,9 @@ one or more characters. For PT6, [`parseSudoersWith_exact_iff` and `exactSudo_cl
 give equivalence and uniqueness for the exact stable grammar, which retains ignored spans
 and recovery cursors. Uniqueness does not hold for every derivation of the broader grammar.
 
-**E2E-clean, alias expansion.** Diagnostic-free sanitization proves the dependency order
-needed for equivalence of an *item list* with its expansion. For a flattened *whole policy*,
+**E2E-clean, alias expansion.** Diagnostic-free sanitization proves `TableOK` for each
+of the four tables. [`findItem_expandAll`](../spec/SudoersSpec/Expansion.lean) then gives
+equivalence of any *item list* with its expansion against that table. For a flattened *whole policy*,
 [`authorize_expandAliases`](../spec/SudoersSpec/Expansion.lean) also requires expansion
 not to empty a runas user list and no command-alias body to contain `ALL`. Clean syntax
 alone does not justify dropping those hypotheses or claiming exact equality of all tags.
@@ -313,6 +314,10 @@ Decisions for the project owner:
    proof can specify either behaviour; it cannot make a file with diagnostics safe.
 
 ## 9. Findings to confirm in P0
+
+The table records the original observations. [C-SUDO.md](C-SUDO.md) records the comparison
+and corrections for all six; the separately counted residuals on the larger corpus are not
+evidence for or against those six findings.
 
 | Id | Observation | Basis |
 |---|---|---|
