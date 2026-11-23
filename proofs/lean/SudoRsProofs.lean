@@ -55,3 +55,6 @@ import SudoRsProofs.Parser.Scoping.Command
 import SudoRsProofs.Parser.Analysis.Includes
 import SudoRsProofs.Parser.Analysis.Provenance
 import SudoRsProofs.Parser.DefaultsParse.Main
+import SudoRsProofs.Parser.Scoping.Functions
+import SudoRsProofs.Parser.Scoping.Clone
+import SudoRsProofs.Parser.Scoping.Check

@@ -27,6 +27,9 @@ import SudoRsProofs.Parser.Scoping.Command
 import SudoRsProofs.Parser.Analysis.Includes
 import SudoRsProofs.Parser.Analysis.Provenance
 import SudoRsProofs.Parser.DefaultsParse.Main
+import SudoRsProofs.Parser.Scoping.Functions
+import SudoRsProofs.Parser.Scoping.Clone
+import SudoRsProofs.Parser.Scoping.Check
 
 /-!
 # Axiom audit
@@ -233,3 +236,8 @@ of `SudoRs/{Types,Funs}External.lean` are definitions or `opaque` constants, nev
 #print axioms SudoRsProofs.Parser.settingsModifier_parse_refines
 #print axioms SudoRsProofs.Parser.settingsModifier_vec_refines
 #print axioms SudoRsProofs.Parser.parsed_modifier_produced
+#print axioms SudoRsProofs.Parser.Scoping.specify_host_user_runas_eq
+#print axioms SudoRsProofs.Parser.Scoping.specify_command_eq
+#print axioms SudoRsProofs.Parser.Scoping.settings_clone_eq
+#print axioms SudoRsProofs.Parser.Scoping.check_eq
+#print axioms SudoRsProofs.Parser.Scoping.check_authorization_eq
