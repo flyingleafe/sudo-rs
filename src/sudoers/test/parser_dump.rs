@@ -332,7 +332,7 @@ fn dump_items(first: Vec<Result<Sudo, Status>>, second: Vec<Result<Sudo, Status>
                 let _ = writeln!(out, "ok {}", sudo(item, &mut second));
             }
             Err(Status::Fatal(s, msg)) => {
-                let _ = writeln!(out, "fatal {} {}", span(&s), quote(&msg));
+                let _ = writeln!(out, "fatal {} {}", span(&s), quote(&msg.to_string()));
             }
             Err(Status::Reject) => out.push_str("reject\n"),
         }
