@@ -55,3 +55,9 @@ import SudoersSpec.Grammar.PermissionPrint
 import SudoersSpec.Grammar.PermissionExamples
 import SudoersSpec.Syntax.PanicFree
 import SudoersSpec.Settings.FromParser
+import SudoersSpec.Grammar.SudoAliases
+import SudoersSpec.Grammar.SudoFailure
+import SudoersSpec.Grammar.SudoInclude
+import SudoersSpec.Grammar.SudoSettings
+import SudoersSpec.Grammar.SudoUserReject
+import SudoersSpec.Grammar.SudoFile
