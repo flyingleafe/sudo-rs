@@ -1,16 +1,17 @@
 # Plan: proving the sudoers parser
 
-Status: in progress. The [executable reference parser](../spec/SudoersSpec/Syntax/README.md)
-has been [compared with Rust](P0.md). P1 is complete: the [host-list grammar](../spec/SudoersSpec/Grammar/README.md)
-and [extraction refinement](PR-NOTES.md) compose in [`host_list_grammar_iff`](../lean/SudoRsProofs/Parser/Grammar.lean).
-The text-to-authorization theorem is not established. Feasibility measurements below are
-from `9c30990f` (Charon 0.1.321, Aeneas `8f4466db`).
+Status: the P1–P5 Lean chain is checked for the **stable, include-free text entry point**, from
+[`parse_sudoers_refines`](../lean/SudoRsProofs/Parser/Directives/Main.lean) to
+[`text_to_authorization`](../lean/SudoRsProofs/Parser/EndToEnd.lean), including Defaults and clean-file uniqueness.
+This is not a claim that all plan gates passed: the [larger C comparison](C-SUDO.md#larger-corpus-limits-of-the-classification)
+has unexplained differences. The [result index](README.md) separates theorems, assumptions and tests.
+Feasibility measurements below are from `9c30990f` (Charon 0.1.321, Aeneas `8f4466db`).
 
 ## 1. Goal
 
-Today the refinement theorem `permission_flags_eq` starts from a parsed policy. The parser
-(`src/sudoers/{char_stream,basic_parser,tokens,ast}.rs`) and the pure part of `analyze` are
-unproved, so no statement connects the text of a sudoers file to a decision.
+At the baseline, `permission_flags_eq` started from a parsed policy. No statement connected
+the text of a sudoers file to a decision; the parser (`src/sudoers/{char_stream,basic_parser,tokens,ast}.rs`)
+and the pure part of `analyze` lay outside that proof.
 
 The goal is a kernel-checked chain
 
@@ -189,15 +190,24 @@ Names are provisional.
 account for the whole input: leading blanks, the attempted item, an optional comment, and
 the terminator or text skipped on recovery. `garbage_point` shows why coverage by the
 *reported diagnostic spans* is false: the span has zero width even when the parser discards
-one or more characters. For PT6, [`parseSudoersWith_clean_sound`](../spec/SudoersSpec/Grammar/SudoFile.lean)
-discharges the single-item premise for the stable grammar. It establishes a derivation,
-not uniqueness of every possible derivation of the broad grammar.
+one or more characters. For PT6, [`parseSudoersWith_exact_iff` and `exactSudo_cleanFile_unique`](../spec/SudoersSpec/Grammar/SudoUnique.lean)
+give equivalence and uniqueness for the exact stable grammar, which retains ignored spans
+and recovery cursors. Uniqueness does not hold for every derivation of the broader grammar.
 
 **E2E-clean, alias expansion.** Diagnostic-free sanitization proves the dependency order
 needed for equivalence of an *item list* with its expansion. For a flattened *whole policy*,
 [`authorize_expandAliases`](../spec/SudoersSpec/Expansion.lean) also requires expansion
 not to empty a runas user list and no command-alias body to contain `ALL`. Clean syntax
 alone does not justify dropping those hypotheses or claiming exact equality of all tags.
+
+**E2E, boundary actually checked.** The Rust call chain starts at the same `analyze_text`
+that `Sudoers::read` calls *after* reading and decoding. `text_to_authorization` supplies
+the concrete parser refinement, policy invariants, tag and name bounds, modifier provenance
+and settings range; it does not take an already correct policy as input. A single fixed
+external environment, a resolved request, representable cursor and analysis counters, and
+the diagnostic path/renderer agreements remain hypotheses. Includes have a separate [PA
+theorem for finite snapshots](../lean/SudoRsProofs/Parser/Analysis/Includes.lean);
+opening files, native identity resolution and executing a permitted command are not proved.
 
 **Test boundary.** [P0](P0.md) records which dump format was compared; the original
 two-settings-base observer could miss differences between modifiers. The

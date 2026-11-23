@@ -219,14 +219,23 @@ enabled during extraction, so its `apparmor_profile` restriction is not covered.
 re-escaped token and follows from `1 + 2 * character_count ≤ usize::MAX` at file start.
 [`P2Oracle`](SudoRsProofs/Parser/P2Oracle.lean) relates character classes, command
 canonicalization, glob compilation and native argument conversion to a fixed external
-snapshot. Release and test diagnostic descriptions differ; implementation refinement uses
-release descriptions. Dump comparisons from `#[cfg(test)]` use test descriptions.
+snapshot. The native-string conversion is promised **only for representable UTF-8 text**;
+the token byte bound proves each converted word is in that domain. `GlobOracle.os_inj`
+requires lossless comparison keys for other OS arguments, not lossy UTF-8 decoding.
+Release and test diagnostic descriptions differ; refinement uses release descriptions,
+while `#[cfg(test)]` dump comparisons use test descriptions.
 
-The local analysis proof supplies `PolicyOK`; it assumes representability on the parsed
-inputs, agreement of the primitive error renderer, and an owned source path when a
-diagnostic actually needs one. The apply/range proofs do not require a particular ordering
-of native hash tables. [`observeAuthorization`](../spec/SudoersSpec/Analysis/Observations.lean)
-keeps all other fields and compares `env_keep` and `env_check` by membership. File ownership,
+[`text_to_authorization`](SudoRsProofs/Parser/EndToEnd.lean) assumes no accepted include,
+`(items.map Ref.itemSize).sum ≤ Usize.max` on the reference parse (total collection and
+sanitizer capacity), agreement of the primitive diagnostic renderer, and an owned source
+path when a diagnostic actually needs one. In addition to the parser environment it uses the
+resolved request, representable current host, `InstOracle`, `GlobOracle` and literal host
+matching. [Name and tag bounds](SudoRsProofs/Parser/Analysis/ReferenceFit.lean), raw modifier
+provenance, valid alias indices, `PolicyOK` and `SettingsInRange` are **conclusions of
+earlier links**, not obligations on an assumed policy. An actual empty diagnostics vector
+proves the exact clean grammar derivation is unique. The combined analyzer/check theorem
+does not require this extra clean premise. [`observeAuthorization`](../spec/SudoersSpec/Analysis/Observations.lean)
+keeps all scalar fields and compares `env_keep` and `env_check` by membership. File ownership,
 UTF-8 decoding before the character cursor, PAM, NSS consistency, and OS execution are
 not established by these theorems. `@socket` is not in the default extraction.
 

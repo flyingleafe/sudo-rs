@@ -10,10 +10,11 @@ The policy proofs (P1–P9) start from a parsed policy and a resolved request, n
 of `sudo`. They transfer to the extracted code under the oracle and representation assumptions
 below. Alias flattening preserves decisions and tags under the stated conditions, not
 unconditionally. Separate proofs cover shell-mode argument escaping for every input and
-the compiled AArch64 `-u '#uid'` parser. For sudoers text, Lean proves that the extracted
-host-list parser [accepts exactly the host-list grammar](lean/SudoRsProofs/Parser/Grammar.lean)
-under its cursor bounds and Unicode-oracle assumption. Whole-file text-to-authorization
-equivalence is not yet proved.
+the compiled AArch64 `-u '#uid'` parser. For stable, include-free sudoers text,
+[`text_to_authorization`](lean/SudoRsProofs/Parser/EndToEnd.lean) connects the actual
+extracted parser, analyzer, Defaults passes, `check` and `Judgement::authorization` to the
+independent specification. It starts **after** the input is read and decoded, and ends at
+the returned decision and restrictions, not at OS execution. See the [text proof index](parser/README.md).
 
 ## Verification boundary
 
@@ -23,6 +24,14 @@ returns `ok r` (rather than an error or divergence) and that `r.map absTag` equa
 lookup, aliases, matchers, tag accumulation, and the pre-adjustment decision
 `check_permission_eq`. The spec separately proves default-deny and last-match
 properties.
+
+For the text theorem no policy or settings invariant is assumed: both are derived from the
+input. A denial is a successful return of `Forbidden`, not a failed parse. If the analyzer
+reports nothing, [`TextAgreement.clean_unique`](lean/SudoRsProofs/Parser/EndToEnd.lean)
+also identifies the unique grammar ASTs and end position and proves the alias tables are
+in valid dependency order. Exact tag equality after whole-policy alias expansion has two
+additional conditions, stated in `clean_expanded_flags`. [Input bounds and primitive model
+agreements](lean/ASSUMPTIONS.md#parser-and-analysis-boundaries) still apply.
 
 [`validate_flags_eq` and `list_flags_eq`](lean/SudoRsProofs/ListValidate.lean) make the
 same statement for the tags that `sudo -v` and `sudo -l` compute, against
