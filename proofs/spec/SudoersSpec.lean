@@ -33,3 +33,12 @@ import SudoersSpec.Syntax.TestsGrammar
 import SudoersSpec.Syntax.SettingsParser
 import SudoersSpec.Syntax.Sudo
 import SudoersSpec.Syntax.TestsSudo
+import SudoersSpec.Grammar.Basic
+import SudoersSpec.Grammar.Lexical
+import SudoersSpec.Grammar.Token
+import SudoersSpec.Grammar.List
+import SudoersSpec.Grammar.IPv4
+import SudoersSpec.Grammar.Hostname
+import SudoersSpec.Grammar.RoundTrip
+import SudoersSpec.Grammar.Follow
+import SudoersSpec.Grammar.Examples

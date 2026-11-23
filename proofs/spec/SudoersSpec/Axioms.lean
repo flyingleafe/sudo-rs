@@ -7,6 +7,7 @@ import SudoersSpec.Escape
 import SudoersSpec.Syntax.Ast
 import SudoersSpec.Settings.Properties
 import SudoersSpec.Syntax.Sudo
+import SudoersSpec.Grammar.Examples
 
 /-! Axiom audit: every main result depends on at most `propext`, `Classical.choice` and
 `Quot.sound`. `lake build` prints the lists. -/
@@ -166,3 +167,62 @@ open SudoersSpec
 #print axioms SudoersSpec.Syntax.metaOrTag_consumes
 #print axioms SudoersSpec.Syntax.parseSudoersWith_ne_reject
 #print axioms SudoersSpec.Syntax.parseSudoers_ne_reject
+#print axioms SudoersSpec.Grammar.trailingWhitespace_sound
+#print axioms SudoersSpec.Grammar.trailingWhitespace_complete
+#print axioms SudoersSpec.Grammar.trySyntax_reject_iff
+#print axioms SudoersSpec.Grammar.trySyntax_sound
+#print axioms SudoersSpec.Grammar.trySyntax_complete
+#print axioms SudoersSpec.Grammar.tryNonterminal_sound
+#print axioms SudoersSpec.Grammar.tryNonterminal_complete
+#print axioms SudoersSpec.Grammar.tryNonterminal_reject
+#print axioms SudoersSpec.Grammar.expectNonterminal_sound
+#print axioms SudoersSpec.Grammar.expectNonterminal_complete
+#print axioms SudoersSpec.Grammar.expectNonterminal_rejectPure
+#print axioms SudoersSpec.Grammar.acceptEscaped_sound
+#print axioms SudoersSpec.Grammar.acceptEscaped_complete
+#print axioms SudoersSpec.Grammar.acceptEscaped_reject
+#print axioms SudoersSpec.Grammar.token_sound
+#print axioms SudoersSpec.Grammar.token_complete
+#print axioms SudoersSpec.Grammar.token_reject
+#print axioms SudoersSpec.Grammar.token_rejectPure_iff
+#print axioms SudoersSpec.Grammar.tokenG_noEsc
+#print axioms SudoersSpec.Grammar.qualified_sound
+#print axioms SudoersSpec.Grammar.qualified_complete
+#print axioms SudoersSpec.Grammar.qualified_reject
+#print axioms SudoersSpec.Grammar.parseList_sound
+#print axioms SudoersSpec.Grammar.parseList_complete
+#print axioms SudoersSpec.Grammar.parseList_reject
+#print axioms SudoersSpec.Grammar.specList_sound
+#print axioms SudoersSpec.Grammar.specList_complete
+#print axioms SudoersSpec.Grammar.specList_reject
+#print axioms SudoersSpec.Grammar.looksLikeIPv4_iff
+#print axioms SudoersSpec.Grammar.metaConstruct_iff
+#print axioms SudoersSpec.Grammar.metaHostname_sound
+#print axioms SudoersSpec.Grammar.metaHostname_complete
+#print axioms SudoersSpec.Grammar.metaHostname_rejectPure
+#print axioms SudoersSpec.Grammar.specListHostname_rejectPure
+#print axioms SudoersSpec.Grammar.specListHostname_sound
+#print axioms SudoersSpec.Grammar.specListHostname_complete
+#print axioms SudoersSpec.Grammar.specListHostname_run_ok_iff
+#print axioms SudoersSpec.Grammar.hostList_unambiguous
+#print axioms SudoersSpec.Grammar.hostList_derives_unique
+#print axioms SudoersSpec.Grammar.specListHostname_roundTrip
+#print axioms SudoersSpec.Grammar.printable_iff_derivable
+#print axioms SudoersSpec.Grammar.HostOracle.metaHostVal_iff
+#print axioms SudoersSpec.Grammar.Examples.hostOracle_latin1
+#print axioms SudoersSpec.Grammar.Examples.escTok_not_rejectPure
+#print axioms SudoersSpec.Grammar.Examples.sample_derives
+#print axioms SudoersSpec.Grammar.hostList_follow_iff
+#print axioms SudoersSpec.Grammar.bind_sound
+#print axioms SudoersSpec.Grammar.bind_complete
+#print axioms SudoersSpec.Grammar.expectSyntax_sound
+#print axioms SudoersSpec.Grammar.expectSyntax_complete
+#print axioms SudoersSpec.Grammar.qualified_reject_iff
+#print axioms SudoersSpec.Grammar.parseList_reject_iff
+#print axioms SudoersSpec.Grammar.specList_reject_iff
+#print axioms SudoersSpec.Grammar.aliasName_rejectPure
+#print axioms SudoersSpec.Grammar.aliasName_sound
+#print axioms SudoersSpec.Grammar.aliasName_complete
+#print axioms SudoersSpec.Grammar.hostname_rejectPure
+#print axioms SudoersSpec.Grammar.hostname_sound
+#print axioms SudoersSpec.Grammar.hostname_complete
