@@ -11,6 +11,7 @@ import SudoersSpec.Syntax.Recovery
 import SudoersSpec.Grammar.Examples
 import SudoersSpec.Analysis.Collect
 import SudoersSpec.Grammar.PermissionExamples
+import SudoersSpec.Syntax.PanicFree
 
 /-! Axiom audit: every main result depends on at most `propext`, `Classical.choice` and
 `Quot.sound`. `lake build` prints the lists. -/
@@ -262,3 +263,8 @@ open SudoersSpec
 #print axioms SudoersSpec.Grammar.PermissionExamples.simpleSudoPrintable
 #print axioms SudoersSpec.Grammar.sudo_permission_pt4
 #print axioms SudoersSpec.Grammar.sudo_permission_unambiguous
+#print axioms SudoersSpec.Syntax.MarkerFree.bind
+#print axioms SudoersSpec.Syntax.MarkerFree.maybe
+#print axioms SudoersSpec.Syntax.MarkerFree.loop
+#print axioms SudoersSpec.Syntax.splitWhitespace_ne_nil
+#print axioms SudoersSpec.Syntax.not_ws_of_meta_accept1st
