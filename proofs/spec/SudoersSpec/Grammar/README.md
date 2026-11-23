@@ -316,7 +316,7 @@ not); PT3 applied to a run with blanks, a line continuation, `!!` and `É`; PT2 
 rejected input; the token PT2 counterexample; negative controls `1.2.3.4`, `123`, `a, `, the
 empty text and `a \x` (no derivation for any value and right context).
 
-## Proof size
+## P1 proof size
 
 Measured on this directory (lines without blank lines and comments; `theorem`/`example` and
 definitions counted at the start of a line):
@@ -340,3 +340,83 @@ of this fragment), `Hostname`/`Meta<T>`/`AliasName` in `tokens.rs` 73, `Qualifie
 23: about 340 lines, so about 8 lines of grammar proof per Rust line. The generic layer
 (`Basic`, `Lexical`, `Token`, `List`: 1721 lines) is reused by P2 and P3; the name and host-list
 instances with PT5 and the follow condition are 992 lines.
+
+## P2: permission lines
+
+`PermissionAtoms`, `PermissionRunAs`, `PermissionTags`, `Permission`, and
+`PermissionDispatch` give the syntax judgments for a permission specification;
+`PermissionPrint` and `PermissionExamples` give its round trip and a concrete derivation.
+No judgment is defined by a successful parser run. Tokens reuse `TokenG` over the
+reference character classes, escape tables, length limits and value constructors.
+The command constructor splits the decoded token into a path and argument words and
+uses the given filesystem and glob oracles. No equality between different oracle
+snapshots is assumed.
+
+The outer rule is a user list followed by a `:`-separated list of `Host_List = Entries`
+groups. An entry is optional runas followed by tags and a qualified command. Variants
+of the grammar account for the leading `#` branch and quoted or ordinary first users
+in the actual `Syntax.sudo` production. The ordinary case requires `OrdinaryKey`:
+the first user cannot select a directive. This does not constrain a first user in
+the explicitly quoted or numeric branch. `permissionLine` is the same body without
+the outer dispatch.
+
+* `IdentifierG` recognizes bare names or `#` and a decimal `u32`. The bare markers
+  (`#`, `%`, `%:`, and the opening quote) differ from punctuation that consumes `Ws`.
+  `UserSpecifierG` handles the nested, re-escaped input of quoted users. `MetaG` uses
+  the lexical rejection judgment `TokenRejectG`, not just an empty optional token.
+* A maximal alias-shaped keyword before a command is a tag, `ALL` or an alias.
+  `MetaTagG` checks the required punctuation and payload for known tags, and tests
+  the absence of `=` after an alias. `TagLoopG` accounts for the tag count limit;
+  after the failed keyword probe, command syntax is `QualG` over `CommandTokenG`.
+* The general PT3 grammar includes the successful outcomes of runas defaults after
+  a swallowed error. `MissG` records the consumed prefix and a `NoMatch` judgment
+  (no successful user/group-list derivation from that input). It does not characterize
+  the exact cursor endpoint of an unsuccessful list or its diagnostic.
+* PT3 carries the outer stream position exactly. For a span-bearing ignored tag, the
+  broad structural relation checks the span's internal displacement over the keyword
+  and whitespace; its start is existential, not guarded by the outer stream position.
+  The clean grammar for PT4 excludes span-bearing modifiers. It permits an empty
+  runas user list only under the lexical guard `EmptyRunasUsers`, and does not use
+  the recovered runas cases.
+
+The central statements for the actual `sudo` branch are:
+
+```lean
+sudo_permission_sound (O : Oracles) (D : Descriptions) {s t : Stream} {a : PermissionSpec}
+    (h : (sudo O D).run s = (.ok (.spec a), t)) :
+    ∃ c, s.rest = c ++ t.rest ∧ SudoPermissionG O c a t.rest ∧
+      t.getPos = posAfter c s.getPos
+
+sudo_permission_pt4 (O : Oracles) (D : Descriptions) {c r : List Char}
+    {a : PermissionSpec} (h : PositiveSudoPermissionG O c a r) (line col : Nat) :
+    (sudo O D).run ⟨c ++ r, line, col⟩ =
+      (.ok (.spec a), ⟨r, (posAfter c (line, col)).1, (posAfter c (line, col)).2⟩)
+
+sudo_permission_roundTrip (O : Oracles) (D : Descriptions) {a : PermissionSpec}
+    (h : PrintableSudoPermission O a) (rest : List Char) (line col : Nat) :
+    let c := (PermissionPrint.permissionSpec a).toList
+    (sudo O D).run ⟨c ++ '\n' :: rest, line, col⟩ =
+      (.ok (.spec a), ⟨'\n' :: rest, (posAfter c (line, col)).1, (posAfter c (line, col)).2⟩)
+```
+
+PT4 takes the exact right context of the derivation. PT5 uses a physical newline as
+the follow character and can leave any tail after it, by `positiveSudoPermission_headOnly`.
+Neither theorem consumes the newline, strips a leading indent, nor proves anything about
+file-level recovery. No constraints on starting `line` and `col` are needed for the
+Lean stream. PT4 also implies `sudo_permission_unambiguous` on a fixed input.
+
+`PermissionPrint.permissionSpec` transcribes the permission-printer equations in
+`Differential.Print` into the core-only package; the spec cannot import the harness.
+`PrintableSudoPermission O a` is the explicit, oracle-relative grammar criterion
+`PositiveSudoPermissionG O (PermissionPrint.permissionSpec a).toList a ['\n']`.
+In particular, the list counts and byte limits must fit, the name classes and
+all/alias/plain classifications must agree with the values, a command pattern must
+survive canonicalization and glob compilation under `O`, and the printed argument
+words must reconstruct the given `Args` (including `*` and `""` sentinels). The
+printer does not escape values or print `CWD`, AppArmor, ignored, or no-op modifiers.
+The criterion also excludes collisions in which a printed alias is read as a
+keyword or the first user selects a directive. It is not a claim that every output
+of the differential generator satisfies this judgment. No cross-package equivalence
+or generator-range theorem is needed for the Lean theorem above; those are not
+checked here. The example `PermissionExamples.simpleSudoPrintable` constructs a
+derivation directly, then uses PT5 on it.
