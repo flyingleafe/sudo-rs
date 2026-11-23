@@ -163,9 +163,8 @@ theorem parsed_modifier_produced {O : Oracles} (hO : P2CharOracle O.char)
     (h : defaults.SettingsModifier.Insts.Sudo_rsSudoersBasic_parserParse.parse s =
       ok (.Ok m, t)) : Settings.Produced (Defaults.absModifier m) := by
   obtain ⟨r, t', he, hr, _, ha⟩ := (settingsModifier_parse_refines hO).parse s hs
-  rw [h] at he
-  simp only [Result.ok.injEq, Prod.mk.injEq] at he
-  obtain ⟨rfl, rfl⟩ := he
+  have e : (.Ok m, t) = (r, t') := Result.ok.injEq.mp (h.symm.trans he)
+  cases e
   rcases href : (settingsModifier O .release).run (absStream s) with ⟨result, stop⟩
   rw [href] at hr ha
   cases result with
