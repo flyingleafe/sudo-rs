@@ -39,7 +39,7 @@ structure std.ffi.os_str.OsStr where
 /-- [std::path::Path]: abstract. -/
 opaque std.path.Path : Type
 
-/-- Abstract: sanitizer diagnostics never carry a source path. -/
+/-- [std::path::PathBuf]: abstract (the `source` of a diagnostic; the path of an included file). -/
 opaque std.path.PathBuf : Type
 
 /-- [glob::Pattern]: abstract. -/

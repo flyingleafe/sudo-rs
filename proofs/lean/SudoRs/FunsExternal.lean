@@ -479,3 +479,71 @@ def std.collections.hash.set.HashSet.remove
     let same ← eqQ.partialEqInst.eq q key
     ok (!same)
   ok (kept.length != keys.length, kept)
+
+/-! ### Models used by the analysis of the parsed items and the `Defaults` scoping
+(`analyze`, `Sudoers::check`, `proofs/parser/ANALYSIS.md`) -/
+
+/-- [std::path::{std::path::Path}::to_path_buf]: `Path` and `PathBuf` are abstract, so is the
+copy. Opaque (no axiom): the `source` of a diagnostic of the analysis is `to_path_buf` of the
+path of the file; a theorem that needs its value takes it as a hypothesis. -/
+opaque std.path.Path.to_path_buf : std.path.Path → Result std.path.PathBuf
+
+/-- [std::path::{std::path::PathBuf}::as_path]: abstract. Opaque: only the path of an included
+file, which the include oracle returns, is turned back into a `Path`. -/
+opaque std.path.PathBuf.as_path : std.path.PathBuf → Result std.path.Path
+
+/-- [sudo_rs::sudoers::include_file]: the include oracle, part 1 (`src/sudoers/mod.rs`), kept
+opaque for Charon: it resolves a path against the including file, reads the file system and
+parses the included file. Opaque (no axiom); the analysis calls it only for include items. -/
+opaque sudoers.include_file :
+  std.path.Path → sudoers.IncludeFile → Option sudoers.IncludeState →
+    Result (core.result.Result (std.path.PathBuf × (alloc.vec.Vec
+      (core.result.Result sudoers.ast.Sudo sudoers.basic_parser.Status))) String)
+
+/-- [sudo_rs::sudoers::include_dir_files]: the include oracle, part 2, kept opaque for Charon: the
+listing of an `@includedir` directory, or a message. Opaque (no axiom). -/
+opaque sudoers.include_dir_files :
+  std.path.Path → String → Result (core.result.Result (alloc.vec.Vec std.path.PathBuf) String)
+
+namespace sudo_rs
+
+/-- The text of `kind.to_string()` for the error kind of a fatal parse error (`Display for
+ErrorKind`, `src/sudoers/basic_parser.rs`). Not modelled. -/
+opaque errorKindText : sudoers.basic_parser.ErrorKind → String
+
+end sudo_rs
+
+/-- [sudo_rs::sudoers::fatal_message]: `kind.to_string()`, kept opaque for Charon (formatting).
+Total: `Display for ErrorKind` writes into a `String` and cannot fail; its text is
+`errorKindText`. -/
+def sudoers.fatal_message (kind : sudoers.basic_parser.ErrorKind) : Result String :=
+  ok (sudo_rs.errorKindText kind)
+
+/-- [sudo_rs::defaults::{impl Default for Settings}::default], kept opaque for Charon: the
+initializers of the list settings (`[..].into_iter().map(..).collect::<HashSet<_>>()` in
+`initializer_of!`, `src/defaults/settings_dsl.rs`) have no Aeneas model. Opaque (no axiom): a
+theorem about the settings in force starts from `Settings::default()` as a hypothesis. -/
+opaque defaults.Settings.Insts.CoreDefaultDefault.default : Result defaults.Settings
+
+/-- [alloc::boxed::{impl Default for Box<[T]>}::default]: the empty slice; boxes are erased. -/
+def BoxSlice.Insts.CoreDefaultDefault.default (T : Type _) : Result (Slice T) :=
+  ok (Slice.new T)
+
+/-- [alloc::boxed::{impl Clone for Box<str>}::clone]: copies the bytes; boxes are erased. -/
+def BoxStr.Insts.CoreCloneClone.clone {A : Type _} (_ : core.clone.Clone A) (s : Str) :
+    Result Str :=
+  ok s
+
+/-- [std::collections::hash::set::{impl Clone for HashSet<T, S, A>}::clone]: the same keys,
+each cloned with the key's `Clone` (the table is cloned element by element); extensional, as
+`insert`. -/
+def std.collections.hash.set.HashSet.Insts.CoreCloneClone.clone {T S A : Type}
+    (cloneT : core.clone.Clone T) (_ : core.clone.Clone S) (_ : core.clone.Clone A)
+    (keys : std.collections.hash.set.HashSet T S A) :
+    Result (std.collections.hash.set.HashSet T S A) :=
+  keys.mapM cloneT.clone
+
+/-- [std::hash::random::{impl Clone for RandomState}::clone]: hash seeding is not observed by
+the set model; only fills the dictionary of the `HashSet` clone. -/
+opaque std.hash.random.RandomState.Insts.CoreCloneClone.clone :
+  std.hash.random.RandomState → Result std.hash.random.RandomState
