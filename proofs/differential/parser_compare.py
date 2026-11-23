@@ -343,6 +343,7 @@ RS_RULES = [
 # sudo-rs syntax errors: (text before the error start, text from it) -> category
 RS_CONTEXT_RULES = [
     (r"\+$", r"", "unsupported by sudo-rs: netgroup"),
+    (r"^Defaults!+\s*$", r"", "Defaults! scope: a second '!' with no item after it"),
     (r"#$", r"^-", "user id: '#-N' rejected by sudo-rs"),
     (r"", r"^#-", "user id: '#-N' rejected by sudo-rs"),
     (r"\\$", r"^[^\n]", "escape: sequence rejected by sudo-rs"),
@@ -388,6 +389,11 @@ def classify_rs(msg, text, span, logical, item_line):
         for b, a, cat in RS_CONTEXT_RULES:
             if re.search(b, before) and re.search(a, at):
                 return cat
+    if msg.startswith("expecting '"):
+        if '"' in msg:
+            return "quoting: sudo-rs requires the closing quote before the next token"
+        if ')' in msg:
+            return "runas: an error inside the user list is discarded and the list ends early (F-P3)"
     for pat, cat in RS_RULES:
         if re.search(pat, msg):
             return cat(msg) if callable(cat) else cat
@@ -414,6 +420,7 @@ C_RULES = [
     (r"unknown defaults entry", "Defaults: setting unknown to C"),
     (r"empty group", "user: '%' without a group name"),
     (r"^empty netgroup$", "user: empty netgroup rejected by C"),
+    (r"^: ", "include: empty path after the directive (C reports the open failure)"),
     (r"unexpected line break in string|invalid line continuation", "continuation: inside a quoted string (C)"),
 ]
 
@@ -436,16 +443,23 @@ C_CONTEXT_RULES = [
     (r"/[ \t]+[^,:()]*$", r"", "command: directory with arguments rejected by C"),
     (r"\blist\s+$", r"", "command: 'list' with arguments rejected by C"),
     (r"/[^\s=,]*$", r"^=", "command: '=' inside a path (C ends the path there)"),
+    (r"!\s+$", r"", "negation: '!' separated by whitespace rejected by C"),
 ]
 
 
 def classify_c(cm, text, logical):
     """A line where C reports cm = (line, col, msg) and sudo-rs accepts."""
     line, col, msg = cm
-    for pat, cat in C_RULES:
-        if re.search(pat, msg):
-            return cat
-    if msg != "syntax error" or line is None:
+    if line is not None:
+        ltext0 = text.split("\n")[line - 1] if line - 1 < len(text.split("\n")) else ""
+        if re.match(r"\s*Defaults[A-Za-z0-9_]", ltext0):
+            return "Defaults keyword glued to a word: a user name for C, a Defaults line for sudo-rs"
+    errno_only = msg.strip() in ERRNO_TEXT
+    if not errno_only:
+        for pat, cat in C_RULES:
+            if re.search(pat, msg):
+                return cat
+    if (msg != "syntax error" and not errno_only) or line is None:
         return None
     lines = text.split("\n")
     ltext = lines[line - 1] if line - 1 < len(lines) else ""
@@ -464,6 +478,12 @@ def classify_c(cm, text, logical):
 
 def cjoin(cerr):
     return "; ".join(m[2] for m in cerr)
+
+
+# C messages that are the text of the current `errno` rather than a diagnostic (visudo prints
+# them when the parser reports an error without a message of its own).
+ERRNO_TEXT = {"Success", "No such file or directory", "File exists", "Is a directory",
+              "Not a directory", "Permission denied", "Too many levels of symbolic links"}
 
 
 # --------------------------------------------------------------------------- content
@@ -707,8 +727,52 @@ def apply(f, entries):
     return collections.Counter(x for x in (f(e) for e in entries.elements()) if x is not None)
 
 
-def content_category(mine, theirs):
-    """Name the cause of a content difference: the explanation that makes both sides equal."""
+def part_cause(x, y):
+    """Name the difference between two members of a list, or two commands."""
+    if not (isinstance(x, tuple) and isinstance(y, tuple)) or x == y or len(x) < 2 or len(y) < 2:
+        return None
+    xs, ys = x[1], y[1]
+    if (xs, ys) in ((("username", "ALL"), "ALL"), ("ALL", ("username", "ALL"))):
+        return 'quoted "ALL": the ALL keyword for C, a user name for sudo-rs'
+    if isinstance(xs, tuple) and isinstance(ys, tuple) and len(xs) == 2 == len(ys):
+        if (xs[0] == "alias" and ys == "ALL") or (xs == "ALL" and ys[0] == "alias"):
+            return 'quoted "ALL": the ALL keyword for C, an alias reference for sudo-rs'
+        if (xs[0] == "nonunixgroup" and xs[1] == "" and ys[0] == "nonunixgid") or \
+                (ys[0] == "nonunixgroup" and ys[1] == "" and xs[0] == "nonunixgid"):
+            return "quoted '%:#N': an empty non-unix group name for sudo-rs, a gid for C"
+        if xs[0] == ys[0] and xs[0] in ("username", "usergroup", "nonunixgroup", "hostname") \
+                and isinstance(xs[1], str) and isinstance(ys[1], str):
+            short, long = (xs[1], ys[1]) if len(xs[1]) < len(ys[1]) else (ys[1], xs[1])
+            if short and long.startswith(short):
+                return ("quoted name: sudo-rs keeps the part before a character its unquoted "
+                        "token does not accept")
+        if xs[0] == ys[0] == "cmd" and xs[1] != ys[1] and \
+                (ys[1].startswith(xs[1]) or xs[1].startswith(ys[1])):
+            return "command path: C ends the path at the escape or '=', sudo-rs keeps it"
+    return None
+
+
+def member_cause(only_rs, only_c):
+    """Name the first differing member of unmatched entries of the same kind."""
+    for e in only_rs:
+        for f in only_c:
+            if e[0] != f[0] or len(e) != len(f):
+                continue
+            for i in range(1, len(e)):
+                if e[:i] != f[:i] or e[i + 1:] != f[i + 1:]:
+                    continue
+                x, y = e[i], f[i]
+                for u in (x if isinstance(x, tuple) else [x]):
+                    for v in (y if isinstance(y, tuple) else [y]):
+                        cat = part_cause(u, v)
+                        if cat:
+                            return cat
+    return None
+
+
+def content_category(mine, theirs, text):
+    """Name the cause of a content difference: the explanation that makes both sides equal, else
+    the first differing member of the unmatched entries, else the text."""
     for name, frs, fc in EXPLANATIONS:
         if apply(frs, mine) == apply(fc, theirs):
             return name
@@ -718,6 +782,13 @@ def content_category(mine, theirs):
     if a == b:
         return "content: several of the causes above"
     only_rs, only_c = list(a - b), list(b - a)
+    cat = member_cause(only_rs, only_c)
+    if cat:
+        return cat
+    if [e for e in only_c if e[0] == "rule"] and not [e for e in only_rs if e[0] == "rule"] and \
+            re.search(r"(^|[\n])[ \t]*#[^\n]*\\\\[\n]", text):
+        return ("comment ending in a backslash: C joins the next line into the comment, "
+                "sudo-rs does not")
     for e in only_rs:
         for f in only_c:
             if e[0] == f[0] == "rule" and e[1] == f[1] and e[2] == f[2]:
@@ -891,7 +962,7 @@ def main():
                 content["equal"] += 1
             else:
                 only_rs, only_c = list(mine - theirs), list(theirs - mine)
-                note(label, content_category(mine, theirs), 0,
+                note(label, content_category(mine, theirs, text), 0,
                      f"sudo-rs only: {only_rs[:2]} C only: {only_c[:2]}")
 
     n = len(corpus)

@@ -1,6 +1,8 @@
 # C sudo 1.9.18 as a third opinion on the parser (stage P0)
 
-Evidence kind: test. The numbers below hold for the corpus they were measured on (seed 1, 200
+Evidence kind: test. Unless a section says otherwise, the tables are the **local seed-1 run**
+(200 cases per category, 5,824 cases, NixOS laptop); section 5 reports the cluster run.
+The numbers below hold for the corpus they were measured on (seed 1, 200
 cases per category, 5,824 cases) and for nothing else. The comparison is between the legacy
 sudo-rs parser (`parse_lines::<Sudo>` at `70fdb56b`, read through the dump of `DUMP.md`) and the
 sudoers parser of C sudo 1.9.18, at the level both expose.
@@ -277,6 +279,40 @@ entries per side. Neither a structural label nor results from a different host e
 these rows. P0's requirement to explain every C discrepancy remains open for this corpus.
 
 ## 5. Running
+## 5. Cluster run
+
+`parser-run.sh 1000 SEED` for seeds 1 to 8 (232,192 cases) at `d84ff98a`, on a Red Hat host
+where some command paths of the corpus exist (`/usr/bin/su`), so C sudo canonicalizes them and
+the per-case C verdicts differ from the laptop: 0 panic records, 146,539 differences, 201
+unclassified (26, 33, 25, 22, 15, 24, 35, 21 per seed).
+
+Reading those 201 cases (their texts, the cluster C messages and the local reproduction of the
+same labelled texts) named these causes, now rules in `parser_compare.py`:
+
+| New category | Cause it names |
+|---|---|
+| quoted "ALL": the ALL keyword for C, a user name or alias reference for sudo-rs | `"ALL"` in a user list |
+| quoted name: sudo-rs keeps the part before a character its unquoted token does not accept | a quoted name whose inner re-parse stops early (`"𐐀#x"` -> `𐐀`) |
+| quoted '%:#N': an empty non-unix group name for sudo-rs, a gid for C | `"%:#5"` |
+| comment ending in a backslash: C joins the next line into the comment, sudo-rs does not | `#\` at the end of a comment line |
+| Defaults! scope: a second '!' with no item after it | `Defaults!! ...` |
+| Defaults keyword glued to a word: a user name for C, a Defaults line for sudo-rs | `DefaultsALL ...` |
+| netgroup: empty netgroup name (C reports it at the '+') | `+` with an empty name |
+| include: target is a directory / include: empty path after the directive | `@include <dir>`, `@include:` |
+| negation: '!' separated by whitespace rejected by C (before any character) | `Defaults:u1,! #0` |
+| quoting: sudo-rs requires the closing quote before the next token | an unclosed quote |
+| runas: an error inside the user list is discarded and the list ends early (F-P3) | `(#<11 digits>, ...)` |
+| C messages that are the text of the current `errno` rather than a diagnostic | `Success`, `File exists` on the cluster: C reports an error without a message; the construct is named by C's column |
+
+Not resolved by a rule: differences of entry *lists* whose entries match only after modelling
+how C splits a command path at `=` or at an escape and how it prints the `""` marker. A change
+of the C command normalizer was tried and reverted: it moved the local seed-1 remainder from 0
+to 7 unclassified, so the classification stays as it is until the cluster re-run shows whether
+these remain. On the local reproduction of the 201 cases, 92 of 361 differences stay
+unclassified, all of this kind (`rule commands differ` 46, `rule users differ` 26, alias members
+9, `Defaults` 7, and 4 single cases).
+
+## 6. Running
 
 Local (about 35 s wall, 1.6 CPU-minutes):
 
@@ -292,6 +328,10 @@ for seed in 1 2 3 4 5 6 7 8; do
   PARSER_SCRATCH=/scratch/sudo-parser-p0-$seed JOBS=16 nix develop ../.. -c ./parser-run.sh 1000 $seed
 done
 ```
+
+With `PARSER_KEEP=1` the run also writes `corpus.txt.gz`, `sudo-rs.dump.gz`, `c-sudo.out.gz`
+and `sudo-rs.dump.bases.gz`; after `gzip -d`, `python3 parser_compare.py corpus.txt
+sudo-rs.dump c-sudo.out differences.tsv` re-classifies them without C sudo.
 
 Each run writes `report.md` (these tables) and `differences.tsv` (one line per difference:
 label, line, category, messages) to `$PARSER_SCRATCH`. A run whose report shows unclassified

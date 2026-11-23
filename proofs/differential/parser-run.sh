@@ -10,7 +10,10 @@
 # cargo target dir (CARGO_TARGET_DIR overrides) and the C build (CSUDO_BUILD overrides);
 # JOBS (default 4) parallel C workers; SUDO_SRC the sudo 1.9.18 sources (default /tmp/fi/src/sudo).
 # Outputs in $PARSER_SCRATCH: corpus.txt, sudo-rs.dump (+ .hostdep), chartable.txt,
-# c-sudo.out, differences.tsv, report.md.
+# c-sudo.out, differences.tsv, report.md. PARSER_KEEP=1 also writes corpus.txt.gz,
+# sudo-rs.dump.gz and c-sudo.out.gz, so that the comparison can be re-run offline (no C sudo):
+#   gzip -d corpus.txt.gz sudo-rs.dump.gz c-sudo.out.gz
+#   python3 parser_compare.py corpus.txt sudo-rs.dump c-sudo.out differences.tsv
 set -euo pipefail
 
 n=${1:-200}
@@ -40,6 +43,13 @@ echo "== sudo-rs dump" >&2
 echo "== C sudo" >&2
 rm -rf "$scratch/work"
 "$parser" csudo "$scratch/corpus.txt" "$build" "$scratch/work" "$jobs" > "$scratch/c-sudo.out"
+
+if [ "${PARSER_KEEP:-0}" = 1 ]; then
+  echo "== keeping the inputs and outputs (gzip)" >&2
+  gzip -9 -c "$scratch/corpus.txt" > "$scratch/corpus.txt.gz"
+  gzip -9 -c "$scratch/sudo-rs.dump" > "$scratch/sudo-rs.dump.gz"
+  gzip -9 -c "$scratch/c-sudo.out" > "$scratch/c-sudo.out.gz"
+fi
 
 echo "== comparison" >&2
 python3 "$here/parser_compare.py" "$scratch/corpus.txt" "$scratch/sudo-rs.dump" \
