@@ -296,3 +296,9 @@ open SudoersSpec
 #print axioms SudoersSpec.Grammar.parseSudoersWith_clean_sound
 #print axioms SudoersSpec.Grammar.sudo_clean_step_partition
 #print axioms SudoersSpec.Grammar.sudo_clean_eof_partition
+#print axioms SudoersSpec.Grammar.PermissionPrint.metaItem_not_injective
+#print axioms SudoersSpec.Grammar.permissionValue_printable
+#print axioms SudoersSpec.Grammar.sudo_permission_structural_roundTrip
+#print axioms SudoersSpec.Grammar.checkPermissionValue_iff
+#print axioms SudoersSpec.Grammar.sudo_permission_checked_roundTrip
+#print axioms SudoersSpec.Grammar.PermissionExamples.simpleRuleValue

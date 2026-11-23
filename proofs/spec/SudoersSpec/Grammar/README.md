@@ -344,8 +344,12 @@ instances with PT5 and the follow condition are 992 lines.
 ## P2: permission lines
 
 `PermissionAtoms`, `PermissionRunAs`, `PermissionTags`, `Permission`, and
-`PermissionDispatch` give the syntax judgments for a permission specification;
-`PermissionPrint` and `PermissionExamples` give its round trip and a concrete derivation.
+`PermissionDispatch` give the syntax judgments for a permission specification.
+`PermissionRender` is the renderer shared by the core spec and the differential harness;
+`PermissionPrint` proves grammar-level completeness and round trips. `PermissionSurface`,
+`PermissionNames`, `PermissionCommands`, `PermissionValues` and `PermissionValueCheck`
+prove and implement the structural value criterion below. `PermissionExamples` checks it
+on ordinary abstract values.
 No judgment is defined by a successful parser run. Tokens reuse `TokenG` over the
 reference character classes, escape tables, length limits and value constructors.
 The command constructor splits the decoded token into a path and argument words and
@@ -405,18 +409,46 @@ Neither theorem consumes the newline, strips a leading indent, nor proves anythi
 file-level recovery. No constraints on starting `line` and `col` are needed for the
 Lean stream. PT4 also implies `sudo_permission_unambiguous` on a fixed input.
 
-`PermissionPrint.permissionSpec` transcribes the permission-printer equations in
-`Differential.Print` into the core-only package; the spec cannot import the harness.
-`PrintableSudoPermission O a` is the explicit, oracle-relative grammar criterion
-`PositiveSudoPermissionG O (PermissionPrint.permissionSpec a).toList a ['\n']`.
-In particular, the list counts and byte limits must fit, the name classes and
-all/alias/plain classifications must agree with the values, a command pattern must
-survive canonicalization and glob compilation under `O`, and the printed argument
-words must reconstruct the given `Args` (including `*` and `""` sentinels). The
-printer does not escape values or print `CWD`, AppArmor, ignored, or no-op modifiers.
-The criterion also excludes collisions in which a printed alias is read as a
-keyword or the first user selects a directive. It is not a claim that every output
-of the differential generator satisfies this judgment. No cross-package equivalence
-or generator-range theorem is needed for the Lean theorem above; those are not
-checked here. The example `PermissionExamples.simpleSudoPrintable` constructs a
-derivation directly, then uses PT5 on it.
+### Structural printability
+
+`PermissionValue O a` is compositional over the AST and executable via
+`checkPermissionValue O a`. It does not invoke the stream parser or test for a grammar
+derivation. `permissionValue_printable` constructs `PrintableSudoPermission O a`
+from `PermissionValue O a` and `PermissionLexical O.char`; the original grammar
+judgment and theorem statements are unchanged.
+
+* User, host, host-group and command lists are nonempty and have at most 127 items.
+  Either runas list may additionally be empty. There are at most 127 modifiers,
+  each one of `EXEC`, `NOEXEC`, `SETENV`, `NOSETENV`, `PASSWD` and `NOPASSWD`.
+* Literal name, identifier and command text must have the appropriate first and
+  subsequent character classes, fit the UTF-8 length check, and need no lexer
+  escapes. IDs fit `u32` and the decimal token check; a first numeric user is
+  dispatched separately. The first ordinary user must not select a directive.
+  The name and alias classifications must agree with the values, and command names
+  spelled as aliases must not be reserved command keywords.
+* Plain command paths are absolute, are one whitespace-free word, and do not end
+  in the directory shorthand `/`. The fixed snapshot either leaves the path
+  unchanged or reports that it cannot canonicalize it; glob compilation succeeds.
+  Argument words are nonempty and contain no whitespace. The argument constructor
+  on those words and the appropriate trailing sentinel (`*` or `""`, if any) must
+  preserve the `Args` value. The lexical length and class check covers a final space
+  before the inter-group `:`, which is read into the command token.
+* `PermissionLexical` supplies the P1 host-oracle conditions, ASCII alphanumeric
+  agreement, and the control/newline and whitespace/space facts used at token
+  boundaries. The check is pointwise for the given oracle snapshot; it does not
+  decide these global oracle laws.
+
+`sudo_permission_structural_roundTrip` has the same result as
+`sudo_permission_roundTrip`, with premises `PermissionLexical O.char` and
+`PermissionValue O a`. `sudo_permission_checked_roundTrip` instead takes
+`checkPermissionValue O a = true`. Both leave an arbitrary suffix starting with a
+physical newline. The examples include a checked multi-group value with numeric
+first user, runas, an ordinary tag, a command alias and argument sentinels.
+
+There is no second copy of the renderer in `Differential.Print`, so the harness
+uses the very function proved about here. `PermissionPrint.metaItem_not_injective`
+proves the generic spelling ambiguity between an alias and a direct item;
+the classifier obligations choose the supported interpretation. We do not prove
+that every seed of `Generate.policy` satisfies `PermissionValue`, nor certify a
+live filesystem snapshot. Distinct names with the same spelling, values requiring
+quoting, and unsupported modifiers are not covered by this canonical renderer.

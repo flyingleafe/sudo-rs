@@ -105,7 +105,7 @@ def aliasLines (c : Case) : List String := c.defs.map Print.anyDef
 
 /-- The policy as sudoers text, one string per line. -/
 def sudoersLines (c : Case) : List String :=
-  c.aliasLines ++ c.rules.map Print.permissionSpec
+  c.aliasLines ++ c.rules.map SudoersSpec.Grammar.PermissionPrint.permissionSpec
 
 /-- The probe that runs this case on sudo-rs. -/
 def probe (c : Case) : Probe :=

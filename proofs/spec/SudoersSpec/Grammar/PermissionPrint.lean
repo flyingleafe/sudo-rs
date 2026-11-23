@@ -1,77 +1,11 @@
 import SudoersSpec.Grammar.Permission
 import SudoersSpec.Grammar.Follow
 import SudoersSpec.Grammar.PermissionDispatch
+import SudoersSpec.Grammar.PermissionRender
 
 namespace SudoersSpec.Grammar
 
 open SudoersSpec.Syntax
-
-/-! ## Canonical permission text
-
-These renderers have the equations of `Differential.Print` for permission nodes. They are
-in the core spec package (which cannot import the differential harness). Validity is a
-judgment on the resulting text, not on executing the parser. -/
-namespace PermissionPrint
-
-def metaItem (f : α → String) : Meta α → String
-  | .all => "ALL"
-  | .only a => f a
-  | .alias n => n
-
-def qualified (f : α → String) : Qualified α → String
-  | .allow a => f a
-  | .forbid a => "!" ++ f a
-
-def spec (f : α → String) (s : Spec α) : String := qualified (metaItem f) s
-
-def specList (f : α → String) (ss : SpecList α) : String := ", ".intercalate (ss.map (spec f))
-
-def identifier : Identifier → String
-  | .name n => n
-  | .id n => s!"#{n}"
-
-def user : UserSpecifier → String
-  | .user i => identifier i
-  | .group i => "%" ++ identifier i
-  | .nonunixGroup i => "%:" ++ identifier i
-
-def args : Args → String
-  | .prefix [] => ""
-  | .prefix as => " " ++ " ".intercalate as ++ " *"
-  | .exact [] => " \"\""
-  | .exact as => " " ++ " ".intercalate as
-
-def command (c : Command) : String := c.pattern ++ args c.args
-
-def runas (r : RunAs) : String :=
-  match r.users, r.groups with
-  | us, [] => "(" ++ specList user us ++ ")"
-  | [], gs => "(: " ++ specList identifier gs ++ ")"
-  | us, gs => "(" ++ specList user us ++ " : " ++ specList identifier gs ++ ")"
-
-def modifier : Modifier → Option String
-  | .exec => some "EXEC:"
-  | .noexec => some "NOEXEC:"
-  | .setenv => some "SETENV:"
-  | .nosetenv => some "NOSETENV:"
-  | .passwd => some "PASSWD:"
-  | .nopasswd => some "NOPASSWD:"
-  | _ => none
-
-def commandSpec (a : CommandSpec) : String :=
-  " ".intercalate (a.mods.filterMap modifier ++ [spec command a.cmd])
-
-def entry : PermissionEntry → String
-  | (some r, a) => runas r ++ " " ++ commandSpec a
-  | (none, a) => commandSpec a
-
-def group (g : PermissionGroup) : String :=
-  specList id g.1 ++ " = " ++ ", ".intercalate (g.2.map entry)
-
-def permissionSpec (a : PermissionSpec) : String :=
-  specList user a.users ++ " " ++ " : ".intercalate (a.permissions.map group)
-
-end PermissionPrint
 
 /-! ## Right contexts of the positive grammar -/
 

@@ -43,7 +43,7 @@ inductive Line where
   deriving Inhabited
 
 def Line.text : Line → String
-  | .rule r => Print.permissionSpec r
+  | .rule r => SudoersSpec.Grammar.PermissionPrint.permissionSpec r
   | .defn d => Print.anyDef d
   | .raw s => s
 
@@ -80,7 +80,7 @@ def lineForOthers (c : Case) (l : PermissionSpec) : Bool :=
 user's decision. -/
 def OtherUsersLineIrrelevant (E : EngineFn) : Prop :=
   ∀ (c : Case) (k : Nat) (l : PermissionSpec), lineForOthers c l = true →
-    verdict E (c.withLines (insertAt c.sudoersLines k [Print.permissionSpec l])) =
+    verdict E (c.withLines (insertAt c.sudoersLines k [SudoersSpec.Grammar.PermissionPrint.permissionSpec l])) =
       verdict E c.probe
 
 /-! ## (b) Appending a line without a command-side `!` never revokes -/
@@ -335,7 +335,7 @@ def propA : Prop' (Case × Nat × PermissionSpec) where
     let k ← below (c.sudoersLines.length + 1)
     return (c, k, { r with users := users.map (.allow ∘ .only) })
   stage1 := fun (c, k, l) =>
-    [c.probe, c.withLines (insertAt c.sudoersLines k [Print.permissionSpec l])]
+    [c.probe, c.withLines (insertAt c.sudoersLines k [SudoersSpec.Grammar.PermissionPrint.permissionSpec l])]
   check := fun (c, _, l) rs _ =>
     if !lineForOthers c l then .vacuous
     else match rs with
@@ -344,7 +344,8 @@ def propA : Prop' (Case × Nat × PermissionSpec) where
   shrink := fun (c, k, l) =>
     (Minimize.shrinks c).map (·, k, l) ++ (Minimize.shrinkRule l).map (c, k, ·) ++
       (if k > 0 then [(c, k - 1, l)] else [])
-  describe := fun (c, k, l) => showCase c ++ s!"\n  inserted before line {k}: {Print.permissionSpec l}"
+  describe := fun (c, k, l) =>
+    showCase c ++ s!"\n  inserted before line {k}: {SudoersSpec.Grammar.PermissionPrint.permissionSpec l}"
 
 /-- Turn negated commands into plain ones. -/
 def positive (r : PermissionSpec) : PermissionSpec :=

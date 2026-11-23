@@ -50,8 +50,9 @@ where
     | .all => .all
     | .alias n => .alias n
     | .only (.user i) => .only i
-    | .only (.group i) => .only (.name ("%" ++ Print.identifier i))
-    | .only (.nonunixGroup i) => .only (.name ("%:" ++ Print.identifier i))
+    | .only (.group i) => .only (.name ("%" ++ SudoersSpec.Grammar.PermissionPrint.identifier i))
+    | .only (.nonunixGroup i) =>
+      .only (.name ("%:" ++ SudoersSpec.Grammar.PermissionPrint.identifier i))
 
 /-- Expansion of a runas group list with the (already fully expanded) `Runas_Alias` table. -/
 def expandGroups (t : List (Def UserSpecifier)) (fuel : Nat) (l : SpecList Identifier) :

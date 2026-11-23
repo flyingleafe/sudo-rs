@@ -1,4 +1,4 @@
-import SudoersSpec.Grammar.PermissionPrint
+import SudoersSpec.Grammar.PermissionValueCheck
 import SudoersSpec.Grammar.Examples
 
 namespace SudoersSpec.Grammar.PermissionExamples
@@ -105,5 +105,62 @@ theorem simpleSudoPrintable : PrintableSudoPermission O simpleRule := by
 example : (sudo O Descriptions.release).run (Stream.ofString "ALL ALL = /s\n") =
     (.ok (.spec simpleRule), ⟨['\n'], 1, 13⟩) :=
   sudo_permission_roundTrip O Descriptions.release simpleSudoPrintable [] 1 1
+
+theorem permissionLexical_latin1 : PermissionLexical O.char := by
+  refine ⟨Examples.hostOracle_latin1, ?_, by decide, by decide⟩
+  intro d h
+  change CharOracle.latin1.isAlphanumeric d = _
+  simp only [CharOracle.latin1, Examples.u32_le, Examples.u32_beq]
+  have h1 : d.toNat ≠ 170 := by omega
+  have h2 : d.toNat ≠ 178 := by omega
+  have h3 : d.toNat ≠ 179 := by omega
+  have h4 : d.toNat ≠ 181 := by omega
+  have h5 : d.toNat ≠ 185 := by omega
+  have h6 : d.toNat ≠ 186 := by omega
+  have h7 : ¬ 188 ≤ d.toNat := by omega
+  have h8 : ¬ 192 ≤ d.toNat := by omega
+  simp [h1, h2, h3, h4, h5, h6, h7, h8]
+
+private theorem oneItem {P : α → Prop} {a : α} (h : P a) : BoundedItems P [a] :=
+  ⟨by simp, by simp, by simpa⟩
+
+private theorem simpleCommandValue : CommandValue O simpleCmd := by
+  refine ⟨⟨by decide, by decide, by decide, .inl rfl, rfl⟩, ⟨by simp [argWords], by decide⟩, ?_⟩
+  intro b; cases b <;> exact ⟨by decide, by
+    intro d hd
+    have e : d = '/' := Option.some.inj hd |>.symm
+    subst d; decide, by decide, by decide, by decide⟩
+
+/-- A value-side certificate and application of structural PT5 on ordinary syntax. -/
+theorem simpleRuleValue : PermissionValue O simpleRule := by
+  refine ⟨oneItem trivial, .inr ⟨trivial, by decide⟩, oneItem ?_⟩
+  refine ⟨oneItem trivial, oneItem ?_⟩
+  constructor
+  · intro _ h; cases h
+  · exact ⟨by decide, by simp, simpleCommandValue⟩
+
+example : (sudo O Descriptions.release).run (Stream.ofString "ALL ALL = /s\n") =
+    (.ok (.spec simpleRule), ⟨['\n'], 1, 13⟩) :=
+  sudo_permission_structural_roundTrip O Descriptions.release permissionLexical_latin1 simpleRuleValue [] 1 1
+
+/-- Ordinary generator-shaped values, including a numeric first user, both runas
+lists, a supported tag, an alias, and a second host group. This checks only an AST
+and a pure oracle, not a system configuration. -/
+private def structuredRule : PermissionSpec :=
+  ⟨[.allow (.only (.user (.id 7))), .allow (.only (.group (.name "wheel")))],
+    [([.allow (.only "h1")],
+      [(some ⟨[.allow (.only (.user (.name "bob")))], [.allow (.only (.id 10))]⟩,
+        ⟨[.exec], .allow (.only ⟨"/bin/echo", .prefix ["x"]⟩)⟩),
+       (none, ⟨[], .allow (.alias "CM0")⟩)]),
+     ([.allow .all], [(some ⟨[], []⟩, ⟨[], .forbid (.only ⟨"/bin/echo", .exact []⟩)⟩)])]⟩
+
+private theorem structuredRule_check : checkPermissionValue O structuredRule = true := by decide
+
+example (rest : List Char) (line col : Nat) :
+    let c := (PermissionPrint.permissionSpec structuredRule).toList
+    (sudo O Descriptions.release).run ⟨c ++ '\n' :: rest, line, col⟩ =
+      (.ok (.spec structuredRule), ⟨'\n' :: rest, (posAfter c (line, col)).1, (posAfter c (line, col)).2⟩) :=
+  sudo_permission_checked_roundTrip O Descriptions.release permissionLexical_latin1
+    structuredRule_check rest line col
 
 end SudoersSpec.Grammar.PermissionExamples
