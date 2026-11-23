@@ -23,3 +23,12 @@ import SudoRsProofs.Properties
 import SudoRsProofs.Expansion
 import SudoRsProofs.Escape
 import SudoRsProofs.Axioms
+import SudoRsProofs.Parser.Abs
+import SudoRsProofs.Parser.Stream
+import SudoRsProofs.Parser.Combinators
+import SudoRsProofs.Parser.Token
+import SudoRsProofs.Parser.List
+import SudoRsProofs.Parser.Tokens
+import SudoRsProofs.Parser.Ast
+import SudoRsProofs.Parser.Lines
+import SudoRsProofs.Parser.Examples

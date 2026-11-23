@@ -76,10 +76,6 @@ theorem StreamOK.initial (src : Slice Char) (h : src.val.length < Usize.max) :
     StreamOK ⟨src, 0#usize, 1#usize, 1#usize⟩ := by
   constructor <;> simp <;> omega
 
-theorem StreamOK.rest_length {s : CS} (h : StreamOK s) :
-    (absStream s).rest.length = s.src.val.length - s.pos.val := by
-  simp
-
 /-! ## Errors -/
 
 /-- `ErrorKind` against `ErrKind`. `Expected(&str)` carries the UTF-8 bytes of the reference
@@ -152,6 +148,21 @@ structure ParseRefines {T α : Type} (P : sudo_rs.sudoers.basic_parser.Parse T) 
     (p : Parser α) : Prop where
   parse : ∀ s, StreamOK s → Refines f (P.parse s) (p.run (absStream s))
 
+/-- A result related to a reference result is never the transitional `Message`. -/
+theorem ResultRel.not_message {T α : Type} {f : T → α} {r : RParsed T} {r' : Parsed α}
+    (h : ResultRel f r r') (sp : sudo_rs.sudoers.basic_parser.Span) (m : String) :
+    r ≠ .Err (.Fatal sp (.Message m)) := by
+  rintro rfl
+  rcases r' with (⟨sp', k'⟩ | _) | a <;> simp only [ResultRel] at h <;> cases h
+  exact KindRel.not_message (by assumption)
+
+/-- **A refining computation never produces `ErrorKind::Message`.** -/
+theorem Refines.not_message {T α : Type} {f : T → α} {x : Result (RParsed T × CS)}
+    {out : Parsed α × Stream} (h : Refines f x out) :
+    ∃ r s', x = ok (r, s') ∧ ∀ sp m, r ≠ .Err (.Fatal sp (.Message m)) := by
+  obtain ⟨r, s', e, hr, -⟩ := h
+  exact ⟨r, s', e, hr.not_message⟩
+
 /-- `UserFriendly::DESCRIPTION` is the reference description `d` (its UTF-8 bytes). -/
 def DescRel {T : Type} (UF : sudo_rs.sudoers.ast_names.UserFriendly T) (d : String) : Prop :=
   ∃ s : Str, UF.DESCRIPTION = ok s ∧ s.val = sudo_rs.stringBytes d
@@ -205,6 +216,6 @@ structure UnicodeOracle (O : CharOracle) : Prop where
     core.result.Result.Insts.CoreOpsTry_traitFromResidualResult.from_residual T
       (core.convert.FromSame E) (.Err e) = ok (.Err e) := by
   simp [core.result.Result.Insts.CoreOpsTry_traitFromResidualResult.from_residual,
-    core.convert.FromSame, core.convert.FromSame.from]
+    core.convert.FromSame.from]
 
 end SudoRsProofs.Parser

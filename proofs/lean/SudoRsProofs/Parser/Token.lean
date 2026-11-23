@@ -114,7 +114,7 @@ theorem accept_escaped_refines (hT : TokenRefines Tk f T') (first : Bool) {s : C
           cases hn : ((absStream s1).eatChar '\n').1 with
           | false => simp [h2, Parser.run_fatalHere]
           | true =>
-            cases hsp : pred ' ' <;> simp [hacc, hsp, h2]
+            cases hsp : pred ' ' <;> simp [h2]
       cases hp : (absStream s1).peek with
       | none =>
         have hn := nextIf_of_peek_none hp T'.escaped

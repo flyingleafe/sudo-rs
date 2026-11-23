@@ -7,6 +7,7 @@ import SudoRsProofs.Authorization
 import SudoRsProofs.Properties
 import SudoRsProofs.Expansion
 import SudoRsProofs.Escape
+import SudoRsProofs.Parser.Examples
 
 /-!
 # Axiom audit
@@ -102,3 +103,18 @@ of `SudoRs/{Types,Funs}External.lean` are definitions or `opaque` constants, nev
 #print axioms SudoRsProofs.Escape.escaped_injective
 #print axioms SudoRsProofs.Escape.escaped_collision
 #print axioms SudoRsProofs.Escape.escaped_unescape
+#print axioms SudoRsProofs.Parser.token_refines
+#print axioms SudoRsProofs.Parser.parse_list_refines
+#print axioms SudoRsProofs.Parser.vec_refines
+#print axioms SudoRsProofs.Parser.qualified_refines
+#print axioms SudoRsProofs.Parser.hostname_token_refines
+#print axioms SudoRsProofs.Parser.meta_token_refines
+#print axioms SudoRsProofs.Parser.hostname_description
+#print axioms SudoRsProofs.Parser.spec_list_hostname_refines
+#print axioms SudoRsProofs.Parser.host_list_refines
+#print axioms SudoRsProofs.Parser.host_list_refines_text
+#print axioms SudoRsProofs.Parser.parse_lines_refines
+#print axioms SudoRsProofs.Parser.parse_lines_refines_text
+#print axioms SudoRsProofs.Parser.parse_lines_no_reject_no_message
+#print axioms SudoRsProofs.Parser.host_list_example
+#print axioms SudoRsProofs.Parser.parse_lines_example

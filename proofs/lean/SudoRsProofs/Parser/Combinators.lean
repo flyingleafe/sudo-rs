@@ -112,8 +112,7 @@ theorem maybe_rel {T α : Type} {f : T → α} {r : RParsed T} {r' : Parsed α}
     ∃ m, sudo_rs.sudoers.basic_parser.maybe r = ok m ∧
       ResultRel (Option.map f) m (SudoersSpec.Syntax.maybe r') := by
   rcases r with x | (⟨sp, k⟩ | _) <;> rcases r' with (⟨sp', k'⟩ | _) | a <;>
-    simp_all [ResultRel, SudoersSpec.Syntax.maybe] <;> cases h <;> simp [ResultRel] <;>
-    constructor <;> assumption
+    simp_all [ResultRel, SudoersSpec.Syntax.maybe]
 
 /-! ## `LeadingWhitespace` -/
 
