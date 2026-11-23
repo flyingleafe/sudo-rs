@@ -45,3 +45,10 @@ import SudoersSpec.Grammar.Follow
 import SudoersSpec.Grammar.Examples
 import SudoersSpec.Analysis.AliasOrder
 import SudoersSpec.Analysis.Collect
+import SudoersSpec.Grammar.PermissionAtoms
+import SudoersSpec.Grammar.PermissionRunAs
+import SudoersSpec.Grammar.PermissionTags
+import SudoersSpec.Grammar.Permission
+import SudoersSpec.Grammar.PermissionDispatch
+import SudoersSpec.Grammar.PermissionPrint
+import SudoersSpec.Grammar.PermissionExamples

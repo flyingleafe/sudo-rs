@@ -10,6 +10,7 @@ import SudoersSpec.Syntax.Sudo
 import SudoersSpec.Syntax.Recovery
 import SudoersSpec.Grammar.Examples
 import SudoersSpec.Analysis.Collect
+import SudoersSpec.Grammar.PermissionExamples
 
 /-! Axiom audit: every main result depends on at most `propext`, `Classical.choice` and
 `Quot.sound`. `lake build` prints the lists. -/
@@ -238,3 +239,26 @@ open SudoersSpec
 #print axioms SudoersSpec.Analysis.collectFrom_some_iff
 #print axioms SudoersSpec.Analysis.reachable_applyModifiers
 #print axioms SudoersSpec.Analysis.authorizationOfText_defined
+#print axioms SudoersSpec.Grammar.userSpecifier_sound
+#print axioms SudoersSpec.Grammar.userSpecifier_complete
+#print axioms SudoersSpec.Grammar.userList_sound
+#print axioms SudoersSpec.Grammar.userList_complete
+#print axioms SudoersSpec.Grammar.identifierList_sound
+#print axioms SudoersSpec.Grammar.identifierList_complete
+#print axioms SudoersSpec.Grammar.runAs_sound
+#print axioms SudoersSpec.Grammar.runAs_complete
+#print axioms SudoersSpec.Grammar.metaOrTag_sound
+#print axioms SudoersSpec.Grammar.metaOrTag_complete
+#print axioms SudoersSpec.Grammar.commandSpec_sound
+#print axioms SudoersSpec.Grammar.commandSpec_complete
+#print axioms SudoersSpec.Grammar.permissions_sound
+#print axioms SudoersSpec.Grammar.permissions_complete
+#print axioms SudoersSpec.Grammar.permissionLine_pt3
+#print axioms SudoersSpec.Grammar.permissionLine_pt4
+#print axioms SudoersSpec.Grammar.permissionLine_roundTrip
+#print axioms SudoersSpec.Grammar.sudo_permission_sound
+#print axioms SudoersSpec.Grammar.sudo_permission_complete
+#print axioms SudoersSpec.Grammar.sudo_permission_roundTrip
+#print axioms SudoersSpec.Grammar.PermissionExamples.simpleSudoPrintable
+#print axioms SudoersSpec.Grammar.sudo_permission_pt4
+#print axioms SudoersSpec.Grammar.sudo_permission_unambiguous
