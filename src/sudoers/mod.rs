@@ -389,7 +389,7 @@ fn open_sudoers(path: &Path) -> io::Result<Vec<char>> {
 
 /// Parse the text of a sudoers file.
 fn parse_sudoers(text: &[char]) -> Vec<basic_parser::Parsed<Sudo>> {
-    basic_parser::parse_lines(&mut char_stream::CharStream::from_chars(text))
+    ast::parse_sudo_lines(&mut char_stream::CharStream::from_chars(text))
 }
 
 #[cfg(feature = "unstable-remote-sudoers")]

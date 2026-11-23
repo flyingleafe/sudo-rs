@@ -51,8 +51,7 @@ pub(super) fn permissions(stream: &mut CharStream) -> Parsed<Permissions> {
 
 /// `parse_lines::<Sudo>`: the whole file, one item per line with per-line error recovery. A
 /// monomorphic instance, and the entry point of the extraction (`Cargo.toml`
-/// `[package.metadata.charon]`).
-#[allow(dead_code)] // wired by `read_sudoers`/`parse_sudoers` (mod.rs, owned by another agent)
+/// `[package.metadata.charon]`); `parse_sudoers` in `mod.rs` calls it.
 pub(super) fn parse_sudo_lines(stream: &mut CharStream) -> Vec<Parsed<Sudo>> {
     parse_lines(stream)
 }
