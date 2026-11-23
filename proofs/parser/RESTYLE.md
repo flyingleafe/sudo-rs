@@ -226,9 +226,16 @@ Under `cfg(test)` every `UserFriendly::DESCRIPTION` is `"elem"`; the description
 compared only by the fuzz target, which builds without `cfg(test)`.
 
 Fuzz smoke run: `parser_equiv` built with `fuzz/run.sh build parser_equiv`, seeded with the
-`sudoers_parse` seeds and the sudoers dictionary, run for 55 s: 48,771 executions, 5,897 edges,
+`sudoers_parse` seeds and the sudoers dictionary, run for 55 s: 36,097 executions, 6,198 edges,
 no difference, no crash. The campaign belongs on the cluster:
 `FUZZ_SECONDS=1800 fuzz/run.sh campaign parser_equiv`.
+
+Dump comparison (`proofs/parser/DUMP.md` section 6, the dump agent's harness): the corpus of
+`parser corpus 20260101 25` (749 cases: every grammar, mutation and `known` category) dumped by
+`SUDO_PARSER_DUMP_CORPUS=… SUDO_PARSER_DUMP_OUT=… cargo test --lib sudoers::test::parser_dump::`
+at the merge base (`b6a9bbdb`) and at this head is **byte-identical** — 3,153 dump lines, and the
+`.bases` and chartable outputs too. This compares the *live* parser before and after the rewrite
+on the dump's own corpus, independently of `equiv.rs`.
 
 The existing unit tests pass unchanged, apart from `assert_remote_failure` (feature
 `unstable-remote-sudoers`, compares the rendered kind) and the test-only `impl Token for
