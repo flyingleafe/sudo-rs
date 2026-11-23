@@ -17,7 +17,7 @@ def aliasRefsOf (l : SpecList α) : List String :=
 
 namespace AliasOrder
 
-local instance : Inhabited (Def α) := ⟨⟨"", []⟩⟩
+def defAt (t : Array (Def α)) (i : Nat) : Def α := t[i]?.getD ⟨"", []⟩
 
 /-- Positions entered, positions finished, and diagnostics emitted. -/
 structure State where
@@ -44,16 +44,16 @@ def visit (t : Array (Def α)) : Nat → Nat → State → State
   | 0, _, s => s
   | fuel + 1, pos, s =>
     if pos ∈ s.seen then
-      if pos ∈ s.order then s else s.emit (recursiveMessage t[pos]!.name)
+      if pos ∈ s.order then s else s.emit (recursiveMessage (defAt t pos).name)
     else
-      let s' := visitRefs t (visit t fuel) (aliasRefsOf t[pos]!.items) { s with seen := pos :: s.seen }
+      let s' := visitRefs t (visit t fuel) (aliasRefsOf (defAt t pos).items) { s with seen := pos :: s.seen }
       { s' with order := s'.order.push pos }
 
 /-- Visit successive roots starting at `i`; `names` records roots encountered so far. -/
 def roots (t : Array (Def α)) : Nat → Nat → List String → State → State
   | 0, _, _, s => s
   | left + 1, i, names, s =>
-    let name := t[i]!.name
+    let name := (defAt t i).name
     if name ∈ names then
       roots t left (i + 1) names (s.emit (duplicateMessage name))
     else
@@ -63,16 +63,16 @@ def roots (t : Array (Def α)) : Nat → Nat → List String → State → State
 def table (defs : List (Def α)) : List (Def α) × List String :=
   let t := defs.toArray
   let s := roots t t.size 0 [] {}
-  (s.order.toList.map (t[·]!), s.diags.toList)
+  (s.order.toList.map (defAt t), s.diags.toList)
 
 end AliasOrder
 
 /-- Tables in processing order, with messages appended in user, host, command, runas order. -/
 def orderAliases (written : AliasTable) : AliasTable × List String :=
-  let (user, d1) := AliasOrder.table written.user
-  let (host, d2) := AliasOrder.table written.host
-  let (cmnd, d3) := AliasOrder.table written.cmnd
-  let (runas, d4) := AliasOrder.table written.runas
-  ({ user, host, cmnd, runas }, d1 ++ d2 ++ d3 ++ d4)
+  let u := AliasOrder.table written.user
+  let h := AliasOrder.table written.host
+  let c := AliasOrder.table written.cmnd
+  let r := AliasOrder.table written.runas
+  ({ user := u.1, host := h.1, cmnd := c.1, runas := r.1 }, u.2 ++ h.2 ++ c.2 ++ r.2)
 
 end SudoersSpec.Analysis

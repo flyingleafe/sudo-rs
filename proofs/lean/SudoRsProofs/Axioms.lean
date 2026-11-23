@@ -11,6 +11,7 @@ import SudoRsProofs.Parser.Examples
 import SudoRsProofs.Parser.Grammar
 import SudoRsProofs.Parser.File
 import SudoRsProofs.Defaults.Range
+import SudoRsProofs.Parser.Analysis.AliasOrder
 
 /-!
 # Axiom audit
@@ -144,3 +145,7 @@ of `SudoRs/{Types,Funs}External.lean` are definitions or `opaque` constants, nev
 #print axioms SudoRsProofs.Defaults.initialModel_sets
 #print axioms SudoRsProofs.Defaults.reachable_inRange
 #print axioms SudoRsProofs.Defaults.authorization_reachable_eq
+#print axioms SudoRsProofs.sanitize_alias_table_exact
+#print axioms SudoRsProofs.sanitize_alias_tables_exact
+#print axioms SudoRsProofs.sanitize_alias_tables_exact_returns
+#print axioms SudoRsProofs.sanitize_alias_table_exact_returns
