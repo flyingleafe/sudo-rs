@@ -607,9 +607,10 @@ theorem chars_of_eq (s : String) (h : s.utf8ByteSize ≤ Usize.max) :
   · rw [SudoRsProofs.Vec.deref_val]
     exact Slice.from_val _ _
 
+/-- `Hostname::construct` is total: refined on every text (`Pre := fun _ => True`). -/
 theorem hostname_token_refines {O : CharOracle} (hO : UnicodeOracle O) :
     TokenRefines sudo_rs.sudoers.tokens.Hostname.Insts.Sudo_rsSudoersBasic_parserToken id
-      (SudoersSpec.Syntax.hostnameToken O) where
+      (SudoersSpec.Syntax.hostnameToken O) (fun _ => True) where
   max_len := ⟨_, rfl, by
     simp [sudo_rs.sudoers.basic_parser.Token.MAX_LEN.default, SudoersSpec.Syntax.hostnameToken]⟩
   max_len_le := by
@@ -620,7 +621,7 @@ theorem hostname_token_refines {O : CharOracle} (hO : UnicodeOracle O) :
   accept c := hostname_accept_eq c
   accept_1st c := hostname_accept_eq c
   escaped _ := rfl
-  construct s hs := by
+  construct s hs _ := by
     obtain ⟨v, hv, hd⟩ := chars_of_eq s hs
     show ∃ r, sudo_rs.sudoers.tokens.Hostname.Insts.Sudo_rsSudoersBasic_parserToken.construct s =
       ok r ∧ ConstructRel id r (SudoersSpec.Syntax.Hostname.construct O s.toList)
@@ -630,11 +631,14 @@ theorem hostname_token_refines {O : CharOracle} (hO : UnicodeOracle O) :
     · exact ⟨_, rfl, (String.ofList_toList (s := s)).symm⟩
     · exact ⟨_, rfl, KindRel.hostIpv4⟩
 
+/-- `Meta<T>` refines `metaToken` with the precondition of `T` on `construct`
+(`Meta::construct` passes the raw text to `T::construct` or does not call it). -/
 theorem meta_token_refines {O : CharOracle} {T α : Type}
     {Tk : sudo_rs.sudoers.basic_parser.Token T} {f : T → α}
-    {T' : SudoersSpec.Syntax.TokenSpec α} (hO : UnicodeOracle O) (h : TokenRefines Tk f T') :
+    {T' : SudoersSpec.Syntax.TokenSpec α} {Pre : List Char → Prop} (hO : UnicodeOracle O)
+    (h : TokenRefines Tk f T' Pre) :
     TokenRefines (sudo_rs.sudoers.tokens.Meta.Insts.Sudo_rsSudoersBasic_parserToken Tk)
-      (SudoRsProofs.absMeta f) (SudoersSpec.Syntax.metaToken O T') where
+      (SudoRsProofs.absMeta f) (SudoersSpec.Syntax.metaToken O T') Pre where
   max_len := by
     obtain ⟨n, hn, hnv⟩ := h.max_len
     refine ⟨n, ?_, hnv⟩
@@ -659,7 +663,7 @@ theorem meta_token_refines {O : CharOracle} {T α : Type}
       h.accept_1st c, bind_ok]
     cases T'.accept1st c <;> simp [hO.is_uppercase]
   escaped c := h.escaped c
-  construct s hs := by
+  construct s hs hpre := by
     obtain ⟨v, hv, hd⟩ := chars_of_eq s hs
     obtain ⟨n, hn, hnle, htake⟩ := trimmed_len_eq hO (alloc.vec.Vec.deref v)
     have hle : n.val ≤ (alloc.vec.Vec.deref v).val.length := hnle
@@ -678,7 +682,7 @@ theorem meta_token_refines {O : CharOracle} {T α : Type}
       · simp only [h2, ↓reduceIte]
         exact ⟨_, rfl, rfl⟩
       · simp only [h2, Bool.false_eq_true, ↓reduceIte]
-        obtain ⟨r, hr, hrel⟩ := h.construct s hs
+        obtain ⟨r, hr, hrel⟩ := h.construct s hs hpre
         rw [hr, bind_ok]
         cases r with
         | Ok item =>

@@ -118,3 +118,7 @@ of `SudoRs/{Types,Funs}External.lean` are definitions or `opaque` constants, nev
 #print axioms SudoRsProofs.Parser.parse_lines_no_reject_no_message
 #print axioms SudoRsProofs.Parser.host_list_example
 #print axioms SudoRsProofs.Parser.parse_lines_example
+#print axioms SudoRsProofs.Parser.token_refines_at
+#print axioms SudoRsProofs.Parser.skip_trailing_whitespace_ok_next
+#print axioms SudoRsProofs.Parser.acceptEscaped_at_noBlankNext
+#print axioms SudoRsProofs.Parser.parse_lines_syntax_example

@@ -347,4 +347,108 @@ theorem expect_nonterminal_refines {T α : Type} {P : sudo_rs.sudoers.basic_pars
   rcases r with x | (⟨sp, k⟩ | _) <;> rcases r' with (⟨sp', k'⟩ | _) | a <;>
     simp_all [Parser.run_lift, Parser.run_fatalFrom]
 
+/-! ## The character after trailing whitespace
+
+After a successful `TrailingWhitespace` (so after `skip_trailing_whitespace`, `try_syntax`,
+`try_nonterminal` and `expect_nonterminal`), the next character, if any, is neither a blank nor
+the escape character: the loop ends only when `LeadingWhitespace` stopped at a non-blank and
+`eat_char('\\')` failed. -/
+
+/-- The property of the stream left by a successful `TrailingWhitespace`. -/
+def NoBlankNext (s : Stream) : Prop :=
+  ∀ c, s.peek = some c → c ≠ ' ' ∧ c ≠ '\t' ∧ c ≠ '\\'
+
+theorem skipWhile_peek {f : Char → Bool} {s : Stream} {c : Char}
+    (h : (s.skipWhile f).peek = some c) : f c = false := by
+  rw [Stream.peek, Stream.skipWhile_rest] at h
+  generalize s.rest = l at h
+  induction l with
+  | nil => cases h
+  | cons a l ih =>
+    by_cases ha : f a = true
+    · rw [List.dropWhile_cons_of_pos ha] at h; exact ih h
+    · rw [List.dropWhile_cons_of_neg ha] at h
+      simp only [List.head?_cons, Option.some.injEq] at h
+      subst h; simpa using ha
+
+theorem leadingWhitespace_snd (s : Stream) :
+    (SudoersSpec.Syntax.leadingWhitespace.run s).2 = s.skipWhile isBlank := by
+  rw [SudoersSpec.Syntax.leadingWhitespace_run]; split <;> rfl
+
+theorem trailingWhitespace_ok_next {s s' : Stream} {u : Unit}
+    (h : SudoersSpec.Syntax.trailingWhitespace.run s = (.ok u, s')) : NoBlankNext s' := by
+  have key := Parser.loop_invariant SudoersSpec.Syntax.trailingWhitespaceBody_progressive
+    (fun _ => True) (fun r s' => r.isOk = true → NoBlankNext s')
+    (fun _ _ _ _ _ _ => trivial) ?_ ?_ () s trivial
+  · have h' : (Parser.loop SudoersSpec.Syntax.trailingWhitespaceBody
+        SudoersSpec.Syntax.trailingWhitespaceBody_progressive ()).run s = (.ok u, s') := h
+    rw [h'] at key
+    exact key rfl
+  · intro st s0 b s1 _ hb _
+    simp only [SudoersSpec.Syntax.trailingWhitespaceBody, Parser.run_bind, Parser.run_observe,
+      Parser.run_eatChar, leadingWhitespace_snd] at hb
+    cases he : ((s0.skipWhile isBlank).eatChar '\\').1 with
+    | true =>
+      simp only [he, ↓reduceIte, Parser.run_bind, Parser.run_eatChar] at hb
+      cases hn : (((s0.skipWhile isBlank).eatChar '\\').2.eatChar '\n').1 <;>
+        simp [hn, Parser.run_fatalHere] at hb
+    | false =>
+      simp only [he, Bool.false_eq_true, ↓reduceIte, Parser.run_pure, Prod.mk.injEq] at hb
+      have hs := (Stream.eatChar_false (c := '\\') (s := s0.skipWhile isBlank)
+        (s' := ((s0.skipWhile isBlank).eatChar '\\').2)).mp (by rw [← he])
+      rw [← hb.2, hs.2]
+      intro c hc
+      have hb' := skipWhile_peek hc
+      simp only [isBlank, Bool.or_eq_false_iff, beq_eq_false_iff_ne] at hb'
+      refine ⟨hb'.2, hb'.1, ?_⟩
+      rintro rfl; exact hs.1 hc
+  · intro _ _ _ _ _ _ hok; simp [Except.isOk, Except.toBool] at hok
+
+theorem skipTrailingWhitespace_ok_next {s s' : Stream} {u : Unit}
+    (h : SudoersSpec.Syntax.skipTrailingWhitespace.run s = (.ok u, s')) : NoBlankNext s' := by
+  simp only [SudoersSpec.Syntax.skipTrailingWhitespace, Parser.run_bind] at h
+  rcases hT : SudoersSpec.Syntax.trailingWhitespace.run s with ⟨r, s1⟩
+  rw [hT] at h
+  rcases r with e | v <;> simp [Parser.run_pure] at h
+  rw [← h]; exact trailingWhitespace_ok_next hT
+
+theorem trySyntax_ok_next {c : Char} {s s' : Stream} {u : Unit}
+    (h : (SudoersSpec.Syntax.trySyntax c).run s = (.ok u, s')) : NoBlankNext s' := by
+  obtain ⟨b, s1, -, h⟩ := Parser.run_bind_eq_ok.mp h
+  cases b with
+  | false => simp at h
+  | true => simp only [Bool.not_true, Bool.false_eq_true, ↓reduceIte] at h
+            exact skipTrailingWhitespace_ok_next h
+
+theorem tryNonterminal_ok_next {α : Type} {p : Parser α} {s s' : Stream} {a : α}
+    (h : (SudoersSpec.Syntax.tryNonterminal p).run s = (.ok a, s')) : NoBlankNext s' := by
+  obtain ⟨x, s1, -, h⟩ := Parser.run_bind_eq_ok.mp h
+  obtain ⟨u, s2, h2, h⟩ := Parser.run_bind_eq_ok.mp h
+  simp only [Parser.run_pure, Prod.mk.injEq] at h
+  rw [← h.2]; exact skipTrailingWhitespace_ok_next h2
+
+theorem expectNonterminal_ok_next {α : Type} {p : Parser α} {d : String} {s s' : Stream}
+    {a : α} (h : (SudoersSpec.Syntax.expectNonterminal d p).run s = (.ok a, s')) :
+    NoBlankNext s' := by
+  simp only [SudoersSpec.Syntax.expectNonterminal, Parser.run_bind, Parser.run_getPos,
+    Parser.run_observe] at h
+  rcases hT : (SudoersSpec.Syntax.tryNonterminal p).run s with ⟨r, s1⟩
+  rw [hT] at h
+  rcases r with (⟨sp, k⟩ | _) | x <;> simp [Parser.run_lift, Parser.run_fatalFrom] at h
+  obtain ⟨rfl, rfl⟩ := h
+  exact tryNonterminal_ok_next hT
+
+/-- **The extracted `skip_trailing_whitespace`, on success, leaves a stream whose next
+character is neither a blank nor `\`.** -/
+theorem skip_trailing_whitespace_ok_next {s : CS} (h : StreamOK s) :
+    ∃ r s', sudo_rs.sudoers.basic_parser.skip_trailing_whitespace s = ok (r, s') ∧
+      StreamOK s' ∧ (r = .Ok () → NoBlankNext (absStream s')) := by
+  obtain ⟨r, s', e, hr, h', a⟩ := skip_trailing_whitespace_refines h
+  refine ⟨r, s', e, h', fun hr' => ?_⟩
+  subst hr'
+  rcases hT : SudoersSpec.Syntax.skipTrailingWhitespace.run (absStream s) with ⟨r', s''⟩
+  rw [hT] at hr a
+  rcases r' with e' | ⟨⟩ <;> simp only [ResultRel] at hr
+  rw [a]; exact skipTrailingWhitespace_ok_next hT
+
 end SudoRsProofs.Parser

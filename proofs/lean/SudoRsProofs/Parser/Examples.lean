@@ -62,8 +62,8 @@ theorem host_list_example {O : CharOracle} (hO : UnicodeOracle O) (hL : Latin1Ag
     rw [this]; scalar_tac
   obtain ⟨r, s', e, hr, -, a⟩ := host_list_refines_text hO hostsSrc hlen
   rw [← latin1Below_eq hL] at hr a
-  have hrun : (SudoersSpec.Syntax.tryNonterminal (SudoersSpec.Syntax.specListHostname
-      (latin1Below O) SudoersSpec.Syntax.Descriptions.release)).run (Stream.new hostsSrc.val) =
+  have hrun : (SudoersSpec.Syntax.specListHostname
+      (latin1Below O) SudoersSpec.Syntax.Descriptions.release).run (Stream.new hostsSrc.val) =
       (.ok [.allow (.only "web1"), .forbid (.only "db")], ⟨[], 1, 10⟩) := by
     simp only [hostsSrc, Slice.from_val]
     rfl
@@ -112,5 +112,29 @@ theorem parse_lines_example {O : CharOracle} (hO : UnicodeOracle O) (hL : Latin1
   simp only [Prod.mk.injEq, Except.ok.injEq] at hrun
   obtain ⟨rfl, ha⟩ := hrun
   exact ⟨v, s', e, hF, ha.symm⟩
+
+/-- An oracle-free instantiation of the generic line theorem: one syntax item, one newline. -/
+theorem parse_lines_syntax_example :
+    let src := Slice.from ['x', '\n'] (by simp; scalar_tac)
+    let parser : sudo_rs.sudoers.basic_parser.Parse Unit :=
+      ⟨sudo_rs.sudoers.basic_parser.try_syntax 'x'⟩
+    let names : sudo_rs.sudoers.ast_names.UserFriendly Unit := ⟨ok (toStr "x")⟩
+    ∃ v s', sudo_rs.sudoers.basic_parser.parse_lines parser names
+        ⟨src, 0#usize, 1#usize, 1#usize⟩ = ok (v, s') ∧
+      List.Forall₂ (ResultRel (id : Unit → Unit)) v.val [.ok ()] ∧
+      absStream s' = ⟨[], 2, 1⟩ := by
+  dsimp only
+  have hp : ParseRefines ⟨sudo_rs.sudoers.basic_parser.try_syntax 'x'⟩ id
+      (SudoersSpec.Syntax.trySyntax 'x') := ⟨fun _ h => try_syntax_refines h 'x'⟩
+  have hd : DescRel (T := Unit) ⟨ok (toStr "x")⟩ "x" := ⟨_, rfl, toStr_val _ _⟩
+  obtain ⟨v, s', items, e, hr, hF, -⟩ :=
+    parse_lines_refines_text hp hd (Slice.from ['x', '\n'] (by simp; scalar_tac))
+      (by simp; scalar_tac)
+  have he : (SudoersSpec.Syntax.parseLines "x" (SudoersSpec.Syntax.trySyntax 'x')).run
+      (Stream.new ['x', '\n']) = (.ok [(.ok ())], ⟨[], 2, 1⟩) := rfl
+  rw [Slice.from_val, he] at hr
+  simp only [Prod.mk.injEq, Except.ok.injEq] at hr
+  obtain ⟨rfl, hs⟩ := hr
+  exact ⟨v, s', e, hF, hs.symm⟩
 
 end SudoRsProofs.Parser

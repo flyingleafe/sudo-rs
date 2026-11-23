@@ -13,8 +13,7 @@ import SudoRsProofs.Parser.Tokens
   (`#[cfg(not(test))]`), so the release table is the one that applies;
 * `ManyRefines` for `Hostname`, `Meta<T>`, `Qualified<T>`;
 * **the P1 theorems** `spec_list_hostname_refines` (the `Vec<Qualified<Meta<Hostname>>>`
-  instance refines `specListHostname O D`) and `host_list_refines` (`host_list`, i.e.
-  `try_nonterminal::<SpecList<Hostname>>`, refines `tryNonterminal (specListHostname O D)`),
+  instance) and `host_list_refines` (the wrapper), both against `specListHostname O D`
   for every representable stream; `host_list_refines_text` states it on a whole input, with a
   precondition on the input length only.
 -/
@@ -242,29 +241,32 @@ theorem spec_list_hostname_refines {O : CharOracle} (hO : UnicodeOracle O)
   have hDesc : DescRel sudo_rs.sudoers.tokens.Hostname.Insts.Sudo_rsSudoersAst_namesUserFriendly
       D.hostname := hD ▸ hostname_description
   have hTok := token_refines (meta_token_refines hO (hostname_token_refines hO))
+    (fun _ _ => trivial)
   have hQ := qualified_refines hTok (desc_meta hDesc)
   have hV := vec_refines hQ (many_qualified (many_meta hostname_many))
     (desc_qualified (desc_meta hDesc))
   exact hV
 
-/-- **P1: `host_list` (`try_nonterminal::<SpecList<Hostname>>`) refines
-`tryNonterminal (specListHostname O D)`**, total correctness, on every representable stream. -/
+/-- **P1: `host_list` refines `specListHostname`** on every representable stream.
+Its enclosing `try_nonterminal` does not change the list's result or remainder. -/
 theorem host_list_refines {O : CharOracle} (hO : UnicodeOracle O)
     (D : SudoersSpec.Syntax.Descriptions)
     (hD : D.hostname = SudoersSpec.Syntax.Descriptions.release.hostname) {s : CS}
     (h : StreamOK s) :
     Refines absHostList (sudo_rs.sudoers.ast.host_list s)
-      ((SudoersSpec.Syntax.tryNonterminal (SudoersSpec.Syntax.specListHostname O D)).run
-        (absStream s)) :=
-  try_nonterminal_refines (spec_list_hostname_refines hO D hD) h
+      ((SudoersSpec.Syntax.specListHostname O D).run (absStream s)) := by
+  have he : (SudoersSpec.Syntax.tryNonterminal (SudoersSpec.Syntax.specListHostname O D)).run
+      (absStream s) = (SudoersSpec.Syntax.specListHostname O D).run (absStream s) :=
+    tryNonterminal_parseList_run _ _ _ _ _
+  rw [← he]
+  exact try_nonterminal_refines (spec_list_hostname_refines hO D hD) h
 
 /-- `host_list` on a whole input `src` (a cursor at position 0, line 1, column 1): the only
 precondition is the input length. -/
 theorem host_list_refines_text {O : CharOracle} (hO : UnicodeOracle O) (src : Slice Char)
     (hlen : src.val.length < Usize.max) :
     Refines absHostList (sudo_rs.sudoers.ast.host_list ⟨src, 0#usize, 1#usize, 1#usize⟩)
-      ((SudoersSpec.Syntax.tryNonterminal
-          (SudoersSpec.Syntax.specListHostname O SudoersSpec.Syntax.Descriptions.release)).run
+      ((SudoersSpec.Syntax.specListHostname O SudoersSpec.Syntax.Descriptions.release).run
         (Stream.new src.val)) :=
   host_list_refines hO _ rfl (StreamOK.initial src hlen)
 

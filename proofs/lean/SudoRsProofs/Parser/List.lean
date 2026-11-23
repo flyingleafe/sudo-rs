@@ -141,4 +141,67 @@ theorem vec_refines {M : sudo_rs.sudoers.basic_parser.Many T} {m : SudoersSpec.S
   rw [← hnv]
   exact parse_list_refines hP hD m.sep n h
 
+private theorem listLoop_ok_next (sep : Char) (max : Nat) (d : String) (p : Parser α)
+    (elems : List α) (s : Stream) (hs : NoBlankNext s) {out : List α} {s' : Stream}
+    (h : (refListLoop sep max d p elems).run s = (.ok out, s')) : NoBlankNext s' := by
+  unfold refListLoop Parser.whileMaybe at h
+  rw [Parser.loop_run] at h
+  simp only [Parser.whileMaybeBody, Parser.run_bind, Parser.run_maybe] at h
+  rcases hsep : (SudoersSpec.Syntax.trySyntax sep).run s with ⟨r, s1⟩
+  rw [hsep] at h
+  rcases r with (⟨sp, k⟩ | _) | ⟨⟩
+  · simp at h
+  · simp only [SudoersSpec.Syntax.maybe_reject, Parser.run_pure, Prod.mk.injEq] at h
+    exact h.2 ▸ (SudoersSpec.Syntax.trySyntax_reject hsep ▸ hs)
+  · have hlt := SudoersSpec.Syntax.trySyntax_consumes sep _ _ _ hsep
+    simp only [SudoersSpec.Syntax.maybe_ok, SudoersSpec.Syntax.parseListBody] at h
+    by_cases hm : elems.length ≥ max
+    · simp [hm] at h
+    · simp only [hm, ↓reduceIte, Parser.run_bind] at h
+      rcases hitem : (SudoersSpec.Syntax.expectNonterminal d p).run s1 with ⟨item, s2⟩
+      rw [hitem] at h
+      cases item with
+      | error e => simp at h
+      | ok a =>
+        have hle := Parser.length_le_of_run hitem
+        simp only [Parser.run_pure] at h
+        exact listLoop_ok_next sep max d p (elems ++ [a]) s2
+          (expectNonterminal_ok_next hitem) h
+termination_by s.rest.length
+decreasing_by omega
+
+theorem parseList_ok_next (sep : Char) (max : Nat) (d : String) (p : Parser α)
+    {s s' : Stream} {out : List α}
+    (h : (SudoersSpec.Syntax.parseList sep max d p).run s = (.ok out, s')) :
+    NoBlankNext s' := by
+  obtain ⟨a, s1, hfirst, hloop⟩ := Parser.run_bind_eq_ok.mp h
+  exact listLoop_ok_next sep max d p [a] s1 (tryNonterminal_ok_next hfirst) hloop
+
+theorem skipTrailingWhitespace_of_noBlankNext {s : Stream} (hs : NoBlankNext s) :
+    SudoersSpec.Syntax.skipTrailingWhitespace.run s = (.ok (), s) := by
+  have hx : s.nextIf isBlank = (none, s) := Stream.nextIf_eq_none.mpr
+    ⟨fun c hc => by
+      obtain ⟨hn1, hn2, _⟩ := hs c hc
+      simp [isBlank, hn1, hn2], rfl⟩
+  have hs' : s.skipWhile isBlank = s := by rw [Stream.skipWhile_eq, hx]
+  have he : s.eatChar '\\' = (false, s) := Stream.eatChar_false.mpr ⟨
+    fun h => (hs _ h).2.2 rfl, rfl⟩
+  have hT : SudoersSpec.Syntax.trailingWhitespace.run s = (.ok (), s) := by
+    rw [SudoersSpec.Syntax.trailingWhitespace, Parser.loop_run]
+    simp [SudoersSpec.Syntax.trailingWhitespaceBody, Parser.run_bind, Parser.run_eatChar,
+      leadingWhitespace_snd, hs', he]
+  simp [SudoersSpec.Syntax.skipTrailingWhitespace, Parser.run_bind, hT]
+
+/-- Each successfully parsed list element already skips trailing whitespace. The outer
+`tryNonterminal` on the whole list therefore leaves its result and stream unchanged. -/
+theorem tryNonterminal_parseList_run (sep : Char) (max : Nat) (d : String) (p : Parser α)
+    (s : Stream) :
+    (SudoersSpec.Syntax.tryNonterminal (SudoersSpec.Syntax.parseList sep max d p)).run s =
+      (SudoersSpec.Syntax.parseList sep max d p).run s := by
+  simp only [SudoersSpec.Syntax.tryNonterminal, Parser.run_bind]
+  rcases hr : (SudoersSpec.Syntax.parseList sep max d p).run s with ⟨r, s1⟩
+  cases r with
+  | error e => rfl
+  | ok a => simp [skipTrailingWhitespace_of_noBlankNext (parseList_ok_next _ _ _ _ hr)]
+
 end SudoRsProofs.Parser

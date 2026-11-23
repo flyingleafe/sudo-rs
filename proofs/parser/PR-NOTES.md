@@ -1,0 +1,53 @@
+# P1 parser refinement
+
+The P1 extracted parser returns `ok` in the Aeneas model and agrees with the reference on both the result and the final stream. This is kernel-checked, not a differential test.
+
+- `host_list_refines_text`: for `src.val.length < Usize.max`, `host_list` starting at `(pos, line, col) = (0, 1, 1)` refines `Syntax.specListHostname O Descriptions.release` on `Stream.new src.val`. Requires `UnicodeOracle O`. `host_list_refines` works on an arbitrary `StreamOK` cursor; it requires only the hostname entry of the descriptions table to match the release entry. The inner `Vec` instance is covered by `spec_list_hostname_refines`. The `try_nonterminal` around the list is redundant: `tryNonterminal_parseList_run` proves its last whitespace pass changes neither the result nor the remainder.
+- `parse_lines_refines_text`: for `2 * src.val.length ≤ Usize.max`, `parse_lines P UF` on the initial cursor returns `ok (v, s')`. For `ParseRefines P f p` and `DescRel UF d`, the reference returns `(.ok items, absStream s')` and `List.Forall₂ (ResultRel f) v.val items`. No successful-item progress hypothesis is needed. `parse_lines_no_reject_no_message` transfers the reference guarantee of no top-level rejects and rules out the transitional `Message` errors. Whole-policy `parse_lines::<Sudo>` still needs the `Sudo` instance proof.
+- `parse_lines_syntax_example` instantiates every hypothesis, without an oracle, and fixes the result and coordinates on `x` followed by a newline. `host_list_example` and `parse_lines_example` compute host-list results under the Unicode oracle and its agreement with pinned Rust on Latin-1. They do not claim to compute any of the opaque predicates in Lean.
+
+The bounds concern the extracted model. Cursor and token indices and the vector operations use the models documented in `proofs/lean/ASSUMPTIONS.md`; these theorems do not model allocator exhaustion. No external model changed. `advance`, `from_chars` and `new_with_pos` are not extracted in the P1 call graph; the text-level theorems initialize the cursor directly over the character slice. Only the character classes of `AliasName` are extracted for P1, not its constructor.
+
+## Proving another production
+
+1. Import the relevant files in `SudoRsProofs.Parser`. Use the existing AST maps in `Abs*.lean`; a vector of parsed values is `absVec f`, a spec list is `absSpecList f v.val`. Strings are Lean `String`s. For `&str`, relate `Str.val` to `sudo_rs.stringBytes`; `toStr_val` proves this for generated literals. Use `DescRel` to link each `UserFriendly::DESCRIPTION` to its `Descriptions.release` entry. `DescRel` is explicit for generic instances; do not substitute `Descriptions.test` for the ordinary extraction.
+2. Prove `ParseRefines P f p` by establishing `Refines f (P.parse s) (p.run (absStream s))` on `StreamOK s`. The latter gives the extracted `ok` equation, `ResultRel`, the preserved cursor invariant, and the final-stream equation. A fatal status maps via `KindRel` and the existing `absSpan`; `ResultRel.not_message` excludes the transitional `Message` without mapping it to anything. As later distinct error variants are extracted, add the corresponding `KindRel` constructors; do not match errors merely by rendered text.
+3. For a token, fill `TokenRefines Tk f T' Pre`. Its fields verify the constants and character classes, plus the `construct` call on texts satisfying `Pre` within the byte bound. Total constructors use `Pre := fun _ => True`. `token_refines` builds the generic `Parse` proof once `TokenText T' cs → Pre cs`. `TokenText` is a sound overapproximation: nonempty, the first character accepted by `accept1st` or obtained from an allowed escape, the others accepted by `accept` or obtained from an allowed escape. The loop preserves the first character. `meta_token_refines` transports the base constructor's precondition unchanged; the fallback passes it the original, untrimmed text.
+4. When the constructor needs the actual start position (rather than just the `TokenText` approximation), use `token_refines_at`. It supplies both the first character of the built text and the successful reference `acceptEscaped` run that produced it. `skipTrailingWhitespace_ok_next`, `trySyntax_ok_next`, `tryNonterminal_ok_next` and `expectNonterminal_ok_next` give `NoBlankNext` (the next character is neither space, tab nor backslash). The extracted analogue is `skip_trailing_whitespace_ok_next`. Combine `NoBlankNext` with `acceptEscaped_at_noBlankNext` to recover the original peek and the `accept1st` check. For a command constructor with a restricted domain, establish the needed non-whitespace character on these paths, not a global constructor-totality claim.
+5. For non-loop bodies, unfold the Rust function and the corresponding reference parser; obtain the callee's `ok` equation and rewrite using `bind_ok` and `uncurry_apply_pair`. Unfold reference `do` binds using `Parser.run_bind`, repeating after an `if` or `match` selects a nested `do` block. Case-split the concrete result and the reference `run` pair: `ResultRel` rules out the mismatched constructors. Once the Rust expression is `ok (r, s')`, `simp` with `refines_ok_iff`, the cursor facts and the result relation closes the goal. Use `exists_eq_ok_of_spec` on Aeneas `step` specs for scalar addition, slice indexing or vector push.
+6. For loops, unfold one extracted iteration with `rw [f_loop]`, not `simp [f_loop]` (which can keep unfolding). Use `Parser.loop_run` on the reference side; no need to reason about `loopFuel`. Recurse on the same measure as the reference (remaining characters, or remaining slice indices for indexed scans). Use the reference `Consumes` and `Parser.length_le_of_run` facts for decreases. Give a separate equation for the `more = false` branch, and connect the failure flag to `Except.error` in the loop postcondition.
+
+## Lemma inventory
+
+| Module | Reuse |
+|---|---|
+| `Abs` | `absStream`, `StreamOK.initial`, `KindRel`, `StatusRel`, `ResultRel`, `ConstructRel`, `Refines.not_message`; `ParseRefines`, `TokenRefines`, `DescRel`, `ManyRefines`, `UnicodeOracle`; `branch_Ok`, `branch_Err`, `from_residual_Err` for extracted `?` |
+| `Stream` | `peek_eq`, `get_pos_eq`, `bump_eq`, `eat_char_eq`, `skip_to_newline_eq`; `absStream_rest_cons` and `pos_lt_of_peek` |
+| `Combinators` | `leading_ws_refines`, `trailing_ws_refines`, `comment_refines`, `skip_trailing_whitespace_refines`, `try_syntax_refines`, `expect_syntax_refines`, `is_syntax_refines`, `maybe_rel`, `try_nonterminal_refines`, `expect_nonterminal_refines`; `NoBlankNext` and the `_ok_next` lemmas |
+| `Token` | `accepts_eq`, `accept_escaped_refines`, `acceptEscaped_produces`, `acceptEscaped_at_noBlankNext`, `token_loop_eq`, `token_refines_at`, `token_refines`, `string_len_eq` |
+| `List` | `parse_list_refines`, `vec_refines`, `absVec`, `parseList_ok_next`, `tryNonterminal_parseList_run` |
+| `Tokens` | `chars_of_eq`, `length_le_utf8ByteSize`, `len_utf8_eq`, `trimmed_len_eq`, `string_of_eq`, `is_all_eq`, `is_alias_name_eq`, `resembles_ipv4_eq`, `hostname_token_refines`, `meta_token_refines`, `aliasName_accept_1st_eq`, `aliasName_accept_eq` |
+| `Ast` | `qualified_refines`, `toStr_val`, `hostname_description`, `desc_meta`, `desc_qualified`, `hostname_many`, `many_meta`, `many_qualified`, `spec_list_hostname_refines`, `host_list_refines` |
+| `Lines` | `line_follows_eq`, `parse_lines_item_eq`, `parse_lines_loop_eq`, `parse_lines_refines`, `parse_lines_refines_text`, `parse_lines_no_reject_no_message` |
+
+Pitfalls: Aeneas `Result` is the effectful outer result; Rust's `Result<T, Status>` is a separate inner datatype. `Reject` is not a rollback guarantee for a generic parser. Failure spans use the cursor *at* failure, including when the status is replaced by an `expect_*`. `String::len` counts UTF-8 bytes, not characters; the first character is pushed before the length check. `parse_lines` precomputes `line_follows` outside the loop and at the end of each iteration, while the reference checks leading whitespace at the start of its loop body. `parse_lines_loop_eq` relates the loops from the cursor *before* `line_follows`; `v.val.length + 2 * remaining ≤ Usize.max` pays for up to two pushes per iteration. The generated `Vec` parser instance is under `sudo_rs.alloc.vec`, not the Aeneas standard `alloc.vec` namespace.
+
+## Cost and Aeneas pin
+
+The nine parser proof modules total **2,739 physical lines** including comments, blank lines and witnesses. The base extraction's `Funs.lean` source spans cover **469 distinct Rust lines** for the matching definitions (deduplicating nested loop spans). That is **5.84 proof lines per Rust line**. Against the **1,156 generated Lean lines** counted in `RESTYLE.md` §6, the ratio is **2.37**. These denominators describe different boundaries: the source-span count excludes unextracted Rust, and the generated count excludes generated doc comments. `Tokens.lean` alone is 702 lines: the sizeable pure proof is the equivalence between the left-to-right hostname scan and the reverse split in the legacy specification; both are proved against a four-piece `List.splitOn` characterization.
+
+Per-module elapsed Lake job times, in seconds, observed on scoped and rebased builds through the shared limiter (load varies; not additive):
+
+| Module | Wall time |
+|---|---:|
+| `Abs` | 2.5 |
+| `Stream` | 5.1 |
+| `Combinators` | 8.7 |
+| `Token` | 3.9 |
+| `List` | 3.7 |
+| `Tokens` | 7.5–14 |
+| `Ast` | 3.2 |
+| `Lines` | 3.4–10 |
+| `Examples` | 3.4 |
+
+**Keep the current pin for the next proof slices.** The failure-flag style adds a small proof tax: for the token, list, and qualifier loops, each proof has a separate false-flag equation, summarizes an `Option Status` in its postcondition, and matches on it again in the wrapper. The whitespace loop does the same with a `Bool`; the lines loop instead needs the state alignment described above. This avoided proving termination on a flag-only step by handling that step directly, and all real recursion uses the reference progress facts. The repetitive branches are measurable in `Token.lean`, `List.lean` and `Ast.lean`, but the larger cost in P1 was proving pure equivalence for operations that no longer have the shape of the legacy code. No comparison against a re-extraction on a newer Aeneas pin was run.

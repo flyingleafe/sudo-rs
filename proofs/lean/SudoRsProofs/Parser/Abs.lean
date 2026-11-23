@@ -25,8 +25,8 @@ The extracted parser (`proofs/parser/RESTYLE.md` section 5.1) against the refere
   panic, no overflow, no divergence), `r` is related to the reference result, `s'` is
   representable and abstracts to the reference output stream.
 * **Instances.** `ParseRefines P f p`: an extracted `Parse T` instance refines a reference
-  `Parser α` on every representable stream. `TokenRefines Tk f T'`: an extracted `Token T`
-  instance refines a reference `TokenSpec α`. `ManyRefines`, `DescRel`: `Many` and
+  `Parser α` on every representable stream. `TokenRefines Tk f T' Pre`: an extracted `Token T`
+  instance refines a reference `TokenSpec α` with constructor domain `Pre`. `ManyRefines`, `DescRel`: `Many` and
   `UserFriendly`. Generic lemmas take these as hypotheses, so a new production only supplies
   its instance proofs.
 * **Characters.** `UnicodeOracle O`: the three `opaque` Unicode predicates of
@@ -173,19 +173,35 @@ structure ManyRefines {T : Type} (M : sudo_rs.sudoers.basic_parser.Many T)
   sep : M.SEP = ok m.sep
   limit : ∃ n : Usize, M.LIMIT = ok n ∧ n.val = m.limit
 
+/-- A character that `acceptEscaped T' pred` can return: one accepted by `pred` (this includes
+the backslash and the blank of a line continuation, both returned only if `pred` accepts them),
+or an `escaped` character after a backslash. -/
+def Produces {α : Type} (T' : TokenSpec α) (pred : Char → Bool) (c : Char) : Prop :=
+  pred c = true ∨ (T'.allowEscape = true ∧ T'.escaped c = true)
+
+/-- A text the token loop of `token T'` can hand to `construct`: non-empty, the first character
+produced by `acceptEscaped` with `accept1st`, the others with `accept`
+(`token_loop_text`). -/
+def TokenText {α : Type} (T' : TokenSpec α) : List Char → Prop
+  | [] => False
+  | c :: cs => Produces T' T'.accept1st c ∧ ∀ d ∈ cs, Produces T' T'.accept d
+
 /-- **An extracted `Token T` instance refines a reference `TokenSpec α`** (values through
-`f`). `max_len_le` keeps the token text (at most `MAX_LEN + 3` bytes, see
-`SudoersSpec.Syntax.tokenBody`) within `usize`, so `String::len` does not fail; `construct` is
-required on every text that fits in memory. -/
+`f`), with `construct` refined on the texts satisfying `Pre`. `max_len_le` keeps the token text
+(at most `MAX_LEN + 3` bytes, see `SudoersSpec.Syntax.tokenBody`) within `usize`, so
+`String::len` does not fail. `Pre` lets an instance whose `construct` panics on some texts (as
+`Command::construct` does on a text without a non-blank character) refine on the texts the
+token loop can build: `token_refines` needs `∀ cs, TokenText T' cs → Pre cs`. Instances whose
+`construct` is total take `Pre := fun _ => True`. -/
 structure TokenRefines {T α : Type} (Tk : sudo_rs.sudoers.basic_parser.Token T) (f : T → α)
-    (T' : TokenSpec α) : Prop where
+    (T' : TokenSpec α) (Pre : List Char → Prop) : Prop where
   max_len : ∃ n : Usize, Tk.MAX_LEN = ok n ∧ n.val = T'.maxLen
   max_len_le : T'.maxLen + 4 ≤ Usize.max
   allow_escape : Tk.ALLOW_ESCAPE = ok T'.allowEscape
   accept : ∀ c, Tk.accept c = ok (T'.accept c)
   accept_1st : ∀ c, Tk.accept_1st c = ok (T'.accept1st c)
   escaped : ∀ c, Tk.escaped c = ok (T'.escaped c)
-  construct : ∀ s : String, s.utf8ByteSize ≤ Usize.max →
+  construct : ∀ s : String, s.utf8ByteSize ≤ Usize.max → Pre s.toList →
     ∃ r, Tk.construct s = ok r ∧ ConstructRel f r (T'.construct s.toList)
 
 /-! ## Characters -/
