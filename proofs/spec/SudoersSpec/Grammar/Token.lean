@@ -594,4 +594,101 @@ theorem token_rejectPure_iff (T : TokenSpec α) :
     simp at hs'
   · exact token_rejectPure T
 
+/-! ## Tokens without escapes (`ALLOW_ESCAPE = false`) -/
+
+theorem utf8Len_append (a b : List Char) : utf8Len (a ++ b) = utf8Len a + utf8Len b := by
+  simp [utf8Len, List.map_append, List.sum_append]
+
+/-- `LenOK` in closed form: either no character follows the first ones in `str`, or the
+characters before the last one take fewer than `m` bytes. -/
+theorem lenOK_iff (m : Nat) :
+    ∀ (str xs : List Char), LenOK m str xs ↔ (xs = [] ∨ utf8Len (str ++ xs.dropLast) < m)
+  | str, [] => by simp [LenOK]
+  | str, [x] => by simp [LenOK]
+  | str, x :: y :: ys => by
+    have ih := lenOK_iff m (str ++ [x]) (y :: ys)
+    simp only [LenOK] at ih ⊢
+    rw [ih]
+    simp only [reduceCtorEq, false_or, List.dropLast_cons_cons, List.append_assoc,
+      List.singleton_append, utf8Len_append]
+    constructor
+    · intro h; exact h.2
+    · intro h; exact ⟨by have := utf8Len_append str (x :: (y :: ys).dropLast); omega, h⟩
+
+theorem escUnit_noEsc {T : TokenSpec α} (hA : T.allowEscape = false) {pred : Char → Bool}
+    {u : List Char} {x : Char} {r : List Char} :
+    EscUnit T pred u x r ↔ u = [x] ∧ pred x = true := by
+  constructor
+  · intro h
+    cases h with
+    | plain hc _ => exact ⟨rfl, hc⟩
+    | escaped h1 _ => rw [hA] at h1; cases h1
+    | backslash h1 _ _ => rw [hA] at h1; cases h1
+    | continuation h1 _ _ _ => rw [hA] at h1; cases h1
+  · rintro ⟨rfl, h⟩
+    exact .plain h (by intro h'; rw [hA] at h'; cases h')
+
+theorem escStop_noEsc {T : TokenSpec α} (hA : T.allowEscape = false) {pred : Char → Bool}
+    {r : List Char} : EscStop T pred r ↔ NextNot (fun d => pred d = true) r := by
+  unfold EscStop NextNot
+  simp [hA]
+
+theorem tokTail_noEsc {T : TokenSpec α} (hA : T.allowEscape = false) {xs rest : List Char} :
+    ∀ {c : List Char}, TokTail T c xs rest ↔
+      c = xs ∧ (∀ x ∈ c, T.accept x = true) ∧ NextNot (fun d => T.accept d = true) rest := by
+  intro c
+  constructor
+  · intro h
+    induction h with
+    | stop hs => exact ⟨rfl, by simp, (escStop_noEsc hA).mp hs⟩
+    | term hr => have := hr.1; rw [hA] at this; cases this
+    | cons hu _ ih =>
+      obtain ⟨rfl, hc⟩ := (escUnit_noEsc hA).mp hu
+      obtain ⟨rfl, hall, hn⟩ := ih
+      refine ⟨rfl, ?_, hn⟩
+      intro y hy
+      simp only [List.singleton_append, List.mem_cons] at hy
+      rcases hy with rfl | hy
+      · exact hc
+      · exact hall y hy
+  · rintro ⟨rfl, hall, hn⟩
+    induction c with
+    | nil => exact .stop ((escStop_noEsc hA).mpr hn)
+    | cons x c ih =>
+      have := TokTail.cons (T := T) (u := [x]) (x := x)
+        ((escUnit_noEsc hA).mpr ⟨rfl, hall x (by simp)⟩)
+        (ih (fun y hy => hall y (List.mem_cons_of_mem _ hy)))
+      exact this
+
+/-- The token grammar for a class without escapes: a first character of `accept_1st`, further
+characters of `accept`, ended in front of a character outside `accept`, the length condition,
+and `construct` on the characters. -/
+theorem tokenG_noEsc {T : TokenSpec α} (hA : T.allowEscape = false) {c : List Char} {a : α}
+    {rest : List Char} :
+    TokenG T c a rest ↔
+      ∃ x xs, c = x :: xs ∧ T.accept1st x = true ∧ (∀ y ∈ xs, T.accept y = true) ∧
+        NextNot (fun d => T.accept d = true) rest ∧ (xs = [] ∨ utf8Len c.dropLast < T.maxLen) ∧
+        T.construct c = .ok a := by
+  constructor
+  · intro h
+    cases h with
+    | @mk u x c' xs _ _ hu ht hl hc =>
+      obtain ⟨rfl, h1⟩ := (escUnit_noEsc hA).mp hu
+      obtain ⟨rfl, hall, hn⟩ := (tokTail_noEsc hA).mp ht
+      refine ⟨x, c', rfl, h1, hall, hn, ?_, hc⟩
+      rcases (lenOK_iff _ _ _).mp hl with h | h
+      · exact .inl h
+      · cases c' with
+        | nil => exact .inl rfl
+        | cons y ys => right; simpa using h
+  · rintro ⟨x, xs, rfl, h1, hall, hn, hl, hc⟩
+    refine TokenG.mk (u := [x]) (c' := xs) ((escUnit_noEsc hA).mpr ⟨rfl, h1⟩)
+      ((tokTail_noEsc hA).mpr ⟨rfl, hall, hn⟩) ?_ hc
+    apply (lenOK_iff _ _ _).mpr
+    rcases hl with h | h
+    · exact .inl h
+    · cases xs with
+      | nil => exact .inl rfl
+      | cons y ys => right; simpa using h
+
 end SudoersSpec.Grammar

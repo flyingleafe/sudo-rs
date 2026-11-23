@@ -53,12 +53,10 @@ theorem NextNot.cons_iff {P : Char → Prop} {d : Char} {r : List Char} :
   · intro h; exact h d rfl
   · intro h d' e; cases e; exact h
 
-theorem NextNot.append_left {P : Char → Prop} {x y : List Char} (h : NextNot P (x ++ y))
-    (hx : x ≠ []) : ∀ d, x.head? = some d → ¬ P d := by
-  intro d e
-  cases x with
-  | nil => exact absurd rfl hx
-  | cons a x => exact h d (by simpa using e)
+instance NextNot.decidable (P : Char → Prop) [DecidablePred P] :
+    (r : List Char) → Decidable (NextNot P r)
+  | [] => isTrue (NextNot.nil P)
+  | d :: _ => decidable_of_iff (¬ P d) NextNot.cons_iff.symm
 
 /-- Truncation of the right context: `NextNot` questions about `x ++ y` are questions about
 `x` when `x` is non-empty and are vacuous when it is empty. -/
