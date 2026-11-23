@@ -51,7 +51,7 @@ private theorem seq_witness {G : Gram α} {H : α → Gram β} {s u t : Stream} 
 def NontermFailureG (G : Gram α) (F : Gram Unit) : Gram Unit :=
   OrG F (SeqG G fun _ => WsFailureG)
 
-private theorem tryNonterm_failure {p : Parser α} {G : Gram α} {F : Gram Unit}
+theorem tryNonterm_failure {p : Parser α} {G : Gram α} {F : Gram Unit}
     (hG : Sound p G) (hF : FailureSound p F) :
     FailureSound (tryNonterminal p) (NontermFailureG G F) := by
   intro s e t h
@@ -64,7 +64,7 @@ private theorem tryNonterm_failure {p : Parser α} {G : Gram α} {F : Gram Unit}
       exact ⟨c, hc, .inr hg⟩
     · cases he
 
-private theorem expectNonterm_failure {p : Parser α} {G : Gram α} {F : Gram Unit}
+theorem expectNonterm_failure {p : Parser α} {G : Gram α} {F : Gram Unit}
     (hG : Sound p G) (hF : FailureSound p F) (description : String) :
     FailureSound (expectNonterminal description p) (NontermFailureG G F) := by
   intro s e t h
@@ -76,7 +76,7 @@ private theorem expectNonterm_failure {p : Parser α} {G : Gram α} {F : Gram Un
   | error e' =>
     cases e' <;> cases h <;> exact tryNonterm_failure hG hF _ _ _ hp
 
-private theorem optionalToken_failure (T : TokenSpec α) :
+theorem optionalToken_failure (T : TokenSpec α) :
     FailureSound (parseOption (token T)) (TokenFatalG T) := by
   intro s e t h
   simp only [parseOption, run_maybe] at h
@@ -93,7 +93,7 @@ private theorem optionalToken_failure (T : TokenSpec α) :
 def RequiredMarkFailureG (ch : Char) : Gram Unit :=
   SeqG (MarkG ch) fun b => if b then WsFailureG else PureG ()
 
-private theorem requiredMark_failure (ch : Char) :
+theorem requiredMark_failure (ch : Char) :
     FailureSound (expectSyntax ch) (RequiredMarkFailureG ch) := by
   intro s e t h
   simp only [expectSyntax, run_bind, run_observe, trySyntax_run] at h
@@ -319,7 +319,7 @@ theorem AtCursor.reject_complete {G : Gram Unit} {p : Parser α} (hp : RejectCom
   obtain ⟨u, hu, hr⟩ := hp c t.rest s hg hc
   rwa [same_cursor (reaches_of_run hu) ht hr] at hu
 
-private theorem tryNontermFailure_complete {p : Parser α} {G : Gram α} {F : Gram Unit}
+theorem tryNontermFailure_complete {p : Parser α} {G : Gram α} {F : Gram Unit}
     (hG : Complete p G) (hF : FailureComplete p F) :
     FailureComplete (tryNonterminal p) (NontermFailureG G F) := by
   intro c r s hg hs
@@ -338,7 +338,7 @@ private theorem expect_failure_of_try (description : String) {p : Parser α} {s 
       simp [expectNonterminal, run_bind, h]⟩
   | fatal sp k => exact ⟨.fatal sp k, by simp [expectNonterminal, run_bind, h]⟩
 
-private theorem expectNontermFailure_complete {p : Parser α} {G : Gram α} {F : Gram Unit}
+theorem expectNontermFailure_complete {p : Parser α} {G : Gram α} {F : Gram Unit}
     (hG : Complete p G) (hF : FailureComplete p F) (description : String) :
     FailureComplete (expectNonterminal description p) (NontermFailureG G F) := by
   intro c r s hg hs
@@ -346,13 +346,13 @@ private theorem expectNontermFailure_complete {p : Parser α} {G : Gram α} {F :
   obtain ⟨e', he'⟩ := expect_failure_of_try description he
   exact ⟨e', t, he', ht⟩
 
-private theorem optionalTokenFailure_complete (T : TokenSpec α) :
+theorem optionalTokenFailure_complete (T : TokenSpec α) :
     FailureComplete (parseOption (token T)) (TokenFatalG T) := by
   intro c r s hg hs
   obtain ⟨sp, k, t, ht, hr⟩ := token_fatal_complete T _ _ _ hg hs
   exact ⟨.fatal sp k, t, by simp [parseOption, run_maybe, ht], hr⟩
 
-private theorem requiredMarkFailure_complete (ch : Char) :
+theorem requiredMarkFailure_complete (ch : Char) :
     FailureComplete (expectSyntax ch) (RequiredMarkFailureG ch) := by
   rintro c r s ⟨x, y, b, rfl, hm, hf⟩ hs
   cases hm with

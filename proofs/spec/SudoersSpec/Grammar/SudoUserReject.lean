@@ -194,14 +194,15 @@ private theorem userSpecifier_reject_complete (O : Oracles) (D : Descriptions) :
     exact (reject_after_complete (expectNonterminal_complete (token_complete _) D.username)
       (quotedTail_reject_complete O D s.getPos)) c r s hd hs
 
-private def MetaUserRejectG (O : Oracles) : Gram Unit :=
+private def ParseMetaRejectG (O : Oracles) (R : Gram Unit) : Gram Unit :=
   SeqG (NontermG (OptG (TokenG (MetaUsernameToken O)) (TokenRejectG (MetaUsernameToken O)))) fun
-    | none => UserSpecifierRejectG O
+    | none => R
     | some _ => EmptyG
 
-private theorem metaUser_reject_sound (O : Oracles) (D : Descriptions) :
-    RejectSound (metaUserSpecifier O D) (MetaUserRejectG O) := by
-  unfold metaUserSpecifier parseMeta MetaUserRejectG
+private theorem parseMeta_reject_sound (O : Oracles) {p : Parser α} {R : Gram Unit}
+    (hp : RejectSound p R) (embed : String → α) :
+    RejectSound (parseMeta O p embed) (ParseMetaRejectG O R) := by
+  unfold parseMeta ParseMetaRejectG
   apply reject_after_sound
     (tryNonterminal_sound (option_sound (token_sound _) (token_rejectSound _)))
   · intro s t h
@@ -216,19 +217,20 @@ private theorem metaUser_reject_sound (O : Oracles) (D : Descriptions) :
     cases a with
     | none =>
       intro s t h
-      exact userSpecifier_reject_sound O D s t (mapP_reject (f := Meta.only) h)
+      exact hp s t (mapP_reject (f := Meta.only) h)
     | some m =>
       intro s t h
       cases m <;> simp at h
 
-private theorem metaUser_reject_complete (O : Oracles) (D : Descriptions) :
-    RejectComplete (metaUserSpecifier O D) (MetaUserRejectG O) := by
-  unfold metaUserSpecifier parseMeta MetaUserRejectG
+private theorem parseMeta_reject_complete (O : Oracles) {p : Parser α} {R : Gram Unit}
+    (hp : RejectComplete p R) (embed : String → α) :
+    RejectComplete (parseMeta O p embed) (ParseMetaRejectG O R) := by
+  unfold parseMeta ParseMetaRejectG
   apply reject_after_complete
     (tryNonterminal_complete (option_complete (token_complete _) (token_rejectComplete _)))
   intro a
   cases a with
-  | none => exact mapP_reject_complete (userSpecifier_reject_complete O D) _
+  | none => exact mapP_reject_complete hp _
   | some _ =>
     intro _ _ _ h _
     exact False.elim h
@@ -237,7 +239,7 @@ private theorem metaUser_reject_complete (O : Oracles) (D : Descriptions) :
 includes the failed meta-token probe and its trailing whitespace, and may include a quote and
 its text if the user parser rejects on the separate quoted stream. -/
 def UserListRejectG (O : Oracles) : Gram Unit :=
-  fun c a r => NextNot (· = '!') (c ++ r) ∧ MetaUserRejectG O c a r
+  fun c a r => NextNot (· = '!') (c ++ r) ∧ ParseMetaRejectG O (UserSpecifierRejectG O) c a r
 
 theorem userList_reject_sound (O : Oracles) (D : Descriptions) :
     RejectSound (tryNonterminal (specListUserSpecifier O D)) (UserListRejectG O) := by
@@ -245,15 +247,37 @@ theorem userList_reject_sound (O : Oracles) (D : Descriptions) :
   have h' := tryNonterminal_reject.mp h
   rw [specListUserSpecifier, specList_eq] at h'
   obtain ⟨hn, hr⟩ := qualified_reject_iff.mp (parseList_reject h')
-  obtain ⟨c, hc, hd⟩ := metaUser_reject_sound O D s t hr
+  obtain ⟨c, hc, hd⟩ := parseMeta_reject_sound O (userSpecifier_reject_sound O D) _ s t hr
   exact ⟨c, hc, hc ▸ hn, hd⟩
 
 theorem userList_reject_complete (O : Oracles) (D : Descriptions) :
     RejectComplete (tryNonterminal (specListUserSpecifier O D)) (UserListRejectG O) := by
   rintro c r s ⟨hn, hmeta⟩ hs
-  obtain ⟨t, ht, hr⟩ := metaUser_reject_complete O D c r s hmeta hs
+  obtain ⟨t, ht, hr⟩ := parseMeta_reject_complete O (userSpecifier_reject_complete O D)
+    (fun name => .user (.name name)) c r s hmeta hs
   refine ⟨t, tryNonterminal_reject.mpr ?_, hr⟩
   unfold specListUserSpecifier
   exact specList_reject_iff.mpr ⟨hs.symm ▸ hn, ht⟩
+
+/-- A group list rejects only on its first, unqualified entry. The consumed prefix
+includes any input consumed by the failed meta-token probe and its trailing whitespace. -/
+def IdentifierListRejectG (O : Oracles) : Gram Unit :=
+  fun c a r => NextNot (· = '!') (c ++ r) ∧ ParseMetaRejectG O (IdentifierRejectG O) c a r
+
+theorem identifierList_reject_sound (O : Oracles) (D : Descriptions) :
+    RejectSound (tryNonterminal (specListIdentifier O D)) (IdentifierListRejectG O) := by
+  intro s t h
+  have h' := tryNonterminal_reject.mp h
+  rw [specListIdentifier] at h'
+  obtain ⟨hn, hr⟩ := specList_reject_iff.mp h'
+  obtain ⟨c, hc, hd⟩ := parseMeta_reject_sound O (identifier_reject_sound O D) Identifier.name s t hr
+  exact ⟨c, hc, hc ▸ hn, hd⟩
+
+theorem identifierList_reject_complete (O : Oracles) (D : Descriptions) :
+    RejectComplete (tryNonterminal (specListIdentifier O D)) (IdentifierListRejectG O) := by
+  rintro c r s ⟨hn, hmeta⟩ hs
+  obtain ⟨t, ht, hr⟩ := parseMeta_reject_complete O (identifier_reject_complete O D)
+    Identifier.name c r s hmeta hs
+  exact ⟨t, tryNonterminal_reject.mpr (specList_reject_iff.mpr ⟨hs.symm ▸ hn, ht⟩), hr⟩
 
 end SudoersSpec.Grammar

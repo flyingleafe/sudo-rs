@@ -376,19 +376,26 @@ theorem sudo_item_sound (O : Oracles) (D : Descriptions) (s : Stream) (a : Sudo)
   cases he
   exact ⟨u, sudo_sound O D hp, skipTrailingWhitespace_sound.atCursor hw⟩
 
-/-- PT6: if the stable parser reports only successes, the file has a grammar derivation whose
-final cursor accounts for every source character. The driver permits final horizontal blanks
-and separates each item from any trailing comment and its physical newline. -/
-theorem parseSudoersWith_clean_sound (D : Descriptions) (O : Oracles) (src : List Char)
-    (items : List Sudo) (h : parseSudoersWith D O src = .ok (items.map Except.ok)) :
-    Recovery.CleanFile (SudoItemG O) (Stream.new src) items ((Stream.new src).advance src.length) := by
+/-- The public file wrapper returns the driver's output when it reports success; the
+driver advances across the entire source, including any final blanks. -/
+theorem parseSudoersWith_ok_lines (D : Descriptions) (O : Oracles) (src : List Char)
+    {items : List (Parsed Sudo)} (h : parseSudoersWith D O src = .ok items) :
+    (parseLines D.sudo (sudo O D)).run (Stream.new src) =
+      (.ok items, (Stream.new src).advance src.length) := by
   obtain ⟨rs, hr, _⟩ := parseLines_ok D.sudo (sudo O D) (Stream.new src)
   simp only [parseSudoersWith, hr] at h
   split at h
   · cases h
   · cases h
-    exact Recovery.cleanFile_sound (sudo_item_sound O D)
-      (Prod.ext hr (Recovery.parseLines_end D.sudo (sudo O D) (Stream.new src)))
+    exact Prod.ext hr (Recovery.parseLines_end D.sudo (sudo O D) (Stream.new src))
+
+/-- PT6: if the stable parser reports only successes, the file has a grammar derivation whose
+final cursor accounts for every source character. The driver permits final horizontal blanks
+and separates each item from any trailing comment and its physical newline. -/
+theorem parseSudoersWith_clean_sound (D : Descriptions) (O : Oracles) (src : List Char)
+    (items : List Sudo) (h : parseSudoersWith D O src = .ok (items.map Except.ok)) :
+    Recovery.CleanFile (SudoItemG O) (Stream.new src) items ((Stream.new src).advance src.length) :=
+  Recovery.cleanFile_sound (sudo_item_sound O D) (parseSudoersWith_ok_lines D O src h)
 
 /-- Explicit source accounting for one clean-file step: leading blanks, the item, an optional
 comment, a newline, and the remaining file. The `CleanFile.eof` rule covers the final blanks. -/
