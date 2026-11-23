@@ -360,6 +360,10 @@ def sudoers.tokens.sudo_string (s : String) :
     Result (core.result.Result common.string.SudoString sudoers.basic_parser.ErrorKind) :=
   if s.toList.contains (Char.ofNat 0) then ok (.Err (.NulInString s)) else ok (.Ok ⟨s⟩)
 
+/-- The text of a `SudoString`: the `Deref<Target = str>` view, i.e. the model's field without
+the NUL terminator (the model omits the terminator already). -/
+def sudoers.tokens.sudo_string_text (s : common.string.SudoString) : Result String := ok s.str
+
 /-- File-system canonicalization, retaining the distinction between failure and non-UTF-8. -/
 opaque sudoers.tokens.canonical : String → Result sudoers.tokens.Canonical
 
@@ -448,6 +452,24 @@ inputs to `fromStrRadix`. -/
 def core.char.methods.Char.to_digit (c : Char) (radix : U32) : Result (Option U32) :=
   if radix.val < 2 ∨ 36 < radix.val then fail .panic
   else ok ((sudo_rs.asciiDigit c.toNat radix.val).map (fun d => ⟨BitVec.ofNat 32 d⟩))
+
+/-- [core::cmp::impls::{impl PartialEq<char> for char}::eq]: character equality. -/
+def Char.Insts.CoreCmpPartialEqChar.eq (a b : Char) : Result Bool := ok (decide (a = b))
+
+/-- [core::cmp::impls::{impl PartialEq<char> for char}::ne]: `!eq`. -/
+def Char.Insts.CoreCmpPartialEqChar.ne (a b : Char) : Result Bool := ok (decide (a ≠ b))
+
+/-- [core::char::methods::{char}::is_ascii_hexdigit]:
+`is_ascii_digit() || matches!(*self, 'A'..='F') || matches!(*self, 'a'..='f')`. -/
+def core.char.methods.Char.is_ascii_hexdigit (c : Char) : Result Bool :=
+  ok (c.isDigit || (0x41 ≤ c.val && c.val ≤ 0x46) || (0x61 ≤ c.val && c.val ≤ 0x66))
+
+/-- [core::option::{impl PartialEq for Option<T>}::eq]: the derived semantics. -/
+def core.option.Option.Insts.CoreCmpPartialEqOption.eq {T : Type _}
+    (cmpPartialEqInst : core.cmp.PartialEq T T) : Option T → Option T → Result Bool
+  | none, none => ok true
+  | some x, some y => cmpPartialEqInst.eq x y
+  | _, _ => ok false
 
 /-- [core::str::{str}::split_at]: the first `mid` bytes and the rest; panics unless `mid` is a
 char boundary (`split_at_checked`, else `slice_error_fail`). -/
