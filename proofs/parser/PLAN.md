@@ -1,8 +1,8 @@
 # Plan: proving the sudoers parser
 
 Status: in progress. The [executable reference parser](../spec/SudoersSpec/Syntax/README.md)
-has been [compared with Rust](P0.md). The reference [host-list grammar](../spec/SudoersSpec/Grammar/README.md)
-and [line-recovery theorems](../spec/SudoersSpec/Syntax/Recovery.lean) are kernel-checked.
+has been [compared with Rust](P0.md). P1 is complete: the [host-list grammar](../spec/SudoersSpec/Grammar/README.md)
+and [extraction refinement](PR-NOTES.md) compose in [`host_list_grammar_iff`](../lean/SudoRsProofs/Parser/Grammar.lean).
 The text-to-authorization theorem is not established. Feasibility measurements below are
 from `9c30990f` (Charon 0.1.321, Aeneas `8f4466db`).
 

@@ -10,9 +10,10 @@ The policy proofs (P1–P9) start from a parsed policy and a resolved request, n
 of `sudo`. They transfer to the extracted code under the oracle and representation assumptions
 below. Alias flattening preserves decisions and tags under the stated conditions, not
 unconditionally. Separate proofs cover shell-mode argument escaping for every input and
-the compiled AArch64 `-u '#uid'` parser. For sudoers text, the reference host-list grammar
-and line recovery have proofs; the whole Rust parser has differential tests, not yet
-an end-to-end proof.
+the compiled AArch64 `-u '#uid'` parser. For sudoers text, Lean proves that the extracted
+host-list parser [accepts exactly the host-list grammar](lean/SudoRsProofs/Parser/Grammar.lean)
+under its cursor bounds and Unicode-oracle assumption. Whole-file text-to-authorization
+equivalence is not yet proved.
 
 ## Verification boundary
 

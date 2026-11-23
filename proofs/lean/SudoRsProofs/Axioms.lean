@@ -8,6 +8,7 @@ import SudoRsProofs.Properties
 import SudoRsProofs.Expansion
 import SudoRsProofs.Escape
 import SudoRsProofs.Parser.Examples
+import SudoRsProofs.Parser.Grammar
 
 /-!
 # Axiom audit
@@ -122,3 +123,6 @@ of `SudoRs/{Types,Funs}External.lean` are definitions or `opaque` constants, nev
 #print axioms SudoRsProofs.Parser.skip_trailing_whitespace_ok_next
 #print axioms SudoRsProofs.Parser.acceptEscaped_at_noBlankNext
 #print axioms SudoRsProofs.Parser.parse_lines_syntax_example
+#print axioms SudoRsProofs.Parser.host_list_grammar_iff
+#print axioms SudoRsProofs.Parser.host_list_printed
+#print axioms SudoRsProofs.Parser.parse_lines_recovery

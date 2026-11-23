@@ -31,4 +31,5 @@ import SudoRsProofs.Parser.List
 import SudoRsProofs.Parser.Tokens
 import SudoRsProofs.Parser.Ast
 import SudoRsProofs.Parser.Lines
+import SudoRsProofs.Parser.Grammar
 import SudoRsProofs.Parser.Examples
