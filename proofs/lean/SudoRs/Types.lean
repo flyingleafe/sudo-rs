@@ -47,14 +47,14 @@ structure common.path.SudoPath where
   inner : String
 
 /-- [sudo_rs::defaults::enums::timestamp_type]
-    Source: 'src/defaults/settings_dsl.rs', lines 154:16-154:62; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 30:0-84:1 -/
+    Source: 'src/defaults/settings_dsl.rs', lines 229:16-229:62; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 38:0-92:1 -/
 @[discriminant isize]
 inductive defaults.enums.timestamp_type where
 | tty : defaults.enums.timestamp_type
 | ppid : defaults.enums.timestamp_type
 
 /-- [sudo_rs::defaults::enums::verifypw]
-    Source: 'src/defaults/settings_dsl.rs', lines 154:16-154:62; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 30:0-84:1 -/
+    Source: 'src/defaults/settings_dsl.rs', lines 229:16-229:62; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 38:0-92:1 -/
 @[discriminant isize]
 inductive defaults.enums.verifypw where
 | all : defaults.enums.verifypw
@@ -63,7 +63,7 @@ inductive defaults.enums.verifypw where
 | never : defaults.enums.verifypw
 
 /-- [sudo_rs::defaults::enums::lecture]
-    Source: 'src/defaults/settings_dsl.rs', lines 154:16-154:62; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 30:0-84:1 -/
+    Source: 'src/defaults/settings_dsl.rs', lines 229:16-229:62; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 38:0-92:1 -/
 @[discriminant isize]
 inductive defaults.enums.lecture where
 | always : defaults.enums.lecture
@@ -71,7 +71,7 @@ inductive defaults.enums.lecture where
 | never : defaults.enums.lecture
 
 /-- [sudo_rs::defaults::Settings]
-    Source: 'src/defaults/settings_dsl.rs', lines 159:8-161:9; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 30:0-84:1 -/
+    Source: 'src/defaults/settings_dsl.rs', lines 235:8-237:9; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 38:0-92:1 -/
 structure defaults.Settings where
   always_query_group_plugin : Bool
   always_set_home : Bool

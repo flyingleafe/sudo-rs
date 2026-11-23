@@ -338,32 +338,32 @@ impl_def common.string.SudoString.Insts.CoreCmpPartialEqStr :
 }
 
 /-- [sudo_rs::defaults::{sudo_rs::defaults::Settings}::apparmor_profile]:
-    Source: 'src/defaults/settings_dsl.rs', lines 167:16-169:17; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 30:0-84:1 -/
+    Source: 'src/defaults/settings_dsl.rs', lines 243:16-245:17; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 38:0-92:1 -/
 def defaults.Settings.impl.apparmor_profile
   (self : defaults.Settings) : Result (Option Str) := do
   core.option.Option.as_deref (core.ops.deref.DerefBoxInst Str)
     self.apparmor_profile
 
 /-- [sudo_rs::defaults::{sudo_rs::defaults::Settings}::use_pty]:
-    Source: 'src/defaults/settings_dsl.rs', lines 167:16-169:17; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 30:0-84:1 -/
+    Source: 'src/defaults/settings_dsl.rs', lines 243:16-245:17; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 38:0-92:1 -/
 def defaults.Settings.impl.use_pty
   (self : defaults.Settings) : Result Bool := do
   ok self.use_pty
 
 /-- [sudo_rs::defaults::{sudo_rs::defaults::Settings}::setenv]:
-    Source: 'src/defaults/settings_dsl.rs', lines 167:16-169:17; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 30:0-84:1 -/
+    Source: 'src/defaults/settings_dsl.rs', lines 243:16-245:17; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 38:0-92:1 -/
 def defaults.Settings.impl.setenv
   (self : defaults.Settings) : Result Bool := do
   ok self.setenv
 
 /-- [sudo_rs::defaults::{sudo_rs::defaults::Settings}::noexec]:
-    Source: 'src/defaults/settings_dsl.rs', lines 167:16-169:17; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 30:0-84:1 -/
+    Source: 'src/defaults/settings_dsl.rs', lines 243:16-245:17; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 38:0-92:1 -/
 def defaults.Settings.impl.noexec
   (self : defaults.Settings) : Result Bool := do
   ok self.noexec
 
 /-- [sudo_rs::defaults::{sudo_rs::defaults::Settings}::env_keep]:
-    Source: 'src/defaults/settings_dsl.rs', lines 167:16-169:17; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 30:0-84:1 -/
+    Source: 'src/defaults/settings_dsl.rs', lines 243:16-245:17; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 38:0-92:1 -/
 def defaults.Settings.impl.env_keep
   (self : defaults.Settings) :
   Result (std.collections.hash.set.HashSet String std.hash.random.RandomState
@@ -372,7 +372,7 @@ def defaults.Settings.impl.env_keep
   ok self.env_keep
 
 /-- [sudo_rs::defaults::{sudo_rs::defaults::Settings}::env_check]:
-    Source: 'src/defaults/settings_dsl.rs', lines 167:16-169:17; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 30:0-84:1 -/
+    Source: 'src/defaults/settings_dsl.rs', lines 243:16-245:17; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 38:0-92:1 -/
 def defaults.Settings.impl.env_check
   (self : defaults.Settings) :
   Result (std.collections.hash.set.HashSet String std.hash.random.RandomState
@@ -381,80 +381,80 @@ def defaults.Settings.impl.env_check
   ok self.env_check
 
 /-- [sudo_rs::defaults::{sudo_rs::defaults::Settings}::secure_path]:
-    Source: 'src/defaults/settings_dsl.rs', lines 167:16-169:17; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 30:0-84:1 -/
+    Source: 'src/defaults/settings_dsl.rs', lines 243:16-245:17; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 38:0-92:1 -/
 def defaults.Settings.impl.secure_path
   (self : defaults.Settings) : Result (Option Str) := do
   core.option.Option.as_deref (core.ops.deref.DerefBoxInst Str)
     self.secure_path
 
 /-- [sudo_rs::defaults::{sudo_rs::defaults::Settings}::umask]:
-    Source: 'src/defaults/settings_dsl.rs', lines 167:16-169:17; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 30:0-84:1 -/
+    Source: 'src/defaults/settings_dsl.rs', lines 243:16-245:17; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 38:0-92:1 -/
 def defaults.Settings.impl.umask
   (self : defaults.Settings) : Result Std.U64 := do
   ok self.umask
 
 /-- [sudo_rs::defaults::{sudo_rs::defaults::Settings}::umask_override]:
-    Source: 'src/defaults/settings_dsl.rs', lines 167:16-169:17; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 30:0-84:1 -/
+    Source: 'src/defaults/settings_dsl.rs', lines 243:16-245:17; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 38:0-92:1 -/
 def defaults.Settings.impl.umask_override
   (self : defaults.Settings) : Result Bool := do
   ok self.umask_override
 
 /-- [sudo_rs::defaults::{sudo_rs::defaults::Settings}::log_allowed]:
-    Source: 'src/defaults/settings_dsl.rs', lines 167:16-169:17; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 30:0-84:1 -/
+    Source: 'src/defaults/settings_dsl.rs', lines 243:16-245:17; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 38:0-92:1 -/
 def defaults.Settings.impl.log_allowed
   (self : defaults.Settings) : Result Bool := do
   ok self.log_allowed
 
 /-- [sudo_rs::defaults::{sudo_rs::defaults::Settings}::passwd_tries]:
-    Source: 'src/defaults/settings_dsl.rs', lines 167:16-169:17; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 30:0-84:1 -/
+    Source: 'src/defaults/settings_dsl.rs', lines 243:16-245:17; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 38:0-92:1 -/
 def defaults.Settings.impl.passwd_tries
   (self : defaults.Settings) : Result Std.U64 := do
   ok self.passwd_tries
 
 /-- [sudo_rs::defaults::{sudo_rs::defaults::Settings}::timestamp_timeout]:
-    Source: 'src/defaults/settings_dsl.rs', lines 167:16-169:17; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 30:0-84:1 -/
+    Source: 'src/defaults/settings_dsl.rs', lines 243:16-245:17; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 38:0-92:1 -/
 def defaults.Settings.impl.timestamp_timeout
   (self : defaults.Settings) : Result Std.U64 := do
   ok self.timestamp_timeout
 
 /-- [sudo_rs::defaults::{sudo_rs::defaults::Settings}::pwfeedback]:
-    Source: 'src/defaults/settings_dsl.rs', lines 167:16-169:17; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 30:0-84:1 -/
+    Source: 'src/defaults/settings_dsl.rs', lines 243:16-245:17; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 38:0-92:1 -/
 def defaults.Settings.impl.pwfeedback
   (self : defaults.Settings) : Result Bool := do
   ok self.pwfeedback
 
 /-- [sudo_rs::defaults::{sudo_rs::defaults::Settings}::passwd_timeout]:
-    Source: 'src/defaults/settings_dsl.rs', lines 167:16-169:17; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 30:0-84:1 -/
+    Source: 'src/defaults/settings_dsl.rs', lines 243:16-245:17; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 38:0-92:1 -/
 def defaults.Settings.impl.passwd_timeout
   (self : defaults.Settings) : Result Std.U64 := do
   ok self.passwd_timeout
 
 /-- [sudo_rs::defaults::{sudo_rs::defaults::Settings}::timestamp_type]:
-    Source: 'src/defaults/settings_dsl.rs', lines 167:16-169:17; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 30:0-84:1 -/
+    Source: 'src/defaults/settings_dsl.rs', lines 243:16-245:17; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 38:0-92:1 -/
 def defaults.Settings.impl.timestamp_type
   (self : defaults.Settings) : Result defaults.enums.timestamp_type := do
   ok self.timestamp_type
 
 /-- [sudo_rs::defaults::{sudo_rs::defaults::Settings}::noninteractive_auth]:
-    Source: 'src/defaults/settings_dsl.rs', lines 167:16-169:17; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 30:0-84:1 -/
+    Source: 'src/defaults/settings_dsl.rs', lines 243:16-245:17; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 38:0-92:1 -/
 def defaults.Settings.impl.noninteractive_auth
   (self : defaults.Settings) : Result Bool := do
   ok self.noninteractive_auth
 
 /-- [sudo_rs::defaults::{sudo_rs::defaults::Settings}::rootpw]:
-    Source: 'src/defaults/settings_dsl.rs', lines 167:16-169:17; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 30:0-84:1 -/
+    Source: 'src/defaults/settings_dsl.rs', lines 243:16-245:17; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 38:0-92:1 -/
 def defaults.Settings.impl.rootpw
   (self : defaults.Settings) : Result Bool := do
   ok self.rootpw
 
 /-- [sudo_rs::defaults::{sudo_rs::defaults::Settings}::targetpw]:
-    Source: 'src/defaults/settings_dsl.rs', lines 167:16-169:17; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 30:0-84:1 -/
+    Source: 'src/defaults/settings_dsl.rs', lines 243:16-245:17; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 38:0-92:1 -/
 def defaults.Settings.impl.targetpw
   (self : defaults.Settings) : Result Bool := do
   ok self.targetpw
 
 /-- [sudo_rs::defaults::{sudo_rs::defaults::Settings}::runcwd]:
-    Source: 'src/defaults/settings_dsl.rs', lines 167:16-169:17; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 30:0-84:1 -/
+    Source: 'src/defaults/settings_dsl.rs', lines 243:16-245:17; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 38:0-92:1 -/
 def defaults.Settings.impl.runcwd
   (self : defaults.Settings) : Result (Option Str) := do
   core.option.Option.as_deref (core.ops.deref.DerefBoxInst Str) self.runcwd
