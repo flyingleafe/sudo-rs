@@ -15,15 +15,32 @@ place: `Command.construct`, when the token text consists of whitespace only (`sp
 empty) — `cmd_iter.next().unwrap()` — reached only through `token (commandToken O)` and
 `token (metaToken O.char (commandToken O))`.
 
-This file provides three of the four ingredients of the argument; the fourth (composing
-`MarkerFree` through the ~50 productions of `ast.rs`/`Sudo`) is not finished, see the end.
+This file provides the ingredients of the argument; what is missing is the `token` step that
+combines them (the head of the `whileMaybe` accumulation) and the composition of `MarkerFree`
+through the productions of `ast.rs`/`Sudo`. The all-production claim is composed elsewhere (from
+the extracted `ok` proof and the fact that the error kind relation has no `.unwrapNone`
+constructor), which is stronger than a claim about the outer marker alone.
 
-1. `MarkerFree` and its propagation: a marker, once produced, survives `?` (`bind`), `maybe`
-   (which recovers only `Reject`), `observe`, `lift`, and every iteration of a `loop`
-   (`MarkerFree.loop`). So a marker cannot be suppressed by an inner combinator.
+1. `MarkerFree` is about the *outer result* of a parser: it says the result is never the marker.
+   `MarkerFree.bind`, `.maybe`, `.lift` and `.loop` carry this absence from the parts to the
+   composite's outer result (`?` propagates an error, `maybe` recovers only `Reject`, a loop
+   returns an iteration's result). `MarkerFree.observe` holds for **every** `p`, because
+   `observe` wraps the inner result in `.ok`: it is a fact about the shape of the outer result,
+   **not** a non-suppression statement — an observer that discards the result it observed can
+   hide a marker, and this family of lemmas says nothing about provenance. (In this parser
+   `observe` is used where the inner `Parsed` is kept — `parseLinesItem` pushes it into the item
+   list — and where it is discarded — the `RunAs` user list, the `#` branch of `Sudo::parse`,
+   the optional comment of `parseLines`; those discarding sites contain no command token, but
+   that composition is not given here.)
 2. `CharLaws`: the character-oracle laws the last step needs.
 3. `splitWhen`/`splitWhitespace`: a token text whose first character is not whitespace is never
    split into no words.
+4. `SimpleCommand_construct_ne_unwrap`, `Command_construct_ne_unwrap_of_head`: the constructors
+   return ordinary results (no marker), the second when the text has a non-whitespace head — so
+   `cmd_iter.next().unwrap()` finds a word.
+5. `metaCommand_first_not_ws`, `commandToken_first_not_ws`: the first character produced by
+   `accept_escaped` on a cursor with no leading `\` is not whitespace (the escape branch, the
+   only other source, needs a leading `\`).
 
 The statement is `result totality in the model`: the model represents the one Rust panic of the
 parser as an error value, so proving `.error` is never returned would be the model-level
@@ -71,7 +88,7 @@ theorem MarkerFree.elim {p : Parser α} (hp : MarkerFree p) {s r s'} (h : p.run 
   rw [hp.at h] at hm
   simp at hm
 
-/-! ## Generic combinators: a marker is never suppressed -/
+/-! ## Generic combinators: absence at the outer result -/
 
 theorem MarkerFree.pure (a : α) : MarkerFree (pure a : Parser α) := by
   intro s
@@ -93,7 +110,9 @@ theorem MarkerFree.lift {r : Parsed α} (hr : markerItem r = false) :
   simp only [Parser.run_lift]
   exact hr
 
-/-- `observe` keeps the result as a value: its item is always `Ok`. -/
+/-- `observe` keeps the result as a value, so its own result is always `Ok` — for **any** `p`,
+including one that can produce a marker. This is a fact about the outer result's shape, not a
+non-suppression property: a caller that discards the observed value loses that information. -/
 theorem MarkerFree.observe (p : Parser α) : MarkerFree (observe p) := by
   intro s
   simp only [Parser.run_observe, markerItem_ok]
@@ -249,5 +268,154 @@ theorem splitWhitespace_ne_nil {O : CharOracle} {c : Char} {cs : List Char}
   cases hsp : splitWhen O.isWhitespace cs with
   | nil => simp
   | cons w ws => simp
+
+/-! ## The panic site is out of reach for a non-whitespace command text -/
+
+/-- `eatChar` on a cursor whose next character is not `c`. -/
+theorem eatChar_run_false {c : Char} {s : Stream} (hs : s.peek ≠ some c) :
+    (eatChar c).run s = (.ok false, s) := by
+  have h : s.eatChar c = (false, s) := by
+    rw [Stream.eatChar_eq, if_neg hs]
+  rw [Parser.run_eatChar, h]
+
+/-- The else branch of `accept_escaped` (`nextIf pred`, then `Reject`). -/
+theorem nextIf_branch_pred {pred : Char → Bool} {s s' : Stream} {c : Char}
+    (h : ((nextIf pred) >>= fun o => match o with
+        | some c => pure c
+        | none => (reject : Parser Char)).run s = (.ok c, s')) : pred c = true := by
+  rw [Parser.run_bind] at h
+  cases hr : s.rest with
+  | nil =>
+    simp only [Parser.run_nextIf, Stream.nextIf, hr] at h
+    simp [Parser.run_reject] at h
+  | cons d ds =>
+    simp only [Parser.run_nextIf, Stream.nextIf, hr] at h
+    by_cases hd : pred d = true
+    · simp only [hd, ite_true, Parser.run_pure, Prod.mk.injEq, Except.ok.injEq] at h
+      obtain ⟨rfl, -⟩ := h
+      exact hd
+    · simp only [hd, Bool.false_eq_true, ite_false] at h
+      simp [Parser.run_reject] at h
+
+/-- A token cursor with no leading `\` cannot take the escape branch of `accept_escaped`, so the
+character it produces satisfies `pred`. -/
+theorem acceptEscaped_pred_of_no_escape {T : TokenSpec α} {pred : Char → Bool} {s s' : Stream}
+    {c : Char} (hs : s.peek ≠ some '\\')
+    (h : (acceptEscaped T pred).run s = (.ok c, s')) : pred c = true := by
+  rw [acceptEscaped, Parser.run_bind] at h
+  have hg : ((if T.allowEscape then eatChar '\\' else (pure false : Parser Bool))).run s
+      = (.ok false, s) := by
+    by_cases hA : T.allowEscape = true
+    · rw [if_pos hA]; exact eatChar_run_false hs
+    · rw [if_neg hA]; rfl
+  rw [hg] at h
+  simp only [] at h
+  simp only [Bool.false_eq_true, ite_false] at h
+  exact nextIf_branch_pred h
+
+/-- First character of a `Meta<Command>` token from a cursor with no leading escape: not
+whitespace. -/
+theorem metaCommand_first_not_ws {O : Oracles} (hL : CharLaws O.char) {s s' : Stream} {c : Char}
+    (hs : s.peek ≠ some '\\')
+    (h : (acceptEscaped (metaToken O.char (commandToken O))
+          (metaToken O.char (commandToken O)).accept1st).run s = (.ok c, s')) :
+    O.char.isWhitespace c = false :=
+  not_ws_of_meta_accept1st hL (acceptEscaped_pred_of_no_escape hs h)
+
+/-- First character of a `Command` token from a cursor with no leading escape: not whitespace. -/
+theorem commandToken_first_not_ws {O : Oracles} (hL : CharLaws O.char) {s s' : Stream} {c : Char}
+    (hs : s.peek ≠ some '\\')
+    (h : (acceptEscaped (commandToken O) SimpleCommand.accept1st).run s = (.ok c, s')) :
+    O.char.isWhitespace c = false :=
+  not_ws_of_simpleCommand_accept1st hL (acceptEscaped_pred_of_no_escape hs h)
+
+/-! ## The constructors return ordinary results -/
+
+/-- `glob::Pattern::new` errors are never the panic marker. -/
+theorem SimpleCommand_compile_ne_unwrap (O : Oracles) (cmd : List Char) :
+    SimpleCommand.compile O cmd ≠ .error .unwrapNone := by
+  intro h
+  rw [SimpleCommand.compile] at h
+  cases hg : O.glob.compile (String.ofList cmd) with
+  | none => rw [hg] at h; simp at h
+  | some e => rw [hg] at h; simp at h
+
+/-- The canonicalize-and-compile tail of `SimpleCommand::construct`. -/
+theorem SimpleCommand_tail_ne_unwrap (O : Oracles) (cmd : List Char) (isDir : Bool) :
+    (match (match O.fs.canonicalize (String.ofList (if isDir then cmd.dropLast else cmd)) with
+      | .ok real => Except.ok real.toList
+      | .okNonUtf8 => Except.error ErrKind.nonUtf8Filesystem
+      | .err => Except.ok (if isDir then cmd.dropLast else cmd)) with
+     | .error e => Except.error e
+     | .ok c => SimpleCommand.compile O (if isDir then c ++ "/*".toList else c)) ≠
+    .error .unwrapNone := by
+  cases hg : O.fs.canonicalize (String.ofList (if isDir then cmd.dropLast else cmd)) with
+  | ok real => simp only []; exact SimpleCommand_compile_ne_unwrap O _
+  | okNonUtf8 => simp only []; simp
+  | err => simp only []; exact SimpleCommand_compile_ne_unwrap O _
+
+/-- `SimpleCommand::construct` returns an ordinary result, never the panic marker. -/
+theorem SimpleCommand_construct_ne_unwrap {O : Oracles} (cmd : List Char) :
+    SimpleCommand.construct O cmd ≠ .error .unwrapNone := by
+  intro h
+  rw [SimpleCommand.construct] at h
+  simp only [] at h
+  split at h
+  · exact SimpleCommand_compile_ne_unwrap O cmd h
+  · split at h
+    · simp at h
+    · split at h
+      · simp at h
+      · split at h
+        · simp at h
+        · exact SimpleCommand_tail_ne_unwrap O cmd _ h
+
+/-- `Command::argPattern` errors are never the panic marker. -/
+theorem Command_argPattern_ne_unwrap (args : List (List Char)) :
+    Command.argPattern args ≠ .error .unwrapNone := by
+  intro h
+  rw [Command.argPattern] at h
+  simp only [] at h
+  repeat' split at h
+  all_goals simp at h
+
+/-- The word-and-arguments tail of `Command::construct`. -/
+theorem Command_head_ne_unwrap {O : Oracles} {cmd : List Char} {args : List (List Char)} :
+    (match SimpleCommand.construct O cmd with
+     | .error e => Except.error e
+     | .ok command =>
+       match Command.argPattern args with
+       | .error e => Except.error e
+       | .ok argpat =>
+         if command == "list" && argpat != Args.prefix [] then
+           Except.error ErrKind.listTakesNoArguments
+         else Except.ok ({ pattern := command, args := argpat } : Command)) ≠ .error .unwrapNone := by
+  cases hs : SimpleCommand.construct O cmd with
+  | error e =>
+    simp only []
+    intro hh
+    exact SimpleCommand_construct_ne_unwrap cmd (by rw [hs]; simpa using hh)
+  | ok command =>
+    simp only []
+    cases ha : Command.argPattern args with
+    | error e =>
+      simp only []
+      intro hh
+      exact Command_argPattern_ne_unwrap args (by rw [ha]; simpa using hh)
+    | ok argpat => simp only []; split <;> simp
+
+/-- `Command::construct` finds a word when the text has a non-whitespace first character, so
+`cmd_iter.next().unwrap()` cannot panic. -/
+theorem Command_construct_ne_unwrap_of_head {O : Oracles} {c : Char} {cs : List Char}
+    (hws : O.char.isWhitespace c = false) :
+    Command.construct O (c :: cs) ≠ .error .unwrapNone := by
+  intro h
+  have hne : splitWhitespace O.char (c :: cs) ≠ [] := splitWhitespace_ne_nil hws
+  rw [Command.construct] at h
+  cases hsp : splitWhitespace O.char (c :: cs) with
+  | nil => exact hne hsp
+  | cons cmd args =>
+    rw [hsp] at h
+    exact Command_head_ne_unwrap h
 
 end SudoersSpec.Syntax

@@ -268,3 +268,8 @@ open SudoersSpec
 #print axioms SudoersSpec.Syntax.MarkerFree.loop
 #print axioms SudoersSpec.Syntax.splitWhitespace_ne_nil
 #print axioms SudoersSpec.Syntax.not_ws_of_meta_accept1st
+#print axioms SudoersSpec.Syntax.acceptEscaped_pred_of_no_escape
+#print axioms SudoersSpec.Syntax.metaCommand_first_not_ws
+#print axioms SudoersSpec.Syntax.commandToken_first_not_ws
+#print axioms SudoersSpec.Syntax.SimpleCommand_construct_ne_unwrap
+#print axioms SudoersSpec.Syntax.Command_construct_ne_unwrap_of_head
