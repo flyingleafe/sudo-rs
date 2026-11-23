@@ -283,28 +283,35 @@ mod test {
     }
 
     fn set_text(judge: &mut Judgement, name: &str, value: &str) {
-        let Some(crate::defaults::SettingKind::Text(f)) = crate::defaults::set(name) else {
+        let Some(crate::defaults::SettingKind::Text(setting)) = crate::defaults::set(name) else {
             panic!()
         };
-        f(value).unwrap()(&mut judge.settings);
+        crate::defaults::check_text(setting, value)
+            .unwrap()
+            .apply(&mut judge.settings);
     }
 
     fn set_integer(judge: &mut Judgement, name: &str, value: &str) {
-        let Some(crate::defaults::SettingKind::Integer(f)) = crate::defaults::set(name) else {
+        let Some(crate::defaults::SettingKind::Integer(setting)) = crate::defaults::set(name)
+        else {
             panic!()
         };
-        f(value).unwrap()(&mut judge.settings);
+        crate::defaults::check_integer(setting, value)
+            .unwrap()
+            .apply(&mut judge.settings);
     }
 
     fn set_flag(judge: &mut Judgement, name: &str) {
         let Some(crate::defaults::SettingKind::Flag(f)) = crate::defaults::set(name) else {
             panic!()
         };
-        f(&mut judge.settings);
+        f.apply(&mut judge.settings);
     }
 
     fn negate(judge: &mut Judgement, name: &str) {
-        crate::defaults::negate(name).unwrap()(&mut judge.settings);
+        crate::defaults::negate(name)
+            .unwrap()
+            .apply(&mut judge.settings);
     }
 
     #[test]

@@ -1,25 +1,33 @@
 #![forbid(unsafe_code)]
-pub type SettingsModifier = Box<dyn FnOnce(&mut Settings)>;
+use std::collections::HashSet;
 
+#[cfg_attr(test, derive(Clone, Copy, Debug, PartialEq, Eq))]
 pub enum ListMode {
     Set,
     Add,
     Del,
 }
 
+/// How a setting takes its value in a `Defaults` line (see `set`): a flag takes none and carries
+/// the modifier that sets it; the other kinds carry the setting, and `check_integer`,
+/// `check_text` and `build_list` turn a value into its modifier.
 #[repr(u32)]
+#[cfg_attr(test, derive(Debug, PartialEq, Eq))]
 pub enum SettingKind {
     Flag(SettingsModifier) = crate::common::HARDENED_ENUM_VALUE_0,
-    Integer(fn(&str) -> Option<SettingsModifier>) = crate::common::HARDENED_ENUM_VALUE_1,
-    Text(fn(&str) -> Option<SettingsModifier>) = crate::common::HARDENED_ENUM_VALUE_2,
-    List(fn(ListMode, Vec<String>) -> SettingsModifier) = crate::common::HARDENED_ENUM_VALUE_3,
+    Integer(IntegerSetting) = crate::common::HARDENED_ENUM_VALUE_1,
+    Text(TextSetting) = crate::common::HARDENED_ENUM_VALUE_2,
+    List(ListSetting) = crate::common::HARDENED_ENUM_VALUE_3,
 }
 
 mod settings_dsl;
 use settings_dsl::{
-    defaults, emit, has_standard_negator, ifdef, initializer_of, modifier_of, referent_of,
-    result_of, storage_of,
+    apply_of, defaults, emit, ifdef, initializer_of, integer_check, kind_of, kind_tables,
+    payload_of, referent_of, result_of, standard_negation, storage_of, text_check,
 };
+
+#[cfg(test)]
+pub(crate) mod legacy;
 
 pub const SYSTEM_EDITOR: &str = if cfg!(target_os = "linux") {
     "/usr/bin/editor:/usr/bin/nano:/usr/bin/vi"
@@ -83,6 +91,34 @@ defaults! {
                                 "PYTHONINSPECT", "PYTHONUSERBASE", "RUBYLIB", "RUBYOPT", "*=()*"] #ignored
 }
 
+/// The effect of a modifier of the list `set`: `items` replace it, are added to it, or are
+/// removed from it.
+fn apply_list(set: &mut HashSet<String>, mode: ListMode, items: Vec<String>) {
+    match mode {
+        ListMode::Set => *set = items.into_iter().collect(),
+        ListMode::Add => set.extend(items),
+        ListMode::Del => {
+            for key in items {
+                set.remove(&key);
+            }
+        }
+    }
+}
+
+/// The integer denoted by `text` in base `radix`, if it lies in `first..=last`.
+fn integer_in_range(text: &str, radix: u32, first: u64, last: u64) -> Option<u64> {
+    match u64::from_str_radix(text, radix) {
+        Ok(value) => {
+            if first <= value && value <= last {
+                Some(value)
+            } else {
+                None
+            }
+        }
+        Err(_) => None,
+    }
+}
+
 fn octal_mode(input: &str) -> Option<u64> {
     <libc::mode_t>::from_str_radix(input.strip_prefix('0')?, 8)
         .ok()
@@ -128,10 +164,10 @@ mod test {
         assert_eq! { def.env_check, ["COLORTERM", "LANG", "LANGUAGE", "LC_*", "LINGUAS", "TERM", "TZ"].iter().map(|s| s.to_string()).collect() };
         assert_eq! { def.verifypw, enums::verifypw::all };
 
-        negate("env_check").unwrap()(&mut def);
-        negate("env_reset").unwrap()(&mut def);
-        negate("secure_path").unwrap()(&mut def);
-        negate("verifypw").unwrap()(&mut def);
+        negate("env_check").unwrap().apply(&mut def);
+        negate("env_reset").unwrap().apply(&mut def);
+        negate("secure_path").unwrap().apply(&mut def);
+        negate("verifypw").unwrap().apply(&mut def);
         assert_eq! { def.always_query_group_plugin, false };
         assert_eq! { def.always_set_home, false };
         assert_eq! { def.env_reset, false };
@@ -148,35 +184,35 @@ mod test {
         let SettingKind::Text(f) = set("lecture").unwrap() else {
             panic!()
         };
-        f("always").unwrap()(&mut def);
+        check_text(f, "always").unwrap().apply(&mut def);
         assert_eq! { def.lecture, enums::lecture::always };
-        f("once").unwrap()(&mut def);
+        check_text(f, "once").unwrap().apply(&mut def);
         assert_eq! { def.lecture, enums::lecture::once };
-        f("never").unwrap()(&mut def);
+        check_text(f, "never").unwrap().apply(&mut def);
         assert_eq! { def.lecture, enums::lecture::never};
-        negate("lecture").unwrap()(&mut def);
+        negate("lecture").unwrap().apply(&mut def);
         assert_eq! { def.lecture, enums::lecture::never };
 
         let SettingKind::Flag(f) = set("env_reset").unwrap() else {
             panic!()
         };
-        f(&mut def);
+        f.apply(&mut def);
         let SettingKind::Text(f) = set("secure_path").unwrap() else {
             panic!()
         };
-        f("/bin").unwrap()(&mut def);
+        check_text(f, "/bin").unwrap().apply(&mut def);
         let SettingKind::Integer(f) = set("passwd_tries").unwrap() else {
             panic!()
         };
-        f("5").unwrap()(&mut def);
+        check_integer(f, "5").unwrap().apply(&mut def);
         let SettingKind::Text(f) = set("verifypw").unwrap() else {
             panic!()
         };
-        f("any").unwrap()(&mut def);
+        check_text(f, "any").unwrap().apply(&mut def);
         let SettingKind::Integer(f) = set("timestamp_timeout").unwrap() else {
             panic!()
         };
-        f("25.25").unwrap()(&mut def);
+        check_integer(f, "25.25").unwrap().apply(&mut def);
         assert_eq! { def.always_query_group_plugin, false };
         assert_eq! { def.always_set_home, false };
         assert_eq! { def.env_reset, true };
@@ -192,6 +228,6 @@ mod test {
         assert_eq! { def.verifypw, enums::verifypw::any };
 
         assert!(set("notanoption").is_none());
-        assert!(f("notanoption").is_none());
+        assert!(check_integer(f, "notanoption").is_none());
     }
 }

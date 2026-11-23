@@ -144,7 +144,7 @@ impl Sudoers {
         for (scope, modifiers) in customisers {
             if match_scope(scope) {
                 for modifier in modifiers {
-                    modifier(&mut self.settings);
+                    modifier.apply(&mut self.settings);
                 }
             }
         }
@@ -159,7 +159,7 @@ impl Sudoers {
         for (scope, modifiers) in customisers {
             if find_item(&scope, cmnd_matcher, &cmnd_aliases) {
                 for modifier in modifiers {
-                    modifier(&mut self.settings);
+                    modifier.apply(&mut self.settings);
                 }
             }
         }

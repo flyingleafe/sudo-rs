@@ -50,81 +50,156 @@ macro_rules! result_of {
     };
 }
 
-macro_rules! modifier_of {
-    ($id:ident, true) => {
-        $crate::defaults::SettingKind::Flag(Box::new(move |obj: &mut Settings| obj.$id = true))
-    };
-    ($id:ident, false) => {
-        $crate::defaults::SettingKind::Flag(Box::new(move |obj: &mut Settings| obj.$id = true))
-    };
-    ($id:ident, [ $($value: expr),* ]) => {
-        $crate::defaults::SettingKind::List(|mode, list| {
-            Box::new(move |obj: &mut Settings| match mode {
-                ListMode::Set => obj.$id = list.into_iter().collect(),
-                ListMode::Add => obj.$id.extend(list),
-                ListMode::Del => {
-                    for key in list {
-                        obj.$id.remove(&key);
-                    }
-                }
-            })
-        })
-    };
-    ($id:ident, =int $first:literal ..= $last: literal $(@ $radix: literal)?; $value: expr) => {
-        #[allow(clippy::from_str_radix_10)]
-        $crate::defaults::SettingKind::Integer(|text| {
-            u64::from_str_radix(text, 10$(*0 + $radix)?)
-                .ok()
-                .filter(|val| ($first ..= $last).contains(val))
-                .map(|i| {
-                    Box::new(move |obj: &mut Settings| obj.$id = i) as SettingsModifier
-                })
-        })
-    };
-    ($id:ident, =int $fn: expr; $value: expr) => {
-        $crate::defaults::SettingKind::Integer(|text| {
-            $fn(&text).map(|i| {
-                Box::new(move |obj: &mut Settings| obj.$id = i) as SettingsModifier
-            })
-        })
-    };
-    ($id:ident, $(=int $check: expr;)+ $value: expr) => { compile_error!("bla") };
-    ($id:ident, $(=enum $key: ident;)+ $value: ident) => {
-        $crate::defaults::SettingKind::Text(|key| match key {
-            $(
-            stringify!($key) => {
-                Some(Box::new(move |obj: &mut Settings| obj.$id = $crate::defaults::enums::$id::$key))
-            },
-            )*
-            _ => None,
-        })
-    };
-    ($id:ident, None) => {
-        $crate::defaults::SettingKind::Text(|text| {
-            let text = text.into();
-            Some(Box::new(move |obj: &mut Settings| obj.$id = Some(text)))
-        })
-    };
-    ($id:ident, $value: expr) => {
-        $crate::defaults::SettingKind::Text(|text| {
-            let text = text.into();
-            Some(Box::new(move |obj: &mut Settings| obj.$id = text))
-        })
+// the payload of a setting's variant of 'SettingsModifier': the new value of the setting, or for
+// a list the change to make to it
+macro_rules! payload_of {
+    ($id:ident, true) => { bool };
+    ($id:ident, false) => { bool };
+    ($id:ident, [ $($value: expr),* ]) => { ($crate::defaults::ListMode, Vec<String>) };
+    ($id:ident, $($spec: tt)*) => { storage_of!($id, $($spec)*) };
+}
+
+// the effect of a setting's variant of 'SettingsModifier' (in 'SettingsModifier::apply')
+macro_rules! apply_of {
+    ($obj:ident . $id:ident = $payload:ident; [ $($value: expr),* ]) => {{
+        let (mode, items) = $payload;
+        $crate::defaults::apply_list(&mut $obj.$id, mode, items)
+    }};
+    ($obj:ident . $id:ident = $payload:ident; $value: tt) => {
+        $obj.$id = $payload
     };
 }
 
-macro_rules! has_standard_negator {
-    (true) => {
-        true
+// what 'fn set' returns for a setting
+macro_rules! kind_of {
+    ($id:ident, true) => {
+        $crate::defaults::SettingKind::Flag($crate::defaults::SettingsModifier::$id(true))
     };
-    (false) => {
-        true
+    ($id:ident, false) => {
+        $crate::defaults::SettingKind::Flag($crate::defaults::SettingsModifier::$id(true))
     };
-    ([$($_: expr),*]) => {
-        true
+    ($id:ident, [ $($value: expr),* ]) => {
+        $crate::defaults::SettingKind::List($crate::defaults::ListSetting::$id)
     };
-    ($($_: tt)*) => {
-        false
+    ($id:ident, =int $($spec: tt)*) => {
+        $crate::defaults::SettingKind::Integer($crate::defaults::IntegerSetting::$id)
+    };
+    ($id:ident, $($spec: tt)*) => {
+        $crate::defaults::SettingKind::Text($crate::defaults::TextSetting::$id)
+    };
+}
+
+// what 'fn negate' returns for a setting that has no explicit negation: flags become false and
+// lists empty; other settings cannot be negated
+macro_rules! standard_negation {
+    ($id:ident, true) => {
+        Some($crate::defaults::SettingsModifier::$id(false))
+    };
+    ($id:ident, false) => {
+        Some($crate::defaults::SettingsModifier::$id(false))
+    };
+    ($id:ident, [ $($value: expr),* ]) => {
+        Some($crate::defaults::SettingsModifier::$id((
+            $crate::defaults::ListMode::Set,
+            Vec::new(),
+        )))
+    };
+    ($id:ident, $($spec: tt)*) => {
+        None
+    };
+}
+
+// the arm of 'fn check_integer' for a setting
+macro_rules! integer_check {
+    ($id:ident, $text:ident; =int $first:literal ..= $last: literal $(@ $radix: expr)?; $value: tt) => {
+        match $crate::defaults::integer_in_range($text, 10$(*0 + $radix)?, $first, $last) {
+            Some(value) => Some($crate::defaults::SettingsModifier::$id(value)),
+            None => None,
+        }
+    };
+    ($id:ident, $text:ident; =int $fn: expr; $value: tt) => {
+        match $fn($text) {
+            Some(value) => Some($crate::defaults::SettingsModifier::$id(value)),
+            None => None,
+        }
+    };
+}
+
+// the arm of 'fn check_text' for a setting
+macro_rules! text_check {
+    ($id:ident, $text:ident; $(=enum $key: ident;)+ $value: ident) => {
+        match $text {
+            $(
+            stringify!($key) => Some($crate::defaults::SettingsModifier::$id($crate::defaults::enums::$id::$key)),
+            )+
+            _ => None,
+        }
+    };
+    ($id:ident, $text:ident; None) => {
+        Some($crate::defaults::SettingsModifier::$id(Some($text.into())))
+    };
+    ($id:ident, $text:ident; $value: expr) => {
+        Some($crate::defaults::SettingsModifier::$id($text.into()))
+    };
+}
+
+// sorts the settings by kind; for each kind that takes a value, generates the enumeration of
+// its settings and the function that turns a value into a modifier
+macro_rules! kind_tables {
+    ([$({ $int:ident; $($int_spec: tt)* })*] [$({ $text:ident; $($text_spec: tt)* })*] [$($list:ident)*]) => {
+        /// The settings that take an integer (`SettingKind::Integer`).
+        #[allow(non_camel_case_types)]
+        #[derive(Clone, Copy)]
+        #[cfg_attr(test, derive(Debug, PartialEq, Eq))]
+        pub(crate) enum IntegerSetting { $($int),* }
+
+        /// The settings that take a text or one of a set of keywords (`SettingKind::Text`).
+        #[allow(non_camel_case_types)]
+        #[derive(Clone, Copy)]
+        #[cfg_attr(test, derive(Debug, PartialEq, Eq))]
+        pub(crate) enum TextSetting { $($text),* }
+
+        /// The settings that are sets of strings (`SettingKind::List`).
+        #[allow(non_camel_case_types)]
+        #[derive(Clone, Copy)]
+        #[cfg_attr(test, derive(Debug, PartialEq, Eq))]
+        pub(crate) enum ListSetting { $($list),* }
+
+        /// The modifier that gives `setting` the integer denoted by `text`, if that is a valid value.
+        pub(crate) fn check_integer(setting: IntegerSetting, text: &str) -> Option<SettingsModifier> {
+            match setting {
+                $(IntegerSetting::$int => integer_check!($int, text; $($int_spec)*),)*
+            }
+        }
+
+        /// The modifier that gives `setting` the value `text`, if that is a valid value.
+        pub(crate) fn check_text(setting: TextSetting, text: &str) -> Option<SettingsModifier> {
+            match setting {
+                $(TextSetting::$text => text_check!($text, text; $($text_spec)*),)*
+            }
+        }
+
+        /// The modifier that changes the list `setting` by `items` as `mode` says.
+        pub(crate) fn build_list(setting: ListSetting, mode: ListMode, items: Vec<String>) -> SettingsModifier {
+            match setting {
+                $(ListSetting::$list => SettingsModifier::$list((mode, items)),)*
+            }
+        }
+    };
+    ($int:tt $text:tt $list:tt { $id:ident; true } $($rest: tt)*) => {
+        kind_tables! { $int $text $list $($rest)* }
+    };
+    ($int:tt $text:tt $list:tt { $id:ident; false } $($rest: tt)*) => {
+        kind_tables! { $int $text $list $($rest)* }
+    };
+    ([$($int: tt)*] $text:tt $list:tt { $id:ident; =int $($spec: tt)* } $($rest: tt)*) => {
+        kind_tables! { [$($int)* { $id; =int $($spec)* }] $text $list $($rest)* }
+    };
+    ($int:tt $text:tt [$($list: tt)*] { $id:ident; [ $($value: tt)* ] } $($rest: tt)*) => {
+        kind_tables! { $int $text [$($list)* $id] $($rest)* }
+    };
+    ($int:tt [$($text: tt)*] $list:tt { $id:ident; $($spec: tt)* } $($rest: tt)*) => {
+        kind_tables! { $int [$($text)* { $id; $($spec)* }] $list $($rest)* }
     };
 }
 
@@ -156,6 +231,7 @@ macro_rules! defaults {
         }
 
         #[derive(Clone)]
+        #[cfg_attr(test, derive(Debug, PartialEq, Eq))]
         pub(crate) struct Settings {
             $($name: storage_of!($name, $(=int $fn;)?$(=int $first;)?$($(=enum $key;)*)? $value)),*
         }
@@ -197,18 +273,31 @@ macro_rules! defaults {
             }
         }
 
+        /// A change to the settings made by one entry of a `Defaults` line: for every setting
+        /// its new value, for a list the change to make to it (see `apply`).
+        #[allow(non_camel_case_types)]
+        #[cfg_attr(test, derive(Debug, PartialEq, Eq))]
+        pub(crate) enum SettingsModifier {
+            $($name(payload_of!($name, $(=int $fn;)?$(=int $first;)?$($(=enum $key;)*)? $value))),*
+        }
+
+        impl SettingsModifier {
+            pub(crate) fn apply(self, obj: &mut Settings) {
+                match self {
+                    $(Self::$name(value) => apply_of!(obj.$name = value; $value),)*
+                }
+            }
+        }
+
         pub(crate) fn negate(name: &str) -> Option<SettingsModifier> {
             match name {
                 $(
-                stringify!($name) if ifdef!($($negate)?; true; has_standard_negator!($value)) => {
-                    let value = ifdef!($($negate)?;
-                        // this setting has an explicit negation; use that
-                        initializer_of!($name, $(=int $fn;)?$(=int $first;)?$($(=enum $key;)*)? $($negate)?);
-                        // for bool and sets, false/empty works (for other types this is dead code)
-                        Default::default()
-                    );
-                    Some(Box::new(move |obj: &mut Settings| obj.$name = value))
-                },
+                stringify!($name) => ifdef!($($negate)?;
+                    // this setting has an explicit negation; use that
+                    Some(SettingsModifier::$name(initializer_of!($name, $(=int $fn;)?$(=int $first;)?$($(=enum $key;)*)? $($negate)?)));
+                    // flags and lists have a standard negation (other settings have none)
+                    standard_negation!($name, $value)
+                ),
                 )*
                 _ => None
             }
@@ -217,23 +306,30 @@ macro_rules! defaults {
         pub(crate) fn set(name: &str) -> Option<SettingKind> {
             match name {
             $(
-                stringify!($name) => Some(modifier_of!($name, $(=int $fn;)?$(=int $first ..= $last $(@ $radix)?;)?$($(=enum $key;)*)? $value)),
+                stringify!($name) => Some(kind_of!($name, $(=int $fn;)?$(=int $first;)?$($(=enum $key;)*)? $value)),
             )*
                 _ => None,
             }
         }
+
+        kind_tables! { [] [] [] $({ $name; $(=int $fn;)?$(=int $first ..= $last $(@ $radix)?;)?$($(=enum $key;)*)? $value })* }
     };
 }
 
+pub(super) use apply_of;
 pub(super) use defaults;
 pub(super) use emit;
-pub(super) use has_standard_negator;
 pub(super) use ifdef;
 pub(super) use initializer_of;
-pub(super) use modifier_of;
+pub(super) use integer_check;
+pub(super) use kind_of;
+pub(super) use kind_tables;
+pub(super) use payload_of;
 pub(super) use referent_of;
 pub(super) use result_of;
+pub(super) use standard_negation;
 pub(super) use storage_of;
+pub(super) use text_check;
 
 /// Test-only rendering of a setting's value (see `proofs/parser/DUMP.md`): `true`/`false`,
 /// decimal integers, enum variant names, quoted strings, `none`/`(some "..")`, and sets as
@@ -322,7 +418,7 @@ mod dump_test {
                 r#"["COLORTERM" "LANG" "LANGUAGE" "LC_*" "LINGUAS" "TERM" "TZ"]"#.to_string()
             )
         );
-        negate("env_reset").unwrap()(&mut settings);
+        negate("env_reset").unwrap().apply(&mut settings);
         assert_eq!(settings.dump_fields()[2], ("env_reset", "false".to_string()));
         assert_eq!(super::dump_quoted("a\"\\\u{e9}\n"), r#""a\"\\\u{e9}\u{a}""#);
     }
