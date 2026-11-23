@@ -21,6 +21,14 @@ set_option maxHeartbeats 1000000
 set_option maxRecDepth 2048
 open sudo_rs
 
+/-- [core::char::methods::{char}::to_digit]:
+    Source: '/rustc/library/core/src/char/methods.rs', lines 409:4-409:58
+    Name pattern: [core::char::methods::{char}::to_digit]
+    Visibility: public -/
+@[rust_fun "core::char::methods::{char}::to_digit"]
+axiom core.char.methods.Char.to_digit
+  : Char → Std.U32 → Result (Option Std.U32)
+
 /-- [core::char::methods::{char}::len_utf8]:
     Source: '/rustc/library/core/src/char/methods.rs', lines 665:4-665:40
     Name pattern: [core::char::methods::{char}::len_utf8]
@@ -42,12 +50,26 @@ axiom core.char.methods.Char.is_uppercase : Char → Result Bool
 @[rust_fun "core::char::methods::{char}::is_numeric"]
 axiom core.char.methods.Char.is_numeric : Char → Result Bool
 
+/-- [core::char::methods::{char}::is_alphanumeric]:
+    Source: '/rustc/library/core/src/char/methods.rs', lines 1054:4-1054:40
+    Name pattern: [core::char::methods::{char}::is_alphanumeric]
+    Visibility: public -/
+@[rust_fun "core::char::methods::{char}::is_alphanumeric"]
+axiom core.char.methods.Char.is_alphanumeric : Char → Result Bool
+
 /-- [core::char::methods::{char}::is_whitespace]:
     Source: '/rustc/library/core/src/char/methods.rs', lines 1088:4-1088:44
     Name pattern: [core::char::methods::{char}::is_whitespace]
     Visibility: public -/
 @[rust_fun "core::char::methods::{char}::is_whitespace"]
 axiom core.char.methods.Char.is_whitespace : Char → Result Bool
+
+/-- [core::char::methods::{char}::is_control]:
+    Source: '/rustc/library/core/src/char/methods.rs', lines 1121:4-1121:41
+    Name pattern: [core::char::methods::{char}::is_control]
+    Visibility: public -/
+@[rust_fun "core::char::methods::{char}::is_control"]
+axiom core.char.methods.Char.is_control : Char → Result Bool
 
 /-- [core::char::methods::{char}::is_ascii_uppercase]:
     Source: '/rustc/library/core/src/char/methods.rs', lines 2113:4-2113:50
@@ -466,6 +488,14 @@ axiom alloc.string.String.Insts.CoreOpsDerefDerefStr.deref
 axiom alloc.string.String.Insts.CoreConvertFromShared0Str.from
   : Str → Result String
 
+/-- [alloc::vec::{alloc::vec::Vec<T>}::into_boxed_slice]:
+    Source: '/rustc/library/alloc/src/vec/mod.rs', lines 1731:4-1731:52
+    Name pattern: [alloc::vec::{alloc::vec::Vec<@T>}::into_boxed_slice]
+    Visibility: public -/
+@[rust_fun "alloc::vec::{alloc::vec::Vec<@T>}::into_boxed_slice"]
+axiom alloc.vec.Vec.into_boxed_slice
+  {T : Type _} (A : Type _) : alloc.vec.Vec T → Result (Slice T)
+
 /-- [alloc::vec::{impl core::default::Default for alloc::vec::Vec<T>}::default]:
     Source: '/rustc/library/alloc/src/vec/mod.rs', lines 4417:4-4417:26
     Name pattern: [alloc::vec::{core::default::Default<alloc::vec::Vec<@T>>}::default]
@@ -514,9 +544,43 @@ axiom common.string.SudoString.Insts.CoreCmpPartialEqStr.eq
 axiom sudoers.char_stream.chars_of : String → Result (alloc.vec.Vec Char)
 
 /-- [sudo_rs::sudoers::basic_parser::escape_char]:
-    Source: 'src/sudoers/basic_parser.rs', lines 175:0-177:1
+    Source: 'src/sudoers/basic_parser.rs', lines 234:0-236:1
     Visibility: public -/
 axiom sudoers.basic_parser.escape_char : Result Char
+
+/-- [sudo_rs::sudoers::tokens::sudo_string]:
+    Source: 'src/sudoers/tokens.rs', lines 92:0-98:1 -/
+axiom sudoers.tokens.sudo_string
+  :
+  String → Result (core.result.Result common.string.SudoString
+    sudoers.basic_parser.ErrorKind)
+
+/-- [sudo_rs::sudoers::tokens::compile_pattern]:
+    Source: 'src/sudoers/tokens.rs', lines 582:0-587:1 -/
+axiom sudoers.tokens.compile_pattern
+  :
+  String → Result (core.result.Result glob.Pattern
+    sudoers.basic_parser.ErrorKind)
+
+/-- [sudo_rs::sudoers::tokens::canonical]:
+    Source: 'src/sudoers/tokens.rs', lines 569:0-577:1 -/
+axiom sudoers.tokens.canonical : String → Result sudoers.tokens.Canonical
+
+/-- [sudo_rs::sudoers::tokens::os_string]:
+    Source: 'src/sudoers/tokens.rs', lines 496:0-498:1 -/
+axiom sudoers.tokens.os_string : String → Result std.ffi.os_str.OsString
+
+/-- [sudo_rs::sudoers::tokens::sudo_path]:
+    Source: 'src/sudoers/tokens.rs', lines 760:0-769:1 -/
+axiom sudoers.tokens.sudo_path
+  :
+  String → Result (core.result.Result common.path.SudoPath
+    sudoers.basic_parser.ErrorKind)
+
+/-- [sudo_rs::sudoers::tokens::classify_chdir]:
+    Source: 'src/sudoers/tokens.rs', lines 749:0-757:1 -/
+axiom sudoers.tokens.classify_chdir
+  : String → Result sudoers.tokens.ChDirForm
 
 /-- [sudo_rs::sudoers::warn_ignored]:
     Source: 'src/sudoers/mod.rs', lines 917:0-927:1 -/
@@ -528,12 +592,4 @@ axiom sudoers.alias_diagnostic
   :
   alloc.vec.Vec sudoers.Error → sudoers.AliasDiagnostic → Str → Result
     (alloc.vec.Vec sudoers.Error)
-
-/-- [sudo_rs::sudoers::tokens::{impl sudo_rs::sudoers::basic_parser::Token for sudo_rs::sudoers::tokens::ChDir}::construct]:
-    Source: 'src/sudoers/tokens.rs', lines 521:4-531:5
-    Visibility: public -/
-axiom sudoers.tokens.ChDir.Insts.Sudo_rsSudoersBasic_parserToken.construct
-  :
-  String → Result (core.result.Result sudoers.tokens.ChDir
-    sudoers.basic_parser.ErrorKind)
 

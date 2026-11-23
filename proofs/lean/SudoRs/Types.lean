@@ -30,6 +30,13 @@ structure core.hash.BuildHasher (Self : Type _) (Self_Hasher : Type _) where
   HasherInst : core.hash.Hasher Self_Hasher
   build_hasher : Self → Result Self_Hasher
 
+/-- [core::marker::PhantomData]
+    Source: '/rustc/library/core/src/marker.rs', lines 811:0-811:39
+    Name pattern: [core::marker::PhantomData]
+    Visibility: public -/
+@[reducible, rust_type "core::marker::PhantomData"]
+def core.marker.PhantomData (T : Type _) := Unit
+
 /-- [glob::MatchOptions]
     Source: '/cargo/registry/src/index.crates.io-1949cf8c6b5b557f/glob-0.3.4/src/lib.rs', lines 1063:0-1063:23
     Name pattern: [glob::MatchOptions]
@@ -265,14 +272,14 @@ inductive sudoers.ast.Qualified (T : Type _) where
 | Forbid : T → sudoers.ast.Qualified T
 
 /-- Trait declaration: [sudo_rs::sudoers::basic_parser::Many]
-    Source: 'src/sudoers/basic_parser.rs', lines 458:0-461:1
+    Source: 'src/sudoers/basic_parser.rs', lines 517:0-520:1
     Visibility: public -/
 structure sudoers.basic_parser.Many (Self : Type _) where
   SEP : Result Char
   LIMIT : Result Std.Usize
 
 /-- [sudo_rs::sudoers::tokens::Meta]
-    Source: 'src/sudoers/tokens.rs', lines 136:0-140:1
+    Source: 'src/sudoers/tokens.rs', lines 217:0-221:1
     Visibility: public -/
 @[discriminant u32 [86649125,181786330,1775640520]]
 inductive sudoers.tokens.Meta (T : Type _) where
@@ -281,7 +288,7 @@ inductive sudoers.tokens.Meta (T : Type _) where
 | Alias : String → sudoers.tokens.Meta T
 
 /-- [sudo_rs::sudoers::basic_parser::ErrorKind]
-    Source: 'src/sudoers/basic_parser.rs', lines 53:0-73:1
+    Source: 'src/sudoers/basic_parser.rs', lines 53:0-107:1
     Visibility: public -/
 @[discriminant isize]
 inductive sudoers.basic_parser.ErrorKind where
@@ -295,10 +302,27 @@ inductive sudoers.basic_parser.ErrorKind where
 | MissingLineTerminator : sudoers.basic_parser.ErrorKind
 | GarbageAtEndOfLine : sudoers.basic_parser.ErrorKind
 | HostIpv4 : sudoers.basic_parser.ErrorKind
+| EmbeddedDollar : sudoers.basic_parser.ErrorKind
+| NulInString : String → sudoers.basic_parser.ErrorKind
+| NulInPath : String → sudoers.basic_parser.ErrorKind
+| ValueTooLarge : sudoers.basic_parser.ErrorKind
+| RegexNotSupported : sudoers.basic_parser.ErrorKind
+| GlobInArguments : sudoers.basic_parser.ErrorKind
+| ListArguments : sudoers.basic_parser.ErrorKind
+| WildcardPattern : String → sudoers.basic_parser.ErrorKind
+| DigestNotSupported : sudoers.basic_parser.ErrorKind
+| FullyQualifiedPath : sudoers.basic_parser.ErrorKind
+| NonUtf8Path : sudoers.basic_parser.ErrorKind
+| StarInPath : sudoers.basic_parser.ErrorKind
+| NetgroupsNotSupported : sudoers.basic_parser.ErrorKind
+| TagNotSupported : String → sudoers.basic_parser.ErrorKind
+| SelinuxNotSupported : sudoers.basic_parser.ErrorKind
+| UnsupportedModifier : String → sudoers.basic_parser.ErrorKind
+| TooManyTags : sudoers.basic_parser.ErrorKind
 | Message : String → sudoers.basic_parser.ErrorKind
 
 /-- Trait declaration: [sudo_rs::sudoers::basic_parser::Token]
-    Source: 'src/sudoers/basic_parser.rs', lines 295:0-310:1
+    Source: 'src/sudoers/basic_parser.rs', lines 354:0-369:1
     Visibility: public -/
 structure sudoers.basic_parser.Token (Self : Type _) where
   MAX_LEN : Result Std.Usize
@@ -310,7 +334,7 @@ structure sudoers.basic_parser.Token (Self : Type _) where
   escaped : Char → Result Bool
 
 /-- [sudo_rs::sudoers::tokens::Hostname]
-    Source: 'src/sudoers/tokens.rs', lines 75:0-75:32
+    Source: 'src/sudoers/tokens.rs', lines 156:0-156:32
     Visibility: public -/
 @[reducible]
 def sudoers.tokens.Hostname := String
@@ -325,7 +349,7 @@ structure sudoers.char_stream.CharStream where
   col : Std.Usize
 
 /-- [sudo_rs::sudoers::basic_parser::LeadingWhitespace]
-    Source: 'src/sudoers/basic_parser.rs', lines 165:0-165:25 -/
+    Source: 'src/sudoers/basic_parser.rs', lines 224:0-224:25 -/
 @[reducible]
 def sudoers.basic_parser.LeadingWhitespace := Unit
 
@@ -348,12 +372,12 @@ inductive sudoers.basic_parser.Status where
 | Reject : sudoers.basic_parser.Status
 
 /-- [sudo_rs::sudoers::basic_parser::TrailingWhitespace]
-    Source: 'src/sudoers/basic_parser.rs', lines 168:0-168:26 -/
+    Source: 'src/sudoers/basic_parser.rs', lines 227:0-227:26 -/
 @[reducible]
 def sudoers.basic_parser.TrailingWhitespace := Unit
 
 /-- Trait declaration: [sudo_rs::sudoers::basic_parser::Parse]
-    Source: 'src/sudoers/basic_parser.rs', lines 157:0-161:1
+    Source: 'src/sudoers/basic_parser.rs', lines 216:0-220:1
     Visibility: public -/
 structure sudoers.basic_parser.Parse (Self : Type _) where
   parse : sudoers.char_stream.CharStream → Result ((core.result.Result Self
@@ -366,7 +390,7 @@ structure sudoers.ast_names.UserFriendly (Self : Type _) where
   DESCRIPTION : Result Str
 
 /-- [sudo_rs::sudoers::ast::Identifier]
-    Source: 'src/sudoers/ast.rs', lines 49:0-52:1
+    Source: 'src/sudoers/ast.rs', lines 69:0-72:1
     Visibility: public -/
 @[discriminant u32 [86649125,181786330]]
 inductive sudoers.ast.Identifier where
@@ -374,7 +398,7 @@ inductive sudoers.ast.Identifier where
 | ID : Std.U32 → sudoers.ast.Identifier
 
 /-- [sudo_rs::sudoers::ast::UserSpecifier]
-    Source: 'src/sudoers/ast.rs', lines 66:0-70:1
+    Source: 'src/sudoers/ast.rs', lines 86:0-90:1
     Visibility: public -/
 @[discriminant u32 [86649125,181786330,1775640520]]
 inductive sudoers.ast.UserSpecifier where
@@ -382,71 +406,46 @@ inductive sudoers.ast.UserSpecifier where
 | Group : sudoers.ast.Identifier → sudoers.ast.UserSpecifier
 | NonunixGroup : sudoers.ast.Identifier → sudoers.ast.UserSpecifier
 
-/-- [sudo_rs::sudoers::ast::RunAs]
-    Source: 'src/sudoers/ast.rs', lines 81:0-84:1
+/-- [sudo_rs::sudoers::tokens::Unquoted]
+    Source: 'src/sudoers/tokens.rs', lines 772:0-772:68
     Visibility: public -/
-structure sudoers.ast.RunAs where
-  users : alloc.vec.Vec (sudoers.ast.Qualified (sudoers.tokens.Meta
-    sudoers.ast.UserSpecifier))
-  groups : alloc.vec.Vec (sudoers.ast.Qualified (sudoers.tokens.Meta
-    sudoers.ast.Identifier))
+def sudoers.tokens.Unquoted (T : Type _) := String × core.marker.PhantomData T
 
-/-- [sudo_rs::sudoers::ast::Authenticate]
-    Source: 'src/sudoers/ast.rs', lines 90:0-97:1
+/-- [sudo_rs::sudoers::tokens::Username]
+    Source: 'src/sudoers/tokens.rs', lines 11:0-11:36
     Visibility: public -/
-@[discriminant u32 [86649125,181786330,1775640520]]
-inductive sudoers.ast.Authenticate where
-| None : sudoers.ast.Authenticate
-| Passwd : sudoers.ast.Authenticate
-| Nopasswd : sudoers.ast.Authenticate
+@[reducible]
+def sudoers.tokens.Username := common.string.SudoString
 
-/-- [sudo_rs::sudoers::ast::EnvironmentControl]
-    Source: 'src/sudoers/ast.rs', lines 102:0-109:1
+/-- [sudo_rs::sudoers::tokens::DigitsU32]
+    Source: 'src/sudoers/tokens.rs', lines 102:0-102:30
     Visibility: public -/
-@[discriminant u32 [86649125,181786330,1775640520]]
-inductive sudoers.ast.EnvironmentControl where
-| Implicit : sudoers.ast.EnvironmentControl
-| Setenv : sudoers.ast.EnvironmentControl
-| Nosetenv : sudoers.ast.EnvironmentControl
+@[reducible]
+def sudoers.tokens.DigitsU32 := Std.U32
 
-/-- [sudo_rs::sudoers::ast::ExecControl]
-    Source: 'src/sudoers/ast.rs', lines 114:0-121:1
-    Visibility: public -/
-@[discriminant u32 [86649125,181786330,1775640520]]
-inductive sudoers.ast.ExecControl where
-| Implicit : sudoers.ast.ExecControl
-| Exec : sudoers.ast.ExecControl
-| Noexec : sudoers.ast.ExecControl
-
-/-- [sudo_rs::sudoers::tokens::ChDir]
-    Source: 'src/sudoers/tokens.rs', lines 513:0-516:1
-    Visibility: public -/
-@[discriminant u32 [86649125,181786330]]
-inductive sudoers.tokens.ChDir where
-| Path : common.path.SudoPath → sudoers.tokens.ChDir
-| Any : sudoers.tokens.ChDir
-
-/-- [sudo_rs::sudoers::ast::Tag]
-    Source: 'src/sudoers/ast.rs', lines 126:0-133:1
-    Visibility: public -/
-structure sudoers.ast.Tag where
-  authenticate : sudoers.ast.Authenticate
-  cwd : Option sudoers.tokens.ChDir
-  env : sudoers.ast.EnvironmentControl
-  apparmor_profile : Option String
-  noexec : sudoers.ast.ExecControl
-  ignored : alloc.vec.Vec sudoers.basic_parser.Span
+/-- Trait declaration: [sudo_rs::sudoers::ast::FromUsername]
+    Source: 'src/sudoers/ast.rs', lines 273:0-275:1 -/
+structure sudoers.ast.FromUsername (Self : Type _) where
+  from_username : common.string.SudoString → Result Self
 
 /-- [sudo_rs::sudoers::tokens::Args]
-    Source: 'src/sudoers/tokens.rs', lines 245:0-248:1
+    Source: 'src/sudoers/tokens.rs', lines 326:0-329:1
     Visibility: public -/
 @[discriminant u32 [86649125,181786330]]
 inductive sudoers.tokens.Args where
 | Prefix : Slice std.ffi.os_str.OsString → sudoers.tokens.Args
 | Exact : Slice std.ffi.os_str.OsString → sudoers.tokens.Args
 
+/-- [sudo_rs::sudoers::tokens::ChDir]
+    Source: 'src/sudoers/tokens.rs', lines 707:0-710:1
+    Visibility: public -/
+@[discriminant u32 [86649125,181786330]]
+inductive sudoers.tokens.ChDir where
+| Path : common.path.SudoPath → sudoers.tokens.ChDir
+| Any : sudoers.tokens.ChDir
+
 /-- [sudo_rs::sudoers::ast::Modifier]
-    Source: 'src/sudoers/ast.rs', lines 354:0-365:1
+    Source: 'src/sudoers/ast.rs', lines 400:0-411:1
     Visibility: public -/
 @[discriminant isize]
 inductive sudoers.ast.Modifier where
@@ -462,14 +461,95 @@ inductive sudoers.ast.Modifier where
 | NoOp : sudoers.ast.Modifier
 
 /-- [sudo_rs::sudoers::ast::CommandSpec]
-    Source: 'src/sudoers/ast.rs', lines 142:0-142:61
+    Source: 'src/sudoers/ast.rs', lines 162:0-162:61
     Visibility: public -/
 def sudoers.ast.CommandSpec :=
   alloc.vec.Vec sudoers.ast.Modifier × sudoers.ast.Qualified
   (sudoers.tokens.Meta (glob.Pattern × sudoers.tokens.Args))
 
+/-- [sudo_rs::sudoers::ast::RunAs]
+    Source: 'src/sudoers/ast.rs', lines 101:0-104:1
+    Visibility: public -/
+structure sudoers.ast.RunAs where
+  users : alloc.vec.Vec (sudoers.ast.Qualified (sudoers.tokens.Meta
+    sudoers.ast.UserSpecifier))
+  groups : alloc.vec.Vec (sudoers.ast.Qualified (sudoers.tokens.Meta
+    sudoers.ast.Identifier))
+
+/-- [sudo_rs::sudoers::tokens::Canonical]
+    Source: 'src/sudoers/tokens.rs', lines 557:0-564:1
+    Visibility: public -/
+@[discriminant isize]
+inductive sudoers.tokens.Canonical where
+| Unresolved : sudoers.tokens.Canonical
+| Resolved : String → sudoers.tokens.Canonical
+| NotUtf8 : sudoers.tokens.Canonical
+
+/-- [sudo_rs::sudoers::tokens::ChDirForm]
+    Source: 'src/sudoers/tokens.rs', lines 740:0-744:1 -/
+@[discriminant isize]
+inductive sudoers.tokens.ChDirForm where
+| Any : sudoers.tokens.ChDirForm
+| ContainsStar : sudoers.tokens.ChDirForm
+| Path : sudoers.tokens.ChDirForm
+
+/-- [sudo_rs::sudoers::tokens::StringParameter]
+    Source: 'src/sudoers/tokens.rs', lines 684:0-684:39
+    Visibility: public -/
+@[reducible]
+def sudoers.tokens.StringParameter := String
+
+/-- [sudo_rs::sudoers::tokens::AliasName]
+    Source: 'src/sudoers/tokens.rs', lines 306:0-306:33
+    Visibility: public -/
+@[reducible]
+def sudoers.tokens.AliasName := String
+
+/-- [sudo_rs::sudoers::ast::MetaOrTag]
+    Source: 'src/sudoers/ast.rs', lines 397:0-397:33 -/
+@[reducible]
+def sudoers.ast.MetaOrTag := sudoers.tokens.Meta sudoers.ast.Modifier
+
+/-- [sudo_rs::sudoers::ast::Authenticate]
+    Source: 'src/sudoers/ast.rs', lines 110:0-117:1
+    Visibility: public -/
+@[discriminant u32 [86649125,181786330,1775640520]]
+inductive sudoers.ast.Authenticate where
+| None : sudoers.ast.Authenticate
+| Passwd : sudoers.ast.Authenticate
+| Nopasswd : sudoers.ast.Authenticate
+
+/-- [sudo_rs::sudoers::ast::EnvironmentControl]
+    Source: 'src/sudoers/ast.rs', lines 122:0-129:1
+    Visibility: public -/
+@[discriminant u32 [86649125,181786330,1775640520]]
+inductive sudoers.ast.EnvironmentControl where
+| Implicit : sudoers.ast.EnvironmentControl
+| Setenv : sudoers.ast.EnvironmentControl
+| Nosetenv : sudoers.ast.EnvironmentControl
+
+/-- [sudo_rs::sudoers::ast::ExecControl]
+    Source: 'src/sudoers/ast.rs', lines 134:0-141:1
+    Visibility: public -/
+@[discriminant u32 [86649125,181786330,1775640520]]
+inductive sudoers.ast.ExecControl where
+| Implicit : sudoers.ast.ExecControl
+| Exec : sudoers.ast.ExecControl
+| Noexec : sudoers.ast.ExecControl
+
+/-- [sudo_rs::sudoers::ast::Tag]
+    Source: 'src/sudoers/ast.rs', lines 146:0-153:1
+    Visibility: public -/
+structure sudoers.ast.Tag where
+  authenticate : sudoers.ast.Authenticate
+  cwd : Option sudoers.tokens.ChDir
+  env : sudoers.ast.EnvironmentControl
+  apparmor_profile : Option String
+  noexec : sudoers.ast.ExecControl
+  ignored : alloc.vec.Vec sudoers.basic_parser.Span
+
 /-- [sudo_rs::sudoers::ast::PermissionSpec]
-    Source: 'src/sudoers/ast.rs', lines 147:0-150:1
+    Source: 'src/sudoers/ast.rs', lines 167:0-170:1
     Visibility: public -/
 structure sudoers.ast.PermissionSpec where
   users : alloc.vec.Vec (sudoers.ast.Qualified (sudoers.tokens.Meta
@@ -479,13 +559,13 @@ structure sudoers.ast.PermissionSpec where
     sudoers.ast.RunAs) × sudoers.ast.CommandSpec)))
 
 /-- [sudo_rs::sudoers::ast::Def]
-    Source: 'src/sudoers/ast.rs', lines 153:0-153:47
+    Source: 'src/sudoers/ast.rs', lines 173:0-173:47
     Visibility: public -/
 def sudoers.ast.Def (T : Type _) :=
   String × alloc.vec.Vec (sudoers.ast.Qualified (sudoers.tokens.Meta T))
 
 /-- [sudo_rs::sudoers::basic_parser::Comment]
-    Source: 'src/sudoers/basic_parser.rs', lines 171:0-171:15 -/
+    Source: 'src/sudoers/basic_parser.rs', lines 230:0-230:15 -/
 @[reducible]
 def sudoers.basic_parser.Comment := Unit
 
