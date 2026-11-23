@@ -92,6 +92,22 @@ inductive KindRel : RKind → ErrKind → Prop
   | missingLineTerminator : KindRel .MissingLineTerminator .missingLineTerminator
   | garbageAtEndOfLine : KindRel .GarbageAtEndOfLine .garbageAtEndOfLine
   | hostIpv4 : KindRel .HostIpv4 .hostIPv4Address
+  | embeddedDollar : KindRel .EmbeddedDollar .embeddedDollarInUsername
+  | valueTooLarge : KindRel .ValueTooLarge .valueTooLarge
+  | regexNotSupported : KindRel .RegexNotSupported .regularExpressionsNotSupported
+  | globInArguments : KindRel .GlobInArguments .globInCommandArguments
+  | listArguments : KindRel .ListArguments .listTakesNoArguments
+  | wildcardPattern (msg : String) : KindRel (.WildcardPattern msg) (.wildcardPatternError msg)
+  | digestNotSupported : KindRel .DigestNotSupported .digestNotSupported
+  | fullyQualifiedPath : KindRel .FullyQualifiedPath .fullyQualifiedPathNeeded
+  | nonUtf8Path : KindRel .NonUtf8Path .nonUtf8Filesystem
+  | starInPath : KindRel .StarInPath .pathContainsStar
+  | netgroupsNotSupported : KindRel .NetgroupsNotSupported .netgroupsNotSupported
+  | tagNotSupported (tag : String) : KindRel (.TagNotSupported tag) (.notSupported tag)
+  | selinuxNotSupported : KindRel .SelinuxNotSupported .selinuxNotSupported
+  | unsupportedModifier (keyword : String) :
+      KindRel (.UnsupportedModifier keyword) (.unsupportedModifier keyword)
+  | tooManyTags : KindRel .TooManyTags .tooManyTags
 
 /-- The transitional `ErrorKind::Message` refines no reference message. -/
 theorem KindRel.not_message {m : String} {k : ErrKind} : ¬ KindRel (.Message m) k := by
