@@ -21,6 +21,12 @@ pub enum Qualified<T> {
 pub type Spec<T> = Qualified<Meta<T>>;
 pub type SpecList<T> = Vec<Spec<T>>;
 
+/// The host list of a rule (`SpecList<Hostname>`): a named instance of the generic list parser,
+/// so that the extraction (`Cargo.toml` `[package.metadata.charon]`) has one item for it.
+pub(super) fn host_list(stream: &mut CharStream) -> Parsed<SpecList<Hostname>> {
+    try_nonterminal(stream)
+}
+
 /// A generic mapping function (only used for turning `Spec<SimpleCommand>` into `Spec<Command>`)
 impl<T> Spec<T> {
     pub fn map<U>(self, f: impl Fn(T) -> U) -> Spec<U> {
@@ -210,8 +216,20 @@ impl<T: Parse + UserFriendly> Parse for Qualified<T> {
     fn parse(stream: &mut CharStream) -> Parsed<Self> {
         if is_syntax('!', stream)? {
             let mut neg = true;
-            while is_syntax('!', stream)? {
-                neg = !neg;
+            let mut failure = None;
+            let mut more = true;
+            while more {
+                match is_syntax('!', stream) {
+                    Ok(true) => neg = !neg,
+                    Ok(false) => more = false,
+                    Err(status) => {
+                        failure = Some(status);
+                        more = false;
+                    }
+                }
+            }
+            if let Some(status) = failure {
+                return Err(status);
             }
             let ident = expect_nonterminal(stream)?;
             if neg {
@@ -288,7 +306,8 @@ impl Parse for UserSpecifier {
         if stream.eat_char('"') {
             let begin_pos = stream.get_pos();
             let Unquoted(text, _): Unquoted<Username> = expect_nonterminal(stream)?;
-            let result = parse_user(&mut CharStream::new_with_pos(&text, begin_pos))?;
+            let chars = super::char_stream::chars_of(&text);
+            let result = parse_user(&mut CharStream::new_with_pos(&chars, begin_pos))?;
             expect_syntax('"', stream)?;
 
             Ok(result)
@@ -473,7 +492,7 @@ impl Parse for CommandSpec {
 /// ```
 impl Parse for (SpecList<Hostname>, Vec<(Option<RunAs>, CommandSpec)>) {
     fn parse(stream: &mut CharStream) -> Parsed<Self> {
-        let hosts = try_nonterminal(stream)?;
+        let hosts = host_list(stream)?;
         expect_syntax('=', stream)?;
         let runas_cmds = expect_nonterminal(stream)?;
 

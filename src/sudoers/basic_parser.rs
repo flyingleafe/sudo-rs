@@ -24,6 +24,12 @@
 //!     }
 //! }
 //! ```
+//!
+//! This module is written in the restricted style of `proofs/parser/RESTYLE.md` (no closures,
+//! no `fn` pointers, no `str` pattern API, no `?` or `return` inside loops, error kinds instead
+//! of formatted messages), so that Charon and Aeneas translate it to Lean.
+
+use std::fmt;
 
 /// Type holding a parsed object (or error information if parsing failed)
 pub type Parsed<T> = Result<T, Status>;
@@ -37,8 +43,56 @@ pub struct Span {
 
 #[cfg_attr(test, derive(Debug, PartialEq))]
 pub enum Status {
-    Fatal(Span, String), // not recoverable; stream in inconsistent state
-    Reject,              // parsing failed by no input consumed
+    Fatal(Span, ErrorKind), // not recoverable; stream in inconsistent state
+    Reject,                 // parsing failed by no input consumed
+}
+
+/// The cause of a fatal error. Its `Display` impl is the only place where the message text of a
+/// diagnostic is produced.
+#[cfg_attr(test, derive(Debug, PartialEq))]
+pub enum ErrorKind {
+    /// blanks at the end of the input
+    SuperfluousWhitespace,
+    /// a backslash in trailing whitespace that does not continue the line
+    StrayEscape,
+    /// `expect_syntax`: the expected character and the one found (`None` at the end of input)
+    Expecting(char, Option<char>),
+    /// `expect_nonterminal`: the description of the nonterminal
+    Expected(&'static str),
+    /// a backslash in a token that escapes nothing the token allows
+    IllegalEscape,
+    TokenTooLong,
+    TooManyItems,
+    MissingLineTerminator,
+    GarbageAtEndOfLine,
+    /// `Hostname::construct`: the text resembles an IPv4 address
+    HostIpv4,
+    /// An already formatted message: the productions not yet rewritten in the restricted style
+    /// (`unrecoverable!`, the `construct` functions of their tokens).
+    Message(String),
+}
+
+impl fmt::Display for ErrorKind {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            ErrorKind::SuperfluousWhitespace => f.write_str("superfluous whitespace"),
+            ErrorKind::StrayEscape => f.write_str("stray escape sequence"),
+            ErrorKind::Expecting(syntax, Some(c)) => {
+                write!(f, "expecting '{syntax}' but found '{c}'")
+            }
+            ErrorKind::Expecting(syntax, None) => write!(f, "expecting '{syntax}' but found 'EOF'"),
+            ErrorKind::Expected(description) => write!(f, "expected {description}"),
+            ErrorKind::IllegalEscape => f.write_str("illegal escape sequence"),
+            ErrorKind::TokenTooLong => f.write_str("token exceeds maximum length"),
+            ErrorKind::TooManyItems => f.write_str("too many items in list"),
+            ErrorKind::MissingLineTerminator => {
+                f.write_str("missing line terminator at end of file")
+            }
+            ErrorKind::GarbageAtEndOfLine => f.write_str("garbage at end of line"),
+            ErrorKind::HostIpv4 => f.write_str("hosts cannot be specified using an IPv4 address"),
+            ErrorKind::Message(message) => f.write_str(message),
+        }
+    }
 }
 
 pub fn make<T>(value: T) -> Parsed<T> {
@@ -49,16 +103,37 @@ pub fn reject<T>() -> Parsed<T> {
     Err(Status::Reject)
 }
 
+/// A fatal error whose span runs from `start` to the current position.
+pub fn fatal_from<T>(start: (usize, usize), stream: &CharStream, kind: ErrorKind) -> Parsed<T> {
+    Err(Status::Fatal(
+        Span {
+            start,
+            end: stream.get_pos(),
+        },
+        kind,
+    ))
+}
+
+/// A fatal error at the current position.
+pub fn fatal_here<T>(stream: &CharStream, kind: ErrorKind) -> Parsed<T> {
+    let pos = stream.get_pos();
+    Err(Status::Fatal(
+        Span {
+            start: pos,
+            end: pos,
+        },
+        kind,
+    ))
+}
+
+/// Return a fatal error with a formatted message (`ErrorKind::Message`); for the productions not
+/// yet rewritten in the restricted style.
 macro_rules! unrecoverable {
     (pos=$pos:expr, $stream:ident, $($str:expr),*) => {
-        return Err(crate::sudoers::basic_parser::Status::Fatal(Span { start: $pos, end: CharStream::get_pos($stream)}, format!($($str),*)))
+        return crate::sudoers::basic_parser::fatal_from($pos, $stream, crate::sudoers::basic_parser::ErrorKind::Message(format!($($str),*)))
     };
-    ($stream:ident, $($str:expr),*) => {{
-        let pos = CharStream::get_pos($stream);
-        return Err(crate::sudoers::basic_parser::Status::Fatal(Span { start: pos, end: pos }, format!($($str),*)))
-    }};
-    ($($str:expr),*) => {
-        return Err(crate::basic_parser::Status::Fatal(Default::default(), format!($($str),*)))
+    ($stream:ident, $($str:expr),*) => {
+        return crate::sudoers::basic_parser::fatal_here($stream, crate::sudoers::basic_parser::ErrorKind::Message(format!($($str),*)))
     };
 }
 
@@ -95,17 +170,27 @@ struct TrailingWhitespace;
 #[cfg_attr(test, derive(Debug, PartialEq, Eq))]
 struct Comment;
 
+/// The escape character `'\\'`. Kept opaque for Charon (`Cargo.toml`): the pinned Aeneas prints
+/// this literal as `'\'`, which Lean rejects; `FunsExternal.lean` defines it as `'\\'`.
+pub fn escape_char() -> char {
+    '\\'
+}
+
 /// Accept zero or more whitespace characters; fails if the whitespace is not "leading" to something
 /// (which can be used to detect end-of-input).
 impl Parse for LeadingWhitespace {
     fn parse(stream: &mut CharStream) -> Parsed<Self> {
-        let eat_space = |stream: &mut CharStream| stream.next_if(|c| "\t ".contains(c));
-        while eat_space(stream).is_some() {}
+        let mut more = true;
+        while more {
+            match stream.peek() {
+                Some(c) if c == '\t' || c == ' ' => stream.bump(c),
+                _ => more = false,
+            }
+        }
 
-        if stream.peek().is_some() {
-            make(LeadingWhitespace {})
-        } else {
-            unrecoverable!(stream, "superfluous whitespace")
+        match stream.peek() {
+            Some(_) => make(LeadingWhitespace {}),
+            None => fatal_here(stream, ErrorKind::SuperfluousWhitespace),
         }
     }
 }
@@ -115,21 +200,28 @@ impl Parse for LeadingWhitespace {
 /// since those can form part of trailing white space.
 impl Parse for TrailingWhitespace {
     fn parse(stream: &mut CharStream) -> Parsed<Self> {
-        loop {
+        let mut stray = false;
+        let mut more = true;
+        while more {
             let _ = LeadingWhitespace::parse(stream); // don't propagate any errors
 
             // line continuations
-            if stream.eat_char('\\') {
+            if stream.eat_char(escape_char()) {
                 // do the equivalent of expect_syntax('\n', stream)?, without recursion
                 if !stream.eat_char('\n') {
-                    unrecoverable!(stream, "stray escape sequence")
+                    stray = true;
+                    more = false;
                 }
             } else {
-                break;
+                more = false;
             }
         }
 
-        make(TrailingWhitespace {})
+        if stray {
+            fatal_here(stream, ErrorKind::StrayEscape)
+        } else {
+            make(TrailingWhitespace {})
+        }
     }
 }
 
@@ -160,21 +252,21 @@ pub fn try_syntax(syntax: char, stream: &mut CharStream) -> Parsed<()> {
 
 /// Similar to [try_syntax], but aborts parsing if the expected character is not found.
 pub fn expect_syntax(syntax: char, stream: &mut CharStream) -> Parsed<()> {
-    if try_syntax(syntax, stream).is_err() {
-        let str = if let Some(c) = stream.peek() {
-            c.to_string()
-        } else {
-            "EOF".to_string()
-        };
-        unrecoverable!(stream, "expecting '{syntax}' but found '{str}'")
+    match try_syntax(syntax, stream) {
+        Ok(()) => make(()),
+        Err(_) => {
+            let found = stream.peek();
+            fatal_here(stream, ErrorKind::Expecting(syntax, found))
+        }
     }
-    make(())
 }
 
 /// Convenience function: usually try_syntax is called as a test criterion; if this returns true, the input was consumed.
 pub fn is_syntax(syntax: char, stream: &mut CharStream) -> Parsed<bool> {
-    let result = maybe(try_syntax(syntax, stream))?;
-    make(result.is_some())
+    match maybe(try_syntax(syntax, stream))? {
+        Some(()) => make(true),
+        None => make(false),
+    }
 }
 
 /// Interface for working with types that implement the [Parse] trait; this allows parsing to use
@@ -192,9 +284,7 @@ use super::ast_names::UserFriendly;
 pub fn expect_nonterminal<T: Parse + UserFriendly>(stream: &mut CharStream) -> Parsed<T> {
     let begin_pos = stream.get_pos();
     match try_nonterminal(stream) {
-        Err(Status::Reject) => {
-            unrecoverable!(pos = begin_pos, stream, "expected {}", T::DESCRIPTION)
-        }
+        Err(Status::Reject) => fatal_from(begin_pos, stream, ErrorKind::Expected(T::DESCRIPTION)),
         result => result,
     }
 }
@@ -203,9 +293,10 @@ pub fn expect_nonterminal<T: Parse + UserFriendly>(stream: &mut CharStream) -> P
 /// maximum length, character classes, and possible escaping). The class for the first character of
 /// the token can be different than that of the rest.
 pub trait Token: Sized {
+    /// The maximum length of the token text in bytes (UTF-8).
     const MAX_LEN: usize = 255;
 
-    fn construct(s: String) -> Result<Self, String>;
+    fn construct(s: String) -> Result<Self, ErrorKind>;
 
     fn accept(c: char) -> bool;
     fn accept_1st(c: char) -> bool {
@@ -218,48 +309,91 @@ pub trait Token: Sized {
     }
 }
 
-/// Implementation of the [Parse] trait for anything that implements [Token]
-impl<T: Token> Parse for T {
-    fn parse(stream: &mut CharStream) -> Parsed<Self> {
-        fn accept_escaped<T: Token>(
-            pred: fn(char) -> bool,
-            stream: &mut CharStream,
-        ) -> Parsed<char> {
-            const ESCAPE: char = '\\';
-            if T::ALLOW_ESCAPE && stream.eat_char(ESCAPE) {
-                if let Some(c) = stream.next_if(T::escaped) {
-                    Ok(c)
-                } else if pred(ESCAPE) {
-                    Ok(ESCAPE)
+/// The character class of the first (`first`) or of a later character of a token.
+fn accepts<T: Token>(first: bool, c: char) -> bool {
+    if first {
+        T::accept_1st(c)
+    } else {
+        T::accept(c)
+    }
+}
+
+/// One character of a token, possibly escaped.
+fn accept_escaped<T: Token>(first: bool, stream: &mut CharStream) -> Parsed<char> {
+    let escape = escape_char();
+    if T::ALLOW_ESCAPE && stream.eat_char(escape) {
+        match stream.peek() {
+            Some(c) if T::escaped(c) => {
+                stream.bump(c);
+                Ok(c)
+            }
+            _ => {
+                if accepts::<T>(first, escape) {
+                    Ok(escape)
                 } else if stream.eat_char('\n') {
-                    if pred(' ') {
+                    if accepts::<T>(first, ' ') {
                         // escape + newline = line continuation (whitespace)
                         Ok(' ')
                     } else {
                         reject()
                     }
                 } else {
-                    unrecoverable!(stream, "illegal escape sequence")
+                    fatal_here(stream, ErrorKind::IllegalEscape)
                 }
-            } else if let Some(c) = stream.next_if(pred) {
+            }
+        }
+    } else {
+        match stream.peek() {
+            Some(c) if accepts::<T>(first, c) => {
+                stream.bump(c);
                 Ok(c)
-            } else {
-                reject()
             }
+            _ => reject(),
         }
+    }
+}
 
+/// Implementation of the [Parse] trait for anything that implements [Token]
+impl<T: Token> Parse for T {
+    fn parse(stream: &mut CharStream) -> Parsed<Self> {
         let start_pos = stream.get_pos();
-        let mut str = accept_escaped::<T>(T::accept_1st, stream)?.to_string();
-        while let Some(c) = maybe(accept_escaped::<T>(T::accept, stream))? {
-            if str.len() >= T::MAX_LEN {
-                unrecoverable!(stream, "token exceeds maximum length")
+        let first = accept_escaped::<T>(true, stream)?;
+        let mut text = String::new();
+        text.push(first);
+
+        let mut failure = None;
+        let mut more = true;
+        while more {
+            match accept_escaped::<T>(false, stream) {
+                Ok(c) => {
+                    if text.len() >= T::MAX_LEN {
+                        let pos = stream.get_pos();
+                        failure = Some(Status::Fatal(
+                            Span {
+                                start: pos,
+                                end: pos,
+                            },
+                            ErrorKind::TokenTooLong,
+                        ));
+                        more = false;
+                    } else {
+                        text.push(c);
+                    }
+                }
+                Err(Status::Reject) => more = false,
+                Err(status) => {
+                    failure = Some(status);
+                    more = false;
+                }
             }
-            str.push(c)
         }
 
-        match T::construct(str) {
-            Ok(result) => make(result),
-            Err(msg) => unrecoverable!(pos = start_pos, stream, "{msg}"),
+        match failure {
+            Some(status) => Err(status),
+            None => match T::construct(text) {
+                Ok(result) => make(result),
+                Err(kind) => fatal_from(start_pos, stream, kind),
+            },
         }
     }
 }
@@ -279,14 +413,44 @@ pub(super) fn parse_list<T: Parse + UserFriendly>(
 ) -> Parsed<Vec<T>> {
     let mut elems = Vec::new();
     elems.push(try_nonterminal(stream)?);
-    while maybe(try_syntax(sep_by, stream))?.is_some() {
-        if elems.len() >= max {
-            unrecoverable!(stream, "too many items in list")
+
+    let mut failure = None;
+    let mut more = true;
+    while more {
+        match try_syntax(sep_by, stream) {
+            Ok(()) => {
+                if elems.len() >= max {
+                    let pos = stream.get_pos();
+                    failure = Some(Status::Fatal(
+                        Span {
+                            start: pos,
+                            end: pos,
+                        },
+                        ErrorKind::TooManyItems,
+                    ));
+                    more = false;
+                } else {
+                    match expect_nonterminal(stream) {
+                        Ok(elem) => elems.push(elem),
+                        Err(status) => {
+                            failure = Some(status);
+                            more = false;
+                        }
+                    }
+                }
+            }
+            Err(Status::Reject) => more = false,
+            Err(status) => {
+                failure = Some(status);
+                more = false;
+            }
         }
-        elems.push(expect_nonterminal(stream)?);
     }
 
-    make(elems)
+    match failure {
+        Some(status) => Err(status),
+        None => make(elems),
+    }
 }
 
 /// Types that implement the Many trait can be parsed multiple tokens into a `Vec<T>`; they are
@@ -304,7 +468,17 @@ impl<T: Parse + Many + UserFriendly> Parse for Vec<T> {
     }
 }
 
+/// `LeadingWhitespace::parse(stream).is_ok()`: whether another line follows.
+#[allow(clippy::redundant_pattern_matching)] // `Result::is_ok` has no Aeneas model
+fn line_follows(stream: &mut CharStream) -> bool {
+    match LeadingWhitespace::parse(stream) {
+        Ok(_) => true,
+        Err(_) => false,
+    }
+}
+
 /// Entry point utility function; parse a `Vec<T>` but with fatal error recovery per line
+#[allow(clippy::redundant_pattern_matching)] // `Result::is_ok` has no Aeneas model
 pub fn parse_lines<T>(stream: &mut CharStream) -> Vec<Parsed<T>>
 where
     T: Parse + UserFriendly,
@@ -315,24 +489,24 @@ where
     // by the second accept_if (making progress), or the end of the stream will have been reacherd
     // (which will cause the next iteration to fall through)
 
-    while LeadingWhitespace::parse(stream).is_ok() {
+    let mut more = line_follows(stream);
+    while more {
         let item = expect_nonterminal(stream);
-        let parsed_item_ok = item.is_ok();
+        let parsed_item_ok = matches!(item, Ok(_));
         result.push(item);
 
         let _ = maybe(Comment::parse(stream));
         if !stream.eat_char('\n') {
             if parsed_item_ok {
-                let msg = if stream.peek().is_none() {
-                    "missing line terminator at end of file"
-                } else {
-                    "garbage at end of line"
+                let kind = match stream.peek() {
+                    None => ErrorKind::MissingLineTerminator,
+                    Some(_) => ErrorKind::GarbageAtEndOfLine,
                 };
-                let error = |stream: &mut CharStream| unrecoverable!(stream, "{msg}");
-                result.push(error(stream));
+                result.push(fatal_here(stream, kind));
             }
             stream.skip_to_newline();
         }
+        more = line_follows(stream);
     }
 
     result
@@ -361,11 +535,11 @@ pub fn parse_eval<T: Parse>(text: &str) -> T {
 
 #[cfg(test)]
 pub fn parse_fatal<T: Parse>(text: &str) -> String {
-    let Err(Status::Fatal(_, msg)) = parse_string::<T>(text) else {
+    let Err(Status::Fatal(_, kind)) = parse_string::<T>(text) else {
         panic!("not a fatal error");
     };
 
-    msg
+    kind.to_string()
 }
 
 #[cfg(test)]
@@ -373,7 +547,7 @@ mod test {
     use super::*;
 
     impl Token for String {
-        fn construct(val: String) -> Result<Self, String> {
+        fn construct(val: String) -> Result<Self, ErrorKind> {
             Ok(val)
         }
 

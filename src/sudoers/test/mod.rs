@@ -807,7 +807,7 @@ fn assert_remote_failure(line: &str, expected_msg: &str) {
         panic!("Expected Fatal error");
     };
 
-    assert_eq!(msg, expected_msg);
+    assert_eq!(msg.to_string(), expected_msg);
 }
 
 #[cfg(feature = "unstable-remote-sudoers")]

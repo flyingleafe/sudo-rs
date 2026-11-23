@@ -1,46 +1,68 @@
+//! A cursor over the characters of a text, with line and column tracking.
+//!
+//! The parser reads a `&[char]`: the text is converted once, by [chars_of], at the entry points
+//! (`read_sudoers`, test helpers). Everything here is written in the restricted style of
+//! `proofs/parser/RESTYLE.md`, so that Charon and Aeneas translate it.
+
 #[derive(Clone)]
 pub struct CharStream<'a> {
-    iter: std::iter::Peekable<std::str::Chars<'a>>,
+    src: &'a [char],
+    pos: usize,
     line: usize,
     col: usize,
 }
 
 impl<'a> CharStream<'a> {
-    pub fn new_with_pos(src: &'a str, (line, col): (usize, usize)) -> Self {
+    pub fn new_with_pos(src: &'a [char], (line, col): (usize, usize)) -> Self {
         CharStream {
-            iter: src.chars().peekable(),
+            src,
+            pos: 0,
             line,
             col,
         }
     }
 
-    pub fn new(src: &'a str) -> Self {
+    pub fn from_chars(src: &'a [char]) -> Self {
         Self::new_with_pos(src, (1, 1))
     }
 
-    pub fn next_if(&mut self, f: impl FnOnce(char) -> bool) -> Option<char> {
-        let item = self.iter.next_if(|&c| f(c));
-        match item {
-            Some('\n') => {
-                self.line += 1;
-                self.col = 1;
-            }
-            Some(_) => self.col += 1,
-            _ => {}
+    /// Moves past `c`, which must be the character at the cursor (`self.peek() == Some(c)`).
+    pub fn bump(&mut self, c: char) {
+        self.pos += 1;
+        if c == '\n' {
+            self.line += 1;
+            self.col = 1;
+        } else {
+            self.col += 1;
         }
-        item
     }
 
     pub fn eat_char(&mut self, expect_char: char) -> bool {
-        self.next_if(|c| c == expect_char).is_some()
+        match self.peek() {
+            Some(c) if c == expect_char => {
+                self.bump(c);
+                true
+            }
+            _ => false,
+        }
     }
 
     pub fn skip_to_newline(&mut self) {
-        while self.next_if(|c| c != '\n').is_some() {}
+        let mut more = true;
+        while more {
+            match self.peek() {
+                Some(c) if c != '\n' => self.bump(c),
+                _ => more = false,
+            }
+        }
     }
 
-    pub fn peek(&mut self) -> Option<char> {
-        self.iter.peek().cloned()
+    pub fn peek(&self) -> Option<char> {
+        if self.pos < self.src.len() {
+            Some(self.src[self.pos])
+        } else {
+            None
+        }
     }
 
     pub fn get_pos(&self) -> (usize, usize) {
@@ -48,10 +70,30 @@ impl<'a> CharStream<'a> {
     }
 
     pub fn advance(&mut self, n: usize) {
-        for _ in 0..n {
-            self.next_if(|_| true);
+        let mut i = 0;
+        while i < n {
+            if let Some(c) = self.peek() {
+                self.bump(c);
+            }
+            i += 1;
         }
     }
+}
+
+#[cfg(test)]
+impl CharStream<'static> {
+    /// Test helper: a stream over a copy of `src` that is never freed.
+    pub fn new(src: &str) -> Self {
+        let chars: &'static [char] = Vec::leak(src.chars().collect());
+        Self::from_chars(chars)
+    }
+}
+
+/// The characters of a text. Kept opaque for Charon (`Cargo.toml`): `str::chars` and `collect`
+/// have no Aeneas model; `proofs/lean/SudoRs/FunsExternal.lean` models it as `String.toList`.
+#[allow(clippy::ptr_arg)] // `&String`, not `&str`: the model works on the Lean `String`
+pub fn chars_of(text: &String) -> Vec<char> {
+    text.chars().collect()
 }
 
 #[cfg(test)]

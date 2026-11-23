@@ -8,6 +8,10 @@ mod ast_names;
 mod basic_parser;
 mod char_stream;
 mod entry;
+#[cfg(any(test, fuzzing))]
+pub(crate) mod equiv;
+#[cfg(any(test, fuzzing))]
+mod legacy;
 mod tokens;
 
 use std::collections::HashSet;
@@ -353,7 +357,8 @@ fn read_sudoers<R: io::Read>(mut reader: R) -> io::Result<Vec<basic_parser::Pars
 
     use basic_parser::parse_lines;
     use char_stream::*;
-    Ok(parse_lines(&mut CharStream::new(&buffer)))
+    let chars = chars_of(&buffer);
+    Ok(parse_lines(&mut CharStream::from_chars(&chars)))
 }
 
 fn open_sudoers(path: &Path) -> io::Result<Vec<basic_parser::Parsed<Sudo>>> {
@@ -1242,10 +1247,10 @@ fn analyze(
                     }
                 },
 
-                Err(basic_parser::Status::Fatal(pos, message)) => diagnostics.push(Error {
+                Err(basic_parser::Status::Fatal(pos, kind)) => diagnostics.push(Error {
                     source: Some(cur_path.to_owned()),
                     location: Some(pos),
-                    message,
+                    message: kind.to_string(),
                 }),
                 Err(_) => panic!("internal parser error"),
             }

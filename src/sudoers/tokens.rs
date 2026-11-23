@@ -3,7 +3,8 @@
 use crate::common::{SudoPath, SudoString};
 use std::ffi::OsString;
 
-use super::basic_parser::{Many, Token};
+use super::basic_parser::{ErrorKind, Many, Token};
+use super::char_stream::chars_of;
 use crate::common::{HARDENED_ENUM_VALUE_0, HARDENED_ENUM_VALUE_1, HARDENED_ENUM_VALUE_2};
 
 #[cfg_attr(test, derive(Clone, PartialEq, Eq))]
@@ -13,14 +14,14 @@ pub struct Username(pub SudoString);
 /// Furthermore, it may contain embedded "@" characters (but not start with them) and end in a "$".
 // See: https://systemd.io/USER_NAMES/
 impl Token for Username {
-    fn construct(text: String) -> Result<Self, String> {
+    fn construct(text: String) -> Result<Self, ErrorKind> {
         // if a '$' occurs in a username, it has to be the final character
         if text.strip_suffix('$').unwrap_or(&text).contains('$') {
-            return Err("embedded $ in username".to_string());
+            return Err(ErrorKind::Message("embedded $ in username".to_string()));
         }
 
         SudoString::new(text)
-            .map_err(|e| e.to_string())
+            .map_err(|e| ErrorKind::Message(e.to_string()))
             .map(Username)
     }
 
@@ -45,10 +46,10 @@ pub struct DigitsU32(pub u32);
 impl Token for DigitsU32 {
     const MAX_LEN: usize = 10;
 
-    fn construct(s: String) -> Result<Self, String> {
+    fn construct(s: String) -> Result<Self, ErrorKind> {
         s.parse()
             .map(Self)
-            .map_err(|_| "value too large".to_string())
+            .map_err(|_| ErrorKind::Message("value too large".to_string()))
     }
 
     fn accept(c: char) -> bool {
@@ -61,7 +62,7 @@ pub struct Numeric(pub String);
 impl Token for Numeric {
     const MAX_LEN: usize = 18;
 
-    fn construct(s: String) -> Result<Self, String> {
+    fn construct(s: String) -> Result<Self, ErrorKind> {
         Ok(Numeric(s))
     }
 
@@ -82,24 +83,48 @@ impl std::ops::Deref for Hostname {
 }
 
 impl Token for Hostname {
-    fn construct(text: String) -> Result<Self, String> {
+    fn construct(text: String) -> Result<Self, ErrorKind> {
         // reject hostnames that resemble IPv4 addresses too closely
         // (IPv6 addresses will already be reject since ':' is not in the accept-set)
-        let mut chunks = text.rsplitn(5, '.');
-        if (&mut chunks)
-            .take(4)
-            .all(|part| !part.is_empty() && part.len() <= 3 && part.chars().all(char::is_numeric))
-            && chunks.next().is_none()
-        {
-            return Err("hosts cannot be specified using an IPv4 address".to_string());
+        if resembles_ipv4(&chars_of(&text)) {
+            return Err(ErrorKind::HostIpv4);
         }
 
         Ok(Hostname(text))
     }
 
     fn accept(c: char) -> bool {
-        c.is_ascii_alphanumeric() || ".-_".contains(c)
+        c.is_ascii_alphanumeric() || c == '.' || c == '-' || c == '_'
     }
+}
+
+/// The IPv4 test of `Hostname::construct`. The legacy code was
+/// ```text
+/// let mut chunks = text.rsplitn(5, '.');
+/// (&mut chunks).take(4).all(|part| !part.is_empty() && part.len() <= 3 && part.chars().all(char::is_numeric))
+///     && chunks.next().is_none()
+/// ```
+/// that is: at most four `.`-separated parts, each of one to three bytes (UTF-8), all of them
+/// numeric characters. One pass from the left; `ok` turns false as soon as that fails.
+fn resembles_ipv4(text: &[char]) -> bool {
+    let mut parts = 1; // parts begun so far
+    let mut part_len = 0; // UTF-8 length of the current part
+    let mut ok = true;
+    let mut i = 0;
+    while ok && i < text.len() {
+        let c = text[i];
+        if c == '.' {
+            // the finished part is not empty, and a fifth part may not begin
+            ok = part_len != 0 && parts < 4;
+            parts += 1;
+            part_len = 0;
+        } else {
+            part_len += c.len_utf8();
+            ok = part_len <= 3 && c.is_numeric();
+        }
+        i += 1;
+    }
+    ok && part_len != 0
 }
 
 impl Many for Hostname {}
@@ -115,20 +140,23 @@ pub enum Meta<T> {
 }
 
 impl<T: Token> Token for Meta<T> {
-    fn construct(raw: String) -> Result<Self, String> {
+    fn construct(raw: String) -> Result<Self, ErrorKind> {
         // `T` may accept whitespace resulting in `raw` having trailing whitespace which would make
-        // the first two checks below fail. this `cooked` version has no trailing whitespace
-        let cooked = raw.trim_end().to_string();
+        // the first two checks below fail. the `cooked` version (the first `cooked_len`
+        // characters, `raw.trim_end()`) has no trailing whitespace
+        let chars = chars_of(&raw);
+        let cooked_len = trimmed_len(&chars);
 
-        Ok(if cooked == "ALL" {
-            Meta::All
-        } else if cooked.starts_with(AliasName::accept_1st)
-            && cooked.chars().skip(1).all(AliasName::accept)
-        {
-            Meta::Alias(cooked)
+        if is_all(&chars, cooked_len) {
+            Ok(Meta::All)
+        } else if is_alias_name(&chars, cooked_len) {
+            Ok(Meta::Alias(string_of(&chars, cooked_len)))
         } else {
-            Meta::Only(T::construct(raw)?)
-        })
+            match T::construct(raw) {
+                Ok(item) => Ok(Meta::Only(item)),
+                Err(kind) => Err(kind),
+            }
+        }
     }
 
     const MAX_LEN: usize = T::MAX_LEN;
@@ -152,11 +180,52 @@ impl<T: Many> Many for Meta<T> {
     const LIMIT: usize = T::LIMIT;
 }
 
+/// The length of `text.trim_end()`: the prefix up to the last character that is not whitespace.
+fn trimmed_len(text: &[char]) -> usize {
+    let mut len = 0;
+    let mut i = 0;
+    while i < text.len() {
+        if !text[i].is_whitespace() {
+            len = i + 1;
+        }
+        i += 1;
+    }
+    len
+}
+
+/// `cooked == "ALL"` for the first `len` characters of `text`.
+fn is_all(text: &[char], len: usize) -> bool {
+    len == 3 && text[0] == 'A' && text[1] == 'L' && text[2] == 'L'
+}
+
+/// `cooked.starts_with(AliasName::accept_1st) && cooked.chars().skip(1).all(AliasName::accept)`
+/// for the first `len` characters of `text`.
+fn is_alias_name(text: &[char], len: usize) -> bool {
+    let mut ok = len > 0 && AliasName::accept_1st(text[0]);
+    let mut i = 1;
+    while ok && i < len {
+        ok = AliasName::accept(text[i]);
+        i += 1;
+    }
+    ok
+}
+
+/// The first `len` characters of `text` as a `String`.
+fn string_of(text: &[char], len: usize) -> String {
+    let mut s = String::new();
+    let mut i = 0;
+    while i < len {
+        s.push(text[i]);
+        i += 1;
+    }
+    s
+}
+
 /// An identifier that consists of only uppercase characters.
 pub struct AliasName(pub String);
 
 impl Token for AliasName {
-    fn construct(s: String) -> Result<Self, String> {
+    fn construct(s: String) -> Result<Self, ErrorKind> {
         Ok(AliasName(s))
     }
 
@@ -187,7 +256,7 @@ pub type SimpleCommand = glob::Pattern;
 impl Token for Command {
     const MAX_LEN: usize = 1024;
 
-    fn construct(s: String) -> Result<Self, String> {
+    fn construct(s: String) -> Result<Self, ErrorKind> {
         // the tokenizer should not give us a token that consists of only whitespace
         let mut cmd_iter = s.split_whitespace();
         let cmd = cmd_iter.next().unwrap().to_string();
@@ -206,7 +275,9 @@ impl Token for Command {
                 // regular expressions are not supported, give an error message. If there is only a
                 // terminating '$', this is not treated as a malformed regex by millersudo, so we don't
                 // need to seperately check for that
-                return Err("regular expressions are not supported".to_string());
+                return Err(ErrorKind::Message(
+                    "regular expressions are not supported".to_string(),
+                ));
             }
             let match_type = match args.last().map(|x| x.as_encoded_bytes()) {
                 // if the magic * appears, any further arguments are allowed
@@ -226,14 +297,18 @@ impl Token for Command {
                 .iter()
                 .any(|arg| arg.as_encoded_bytes().iter().any(|c| b"?*[".contains(c)))
             {
-                return Err("glob patterns are not allowed in command arguments".to_string());
+                return Err(ErrorKind::Message(
+                    "glob patterns are not allowed in command arguments".to_string(),
+                ));
             }
 
             match_type(args.into_boxed_slice())
         };
 
         if command.as_str() == "list" && argpat != Args::Prefix(Box::default()) {
-            return Err("list does not take arguments".to_string());
+            return Err(ErrorKind::Message(
+                "list does not take arguments".to_string(),
+            ));
         }
 
         Ok((command, argpat))
@@ -257,20 +332,26 @@ impl Token for Command {
 impl Token for SimpleCommand {
     const MAX_LEN: usize = 1024;
 
-    fn construct(mut cmd: String) -> Result<Self, String> {
+    fn construct(mut cmd: String) -> Result<Self, ErrorKind> {
         let cvt_err = |pat: Result<_, glob::PatternError>| {
-            pat.map_err(|err| format!("wildcard pattern error {err}"))
+            pat.map_err(|err| ErrorKind::Message(format!("wildcard pattern error {err}")))
         };
 
         // detect the two edges cases
         if cmd == "list" || cmd == "sudoedit" {
             return cvt_err(glob::Pattern::new(&cmd));
         } else if cmd.starts_with("sha") {
-            return Err("digest specifications are not supported".to_string());
+            return Err(ErrorKind::Message(
+                "digest specifications are not supported".to_string(),
+            ));
         } else if cmd.starts_with('^') {
-            return Err("regular expressions are not supported".to_string());
+            return Err(ErrorKind::Message(
+                "regular expressions are not supported".to_string(),
+            ));
         } else if !cmd.starts_with('/') {
-            return Err("fully qualified path needed".to_string());
+            return Err(ErrorKind::Message(
+                "fully qualified path needed".to_string(),
+            ));
         }
 
         // record if the cmd ends in a slash and remove it if it does
@@ -283,7 +364,7 @@ impl Token for SimpleCommand {
         if let Ok(real_cmd) = crate::common::resolve::canonicalize(&cmd) {
             cmd = real_cmd
                 .to_str()
-                .ok_or("non-UTF8 characters in filesystem")?
+                .ok_or_else(|| ErrorKind::Message("non-UTF8 characters in filesystem".to_string()))?
                 .to_string();
         }
 
@@ -317,7 +398,7 @@ impl Many for SimpleCommand {}
 pub struct DefaultName(pub String);
 
 impl Token for DefaultName {
-    fn construct(text: String) -> Result<Self, String> {
+    fn construct(text: String) -> Result<Self, ErrorKind> {
         Ok(DefaultName(text))
     }
 
@@ -329,7 +410,7 @@ impl Token for DefaultName {
 pub struct EnvVar(pub String);
 
 impl Token for EnvVar {
-    fn construct(text: String) -> Result<Self, String> {
+    fn construct(text: String) -> Result<Self, ErrorKind> {
         Ok(EnvVar(text))
     }
 
@@ -349,7 +430,7 @@ pub struct QuotedStringParameter(pub String);
 impl Token for QuotedStringParameter {
     const MAX_LEN: usize = 1024;
 
-    fn construct(s: String) -> Result<Self, String> {
+    fn construct(s: String) -> Result<Self, ErrorKind> {
         Ok(Self(s))
     }
 
@@ -372,7 +453,7 @@ pub struct QuotedIncludePath(pub String);
 impl Token for QuotedIncludePath {
     const MAX_LEN: usize = 1024;
 
-    fn construct(s: String) -> Result<Self, String> {
+    fn construct(s: String) -> Result<Self, ErrorKind> {
         Ok(Self(s))
     }
 
@@ -391,7 +472,7 @@ pub struct IncludePath(pub String);
 impl Token for IncludePath {
     const MAX_LEN: usize = 1024;
 
-    fn construct(s: String) -> Result<Self, String> {
+    fn construct(s: String) -> Result<Self, ErrorKind> {
         Ok(IncludePath(s))
     }
 
@@ -411,7 +492,7 @@ pub struct StringParameter(pub String);
 impl Token for StringParameter {
     const MAX_LEN: usize = QuotedStringParameter::MAX_LEN;
 
-    fn construct(s: String) -> Result<Self, String> {
+    fn construct(s: String) -> Result<Self, ErrorKind> {
         Ok(StringParameter(s))
     }
 
@@ -437,14 +518,14 @@ pub enum ChDir {
 impl Token for ChDir {
     const MAX_LEN: usize = 1024;
 
-    fn construct(s: String) -> Result<Self, String> {
+    fn construct(s: String) -> Result<Self, ErrorKind> {
         if s == "*" {
             Ok(ChDir::Any)
         } else if s.contains('*') {
-            Err("path cannot contain '*'".to_string())
+            Err(ErrorKind::Message("path cannot contain '*'".to_string()))
         } else {
             Ok(ChDir::Path(
-                SudoPath::try_from(s).map_err(|e| e.to_string())?,
+                SudoPath::try_from(s).map_err(|e| ErrorKind::Message(e.to_string()))?,
             ))
         }
     }
@@ -469,7 +550,7 @@ pub struct Unquoted<T>(pub String, pub std::marker::PhantomData<T>);
 impl<T: Token> Token for Unquoted<T> {
     const MAX_LEN: usize = 1024;
 
-    fn construct(text: String) -> Result<Self, String> {
+    fn construct(text: String) -> Result<Self, ErrorKind> {
         let mut quoted = String::new();
         for ch in text.chars() {
             if T::escaped(ch) {

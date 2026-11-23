@@ -51,6 +51,17 @@ pub fn sudoers_read(bytes: &[u8]) -> io::Result<Vec<Diagnostic>> {
         .collect())
 }
 
+/// The restricted-style sudoers parser against the legacy parser it replaced
+/// (`sudoers::equiv::compare`: items, spans, message texts, and the effect of every `Defaults`
+/// modifier on two base settings). `Err` describes the first difference. Bytes that are not
+/// UTF-8 never reach the parser (`Sudoers::read` fails first) and give `Ok`.
+pub fn sudoers_parser_equiv(bytes: &[u8]) -> Result<(), String> {
+    match std::str::from_utf8(bytes) {
+        Ok(text) => crate::sudoers::equiv::compare(text).map(|_| ()),
+        Err(_) => Ok(()),
+    }
+}
+
 // ------------------------------------------------------------------ users and groups
 
 /// A group of the fuzzed user database.
