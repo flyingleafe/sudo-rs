@@ -1,5 +1,7 @@
 use super::ast_names::UserFriendly;
 use super::basic_parser::*;
+use super::char_stream::chars_of;
+use super::tokens::sudo_string_text;
 use super::tokens::*;
 use crate::common::SudoString;
 use crate::common::{
@@ -45,6 +47,14 @@ pub type Permissions = PairVec<SpecList<Hostname>, (Option<RunAs>, CommandSpec)>
 /// instance for the extraction, called by `Sudo::parse`.
 pub(super) fn permissions(stream: &mut CharStream) -> Parsed<Permissions> {
     expect_nonterminal(stream)
+}
+
+/// `parse_lines::<Sudo>`: the whole file, one item per line with per-line error recovery. A
+/// monomorphic instance, and the entry point of the extraction (`Cargo.toml`
+/// `[package.metadata.charon]`).
+#[allow(dead_code)] // wired by `read_sudoers`/`parse_sudoers` (mod.rs, owned by another agent)
+pub(super) fn parse_sudo_lines(stream: &mut CharStream) -> Vec<Parsed<Sudo>> {
+    parse_lines(stream)
 }
 
 /// A generic mapping function (only used for turning `Spec<SimpleCommand>` into `Spec<Command>`)
@@ -642,26 +652,32 @@ impl Parse for Sudo {
 
         // the existence of "#include" forces us to handle lines that start with #<ID> explicitly
         if stream.peek() == Some('#') {
-            return if let Ok(ident) = try_nonterminal::<Identifier>(stream) {
-                let first_user = Qualified::Allow(Meta::Only(UserSpecifier::User(ident)));
-                let users = if is_syntax(',', stream)? {
-                    // parse the rest of the userlist and add the already-parsed user in front
-                    let mut rest = expect_user_list(stream)?;
-                    rest.insert(0, first_user);
-                    rest
-                } else {
-                    vec![first_user]
-                };
-                // no need to check get_directive as no other directive starts with #
-                let permissions = permissions(stream)?;
-                make(Sudo::Spec(PermissionSpec { users, permissions }))
-            } else {
-                // the failed "try_nonterminal::<Identifier>" will have consumed the '#'
-                // the most ignominious part of sudoers: having to parse bits of comments
-                parse_include(stream).or_else(|_| {
-                    stream.skip_to_newline();
-                    make(Sudo::LineComment)
-                })
+            return match try_nonterminal::<Identifier>(stream) {
+                Ok(ident) => {
+                    let first_user = Qualified::Allow(Meta::Only(UserSpecifier::User(ident)));
+                    let users = if is_syntax(',', stream)? {
+                        // parse the rest of the userlist and add the already-parsed user in front
+                        let mut rest = expect_user_list(stream)?;
+                        rest.insert(0, first_user);
+                        rest
+                    } else {
+                        vec![first_user]
+                    };
+                    // no need to check get_directive as no other directive starts with #
+                    let permissions = permissions(stream)?;
+                    make(Sudo::Spec(PermissionSpec { users, permissions }))
+                }
+                Err(_status) => {
+                    // the failed "try_nonterminal::<Identifier>" will have consumed the '#'
+                    // the most ignominious part of sudoers: having to parse bits of comments
+                    match parse_include(stream) {
+                        Ok(item) => make(item),
+                        Err(_status) => {
+                            stream.skip_to_newline();
+                            make(Sudo::LineComment)
+                        }
+                    }
+                }
             };
         }
 
@@ -670,25 +686,33 @@ impl Parse for Sudo {
             // a quoted userlist follows; this forces us to read a userlist
             let users = expect_user_list(stream)?;
             let permissions = permissions(stream)?;
-            make(Sudo::Spec(PermissionSpec { users, permissions }))
-        } else if let Some(users) = maybe(user_list(stream))? {
-            // this could be the start of a Defaults or Alias definition, so distinguish.
-            // element 1 always exists (parse_list fails on an empty list)
-            let key = &users[0];
-            let start_pos = start_state.get_pos();
-            if let Some(directive) = maybe(get_directive(key, stream, start_state))? {
+            return make(Sudo::Spec(PermissionSpec { users, permissions }));
+        }
+
+        let users = match maybe(user_list(stream))? {
+            Some(users) => users,
+            None => {
+                // this will leave whatever could not be parsed on the input stream
+                return make(Sudo::LineComment);
+            }
+        };
+
+        // this could be the start of a Defaults or Alias definition, so distinguish.
+        // element 1 always exists (parse_list fails on an empty list)
+        let key = &users[0];
+        let start_pos = start_state.get_pos();
+        match maybe(get_directive(key, stream, start_state))? {
+            Some(directive) => {
                 if users.len() != 1 && directive.could_be_username() {
                     // this is here to guard against User_Alias,foo ALIAS=def being accepted
-                    unrecoverable!(pos = start_pos, stream, "ambiguous syntax");
+                    return fatal_from(start_pos, stream, ErrorKind::AmbiguousSyntax);
                 }
                 make(Sudo::Decl(directive))
-            } else {
+            }
+            None => {
                 let permissions = permissions(stream)?;
                 make(Sudo::Spec(PermissionSpec { users, permissions }))
             }
-        } else {
-            // this will leave whatever could not be parsed on the input stream
-            make(Sudo::LineComment)
         }
     }
 }
@@ -713,23 +737,66 @@ impl Parse for PeerSpec {
 
 /// Parse the include/include dir part that comes after the '#' or '@' prefix symbol
 fn parse_include(stream: &mut CharStream) -> Parsed<Sudo> {
-    fn get_path(stream: &mut CharStream, key_pos: (usize, usize)) -> Parsed<(String, Span)> {
-        let path = if stream.eat_char('"') {
-            let QuotedIncludePath(path) = expect_nonterminal(stream)?;
-            expect_syntax('"', stream)?;
-            path
-        } else {
-            let value_pos = stream.get_pos();
-            let IncludePath(path) = expect_nonterminal(stream)?;
-            if stream.peek() != Some('\n') {
-                unrecoverable!(
-                    pos = value_pos,
-                    stream,
-                    "use quotes around filenames or escape whitespace"
-                )
+    let key_pos = stream.get_pos();
+    match try_nonterminal::<Option<Username>>(stream)? {
+        Some(Username(key)) => {
+            let keyword = sudo_string_text(&key);
+            if equals_str(&keyword, INCLUDE) {
+                let (path, span) = include_path(stream, key_pos)?;
+                make(Sudo::Include(path, span))
+            } else if equals_str(&keyword, INCLUDEDIR) {
+                let (path, span) = include_path(stream, key_pos)?;
+                make(Sudo::IncludeDir(path, span))
+            } else {
+                parse_remote(&keyword, stream, key_pos)
             }
-            path
-        };
+        }
+        None => fatal_from(key_pos, stream, ErrorKind::UnknownDirective),
+    }
+}
+
+/// The `socket` directive, which exists only with `unstable-remote-sudoers`.
+fn parse_remote(
+    keyword: &String,
+    stream: &mut CharStream,
+    key_pos: (usize, usize),
+) -> Parsed<Sudo> {
+    #[cfg(feature = "unstable-remote-sudoers")]
+    {
+        if equals_str(keyword, SOCKET) {
+            let peer_spec = expect_nonterminal(stream)?;
+            let (path, span) = include_path(stream, key_pos)?;
+            make(Sudo::Remote(path, peer_spec, span))
+        } else {
+            fatal_from(key_pos, stream, ErrorKind::UnknownDirective)
+        }
+    }
+    #[cfg(not(feature = "unstable-remote-sudoers"))]
+    {
+        let _ = keyword;
+        fatal_from(key_pos, stream, ErrorKind::UnknownDirective)
+    }
+}
+
+const INCLUDE: &[char] = &['i', 'n', 'c', 'l', 'u', 'd', 'e'];
+const INCLUDEDIR: &[char] = &['i', 'n', 'c', 'l', 'u', 'd', 'e', 'd', 'i', 'r'];
+#[cfg(feature = "unstable-remote-sudoers")]
+const SOCKET: &[char] = &['s', 'o', 'c', 'k', 'e', 't'];
+const DEFAULTS: &[char] = &['D', 'e', 'f', 'a', 'u', 'l', 't', 's'];
+const ALIAS_ALL: &[char] = &['A', 'L', 'L'];
+const ALIAS_CHROOT: &[char] = &['C', 'H', 'R', 'O', 'O', 'T'];
+const ALIAS_CWD: &[char] = &['C', 'W', 'D'];
+const ALIAS_NOTAFTER: &[char] = &['N', 'O', 'T', 'A', 'F', 'T', 'E', 'R'];
+const ALIAS_NOTBEFORE: &[char] = &['N', 'O', 'T', 'B', 'E', 'F', 'O', 'R', 'E'];
+const ALIAS_ROLE: &[char] = &['R', 'O', 'L', 'E'];
+const ALIAS_TIMEOUT: &[char] = &['T', 'I', 'M', 'E', 'O', 'U', 'T'];
+const ALIAS_TYPE: &[char] = &['T', 'Y', 'P', 'E'];
+
+/// The path of an `@include`/`@includedir` directive and its span.
+fn include_path(stream: &mut CharStream, key_pos: (usize, usize)) -> Parsed<(String, Span)> {
+    if stream.eat_char('"') {
+        let QuotedIncludePath(path) = expect_nonterminal(stream)?;
+        expect_syntax('"', stream)?;
         make((
             path,
             Span {
@@ -737,35 +804,37 @@ fn parse_include(stream: &mut CharStream) -> Parsed<Sudo> {
                 end: stream.get_pos(),
             },
         ))
+    } else {
+        let value_pos = stream.get_pos();
+        let IncludePath(path) = expect_nonterminal(stream)?;
+        if stream.peek() == Some('\n') {
+            make((
+                path,
+                Span {
+                    start: key_pos,
+                    end: stream.get_pos(),
+                },
+            ))
+        } else {
+            fatal_from(value_pos, stream, ErrorKind::QuotesAroundFilenames)
+        }
     }
-
-    let key_pos = stream.get_pos();
-    let result = match try_nonterminal(stream)? {
-        Some(Username(key)) if key == "include" => {
-            let (path, span) = get_path(stream, key_pos)?;
-            Sudo::Include(path, span)
-        }
-        Some(Username(key)) if key == "includedir" => {
-            let (path, span) = get_path(stream, key_pos)?;
-            Sudo::IncludeDir(path, span)
-        }
-        #[cfg(feature = "unstable-remote-sudoers")]
-        Some(Username(key)) if key == "socket" => {
-            let peer_spec = expect_nonterminal(stream)?;
-            let (path, span) = get_path(stream, key_pos)?;
-            Sudo::Remote(path, peer_spec, span)
-        }
-        _ => unrecoverable!(pos = key_pos, stream, "unknown directive"),
-    };
-
-    make(result)
 }
 
-fn is_reserved_alias(name: &str) -> bool {
-    matches!(
-        name,
-        "ALL" | "CHROOT" | "CWD" | "NOTAFTER" | "NOTBEFORE" | "ROLE" | "TIMEOUT" | "TYPE"
-    )
+/// `text == word` for a `String` and a character sequence.
+fn equals_str(text: &String, word: &[char]) -> bool {
+    super::tokens::equals_text(&chars_of(text), word)
+}
+
+fn is_reserved_alias(name: &String) -> bool {
+    equals_str(name, ALIAS_ALL)
+        || equals_str(name, ALIAS_CHROOT)
+        || equals_str(name, ALIAS_CWD)
+        || equals_str(name, ALIAS_NOTAFTER)
+        || equals_str(name, ALIAS_NOTBEFORE)
+        || equals_str(name, ALIAS_ROLE)
+        || equals_str(name, ALIAS_TIMEOUT)
+        || equals_str(name, ALIAS_TYPE)
 }
 
 /// grammar:
@@ -782,12 +851,7 @@ where
         let begin_pos = stream.get_pos();
         let AliasName(name) = try_nonterminal(stream)?;
         if is_reserved_alias(&name) {
-            unrecoverable!(
-                pos = begin_pos,
-                stream,
-                "reserved word {} used as an alias name",
-                name
-            );
+            return fatal_from(begin_pos, stream, ErrorKind::ReservedAlias(name));
         }
         expect_syntax('=', stream)?;
 
@@ -809,57 +873,89 @@ fn get_directive<'a>(
     stream: &mut CharStream<'a>,
     begin_state: CharStream<'a>,
 ) -> Parsed<Directive> {
-    use super::ast::Directive::*;
-    use super::ast::Meta::*;
-    use super::ast::Qualified::*;
-    use super::ast::UserSpecifier::*;
-    let Allow(Only(User(Identifier::Name(keyword)))) = perhaps_keyword else {
-        return reject();
+    let keyword = match perhaps_keyword {
+        Qualified::Allow(Meta::Only(UserSpecifier::User(Identifier::Name(name)))) => {
+            sudo_string_text(name)
+        }
+        _ => return reject(),
     };
 
     let begin_pos = begin_state.get_pos();
 
-    match keyword.as_str() {
-        "User_Alias" => make(UserAlias(expect_nonterminal(stream)?)),
-        "Host_Alias" => make(HostAlias(expect_nonterminal(stream)?)),
-        "Cmnd_Alias" | "Cmd_Alias" => make(CmndAlias(expect_nonterminal(stream)?)),
-        "Runas_Alias" => make(RunasAlias(expect_nonterminal(stream)?)),
-        _ if keyword.starts_with("Defaults") => {
-            // HACK #1: no space is allowed between "Defaults" and '!>@:'. The below avoids having to
-            // add "Defaults!" etc as separate tokens; but relying on positional information during
-            // parsing is of course, cheating.
-            // HACK #2: '@' can be part of a username, so it will already have been parsed;
-            // an acceptable hostname is subset of an acceptable username, so that's actually OK.
-            // This resolves an ambiguity in the grammar similarly to how MetaOrTag does that.
-            const DEFAULTS_LEN: usize = "Defaults".len();
-            let allow_scope_modifier = keyword[DEFAULTS_LEN..].starts_with('@')
-                || (stream.get_pos().0 == begin_pos.0
-                    && stream.get_pos().1 - begin_pos.1 == DEFAULTS_LEN);
+    if equals_str(&keyword, ALIAS_KW_USER) {
+        make(Directive::UserAlias(expect_nonterminal(stream)?))
+    } else if equals_str(&keyword, ALIAS_KW_HOST) {
+        make(Directive::HostAlias(expect_nonterminal(stream)?))
+    } else if equals_str(&keyword, ALIAS_KW_CMND) || equals_str(&keyword, ALIAS_KW_CMD) {
+        make(Directive::CmndAlias(expect_nonterminal(stream)?))
+    } else if equals_str(&keyword, ALIAS_KW_RUNAS) {
+        make(Directive::RunasAlias(expect_nonterminal(stream)?))
+    } else if starts_with_str(&keyword, DEFAULTS) {
+        let scope = defaults_scope(&keyword, stream, begin_state, begin_pos)?;
 
-            let scope = if allow_scope_modifier {
-                if keyword[DEFAULTS_LEN..].starts_with('@') {
-                    // Backtrack and start parsing following the '@' sign
-                    *stream = begin_state;
-                    stream.advance(DEFAULTS_LEN + 1);
-                    skip_trailing_whitespace(stream)?;
+        make(Directive::Defaults(expect_nonterminal(stream)?, scope))
+    } else {
+        reject()
+    }
+}
 
-                    ConfigScope::Host(expect_nonterminal(stream)?)
-                } else if is_syntax(':', stream)? {
-                    ConfigScope::User(expect_nonterminal(stream)?)
-                } else if is_syntax('!', stream)? {
-                    ConfigScope::Command(expect_nonterminal(stream)?)
-                } else if is_syntax('>', stream)? {
-                    ConfigScope::RunAs(expect_nonterminal(stream)?)
-                } else {
-                    ConfigScope::Generic
-                }
-            } else {
-                ConfigScope::Generic
-            };
+/// The `Defaults` line length, `"Defaults".len()`; no space is allowed between `Defaults`
+/// and `!>@:` (HACK #1 of `get_directive`).
+const DEFAULTS_LEN: usize = 8;
 
-            make(Defaults(expect_nonterminal(stream)?, scope))
-        }
-        _ => reject(),
+const ALIAS_KW_USER: &[char] = &[
+    'U', 's', 'e', 'r', '_', 'A', 'l', 'i', 'a', 's',
+];
+const ALIAS_KW_HOST: &[char] = &[
+    'H', 'o', 's', 't', '_', 'A', 'l', 'i', 'a', 's',
+];
+const ALIAS_KW_CMND: &[char] = &[
+    'C', 'm', 'n', 'd', '_', 'A', 'l', 'i', 'a', 's',
+];
+const ALIAS_KW_CMD: &[char] = &['C', 'm', 'd', '_', 'A', 'l', 'i', 'a', 's'];
+const ALIAS_KW_RUNAS: &[char] = &[
+    'R', 'u', 'n', 'a', 's', '_', 'A', 'l', 'i', 'a', 's',
+];
+
+/// `text.starts_with(prefix)` for a `String` and a character sequence.
+fn starts_with_str(text: &String, prefix: &[char]) -> bool {
+    super::tokens::starts_with_text(&chars_of(text), prefix)
+}
+
+/// The scope of a `Defaults` line, which decides where the settings apply.
+///
+/// HACK #2 of `get_directive`: `@` can be part of a username, so it has already been parsed; an
+/// acceptable hostname is a subset of an acceptable username, so that is actually fine.
+fn defaults_scope<'a>(
+    keyword: &String,
+    stream: &mut CharStream<'a>,
+    begin_state: CharStream<'a>,
+    begin_pos: (usize, usize),
+) -> Parsed<ConfigScope> {
+    let chars = chars_of(keyword);
+    let scope_at = chars.len() > DEFAULTS_LEN && chars[DEFAULTS_LEN] == '@';
+    let scope_adjacent = stream.get_pos().0 == begin_pos.0
+        && stream.get_pos().1 - begin_pos.1 == DEFAULTS_LEN;
+
+    if !scope_at && !scope_adjacent {
+        return make(ConfigScope::Generic);
+    }
+    if scope_at {
+        // Backtrack and start parsing following the '@' sign
+        *stream = begin_state;
+        stream.advance(DEFAULTS_LEN + 1);
+        skip_trailing_whitespace(stream)?;
+
+        return make(ConfigScope::Host(expect_nonterminal(stream)?));
+    }
+    if is_syntax(':', stream)? {
+        make(ConfigScope::User(expect_nonterminal(stream)?))
+    } else if is_syntax('!', stream)? {
+        make(ConfigScope::Command(expect_nonterminal(stream)?))
+    } else if is_syntax('>', stream)? {
+        make(ConfigScope::RunAs(expect_nonterminal(stream)?))
+    } else {
+        make(ConfigScope::Generic)
     }
 }
 
@@ -871,133 +967,177 @@ impl Parse for defaults::SettingsModifier {
     fn parse(stream: &mut CharStream) -> Parsed<Self> {
         let id_pos = stream.get_pos();
 
-        // Parse multiple entries enclosed in quotes (for list-like Defaults-settings)
-        let parse_vars = |stream: &mut CharStream| -> Parsed<Vec<String>> {
-            if stream.eat_char('"') {
-                let mut result = Vec::new();
-                while let Some(EnvVar(name)) = try_nonterminal(stream)? {
-                    if is_syntax('=', stream)? {
-                        let StringParameter(value) = expect_nonterminal(stream)?;
-                        result.push(name + "=" + &value);
-                    } else {
-                        result.push(name);
-                    }
-                    if result.len() > Identifier::LIMIT {
-                        unrecoverable!(stream, "environment variable list too long")
-                    }
-                }
-                expect_syntax('"', stream)?;
-                if result.is_empty() {
-                    unrecoverable!(stream, "empty string not allowed");
-                }
-
-                make(result)
-            } else {
-                let EnvVar(name) = expect_nonterminal(stream)?;
-                if is_syntax('=', stream)? {
-                    unrecoverable!(stream, "double quotes are required for VAR=value pairs")
-                } else {
-                    make(vec![name])
-                }
-            }
-        };
-
-        // Parse the remainder of a list variable
-        let list_items =
-            |mode: defaults::ListMode, name: String, cfg: defaults::SettingKind, stream: &mut _| {
-                expect_syntax('=', stream)?;
-                let defaults::SettingKind::List(setting) = cfg else {
-                    unrecoverable!(pos = id_pos, stream, "{name} is not a list parameter");
-                };
-
-                make(defaults::build_list(setting, mode, parse_vars(stream)?))
-            };
-
-        // Parse a text parameter
-        let text_item = |stream: &mut CharStream| {
-            if stream.eat_char('"') {
-                let QuotedStringParameter(text) = expect_nonterminal(stream)?;
-                expect_syntax('"', stream)?;
-                make(text)
-            } else {
-                let StringParameter(name) = expect_nonterminal(stream)?;
-                make(name)
-            }
-        };
-
         if is_syntax('!', stream)? {
             let value_pos = stream.get_pos();
             let DefaultName(name) = expect_nonterminal(stream)?;
-            let Some(modifier) = defaults::negate(&name) else {
-                if defaults::set(&name).is_some() {
-                    unrecoverable!(
-                        pos = value_pos,
-                        stream,
-                        "'{name}' cannot be used in a boolean context"
-                    );
-                } else {
-                    unrecoverable!(pos = value_pos, stream, "unknown setting: '{name}'");
+            match defaults::negate(name.as_str()) {
+                Some(modifier) => make(modifier),
+                None => {
+                    if defaults::set(name.as_str()).is_some() {
+                        fatal_from(value_pos, stream, ErrorKind::CannotUseInBoolean(name))
+                    } else {
+                        fatal_from(value_pos, stream, ErrorKind::UnknownSetting(name))
+                    }
                 }
-            };
-
-            make(modifier)
+            }
         } else {
             let DefaultName(name) = try_nonterminal(stream)?;
-            let Some(cfg) = defaults::set(&name) else {
-                unrecoverable!(pos = id_pos, stream, "unknown setting: '{name}'");
+            let cfg = match defaults::set(name.as_str()) {
+                Some(cfg) => cfg,
+                None => return fatal_from(id_pos, stream, ErrorKind::UnknownSetting(name)),
             };
 
             if is_syntax('+', stream)? {
-                list_items(defaults::ListMode::Add, name, cfg, stream)
+                parse_defaults_list(defaults::ListMode::Add, name, cfg, id_pos, stream)
             } else if is_syntax('-', stream)? {
-                list_items(defaults::ListMode::Del, name, cfg, stream)
+                parse_defaults_list(defaults::ListMode::Del, name, cfg, id_pos, stream)
             } else if is_syntax('=', stream)? {
                 let value_pos = stream.get_pos();
                 match cfg {
                     defaults::SettingKind::Flag(_) => {
-                        unrecoverable!(stream, "can't assign to boolean setting '{name}'")
+                        fatal_here(stream, ErrorKind::CannotAssignBoolean(name))
                     }
                     defaults::SettingKind::Integer(setting) => {
                         let Numeric(denotation) = expect_nonterminal(stream)?;
-                        if let Some(modifier) = defaults::check_integer(setting, &denotation) {
-                            make(modifier)
-                        } else {
-                            unrecoverable!(
-                                pos = value_pos,
+                        match defaults::check_integer(setting, denotation.as_str()) {
+                            Some(modifier) => make(modifier),
+                            None => fatal_from(
+                                value_pos,
                                 stream,
-                                "'{denotation}' is not a valid value for {name}"
-                            );
+                                ErrorKind::InvalidSettingValue(denotation, name),
+                            ),
                         }
                     }
                     defaults::SettingKind::List(setting) => {
-                        let items = parse_vars(stream)?;
+                        let items = parse_defaults_vars(stream)?;
 
-                        make(defaults::build_list(
-                            setting,
-                            defaults::ListMode::Set,
-                            items,
-                        ))
+                        make(defaults::build_list(setting, defaults::ListMode::Set, items))
                     }
                     defaults::SettingKind::Text(setting) => {
-                        let text = text_item(stream)?;
-                        let Some(modifier) = defaults::check_text(setting, &text) else {
-                            unrecoverable!(
-                                pos = value_pos,
+                        let text = parse_defaults_text(stream)?;
+                        match defaults::check_text(setting, text.as_str()) {
+                            Some(modifier) => make(modifier),
+                            None => fatal_from(
+                                value_pos,
                                 stream,
-                                "'{text}' is not a valid value for {name}"
-                            );
-                        };
-                        make(modifier)
+                                ErrorKind::InvalidSettingValue(text, name),
+                            ),
+                        }
                     }
                 }
             } else {
-                let defaults::SettingKind::Flag(modifier) = cfg else {
-                    unrecoverable!(pos = id_pos, stream, "'{name}' is not a boolean setting");
-                };
-
-                make(modifier)
+                match cfg {
+                    defaults::SettingKind::Flag(modifier) => make(modifier),
+                    _ => fatal_from(id_pos, stream, ErrorKind::NotABooleanSetting(name)),
+                }
             }
         }
+    }
+}
+
+/// The remainder of a list setting: `=`, then `name is not a list parameter` unless `cfg` is a
+/// list, then the variable list.
+fn parse_defaults_list(
+    mode: defaults::ListMode,
+    name: String,
+    cfg: defaults::SettingKind,
+    id_pos: (usize, usize),
+    stream: &mut CharStream,
+) -> Parsed<defaults::SettingsModifier> {
+    expect_syntax('=', stream)?;
+    match cfg {
+        defaults::SettingKind::List(setting) => {
+            let items = parse_defaults_vars(stream)?;
+
+            make(defaults::build_list(setting, mode, items))
+        }
+        _ => fatal_from(id_pos, stream, ErrorKind::NotAListParameter(name)),
+    }
+}
+
+/// The entries of a list setting: a quoted list of `VAR` and `VAR=value`, or one unquoted name.
+fn parse_defaults_vars(stream: &mut CharStream) -> Parsed<Vec<String>> {
+    if stream.eat_char('"') {
+        let mut result = Vec::new();
+        let mut failure = None;
+        let mut more = true;
+        while more {
+            match try_nonterminal::<Option<EnvVar>>(stream) {
+                Ok(Some(EnvVar(name))) => {
+                    match is_syntax('=', stream) {
+                        Ok(true) => match expect_nonterminal::<StringParameter>(stream) {
+                            Ok(StringParameter(value)) => result.push(join_var(name, &value)),
+                            Err(status) => {
+                                failure = Some(status);
+                                more = false;
+                            }
+                        },
+                        Ok(false) => result.push(name),
+                        Err(status) => {
+                            failure = Some(status);
+                            more = false;
+                        }
+                    }
+                    if more && result.len() > <Identifier as Many>::LIMIT {
+                        let pos = stream.get_pos();
+                        failure = Some(Status::Fatal(
+                            Span {
+                                start: pos,
+                                end: pos,
+                            },
+                            ErrorKind::EnvironmentListTooLong,
+                        ));
+                        more = false;
+                    }
+                }
+                Ok(None) => more = false,
+                Err(status) => {
+                    failure = Some(status);
+                    more = false;
+                }
+            }
+        }
+        if let Some(status) = failure {
+            return Err(status);
+        }
+        expect_syntax('"', stream)?;
+        if result.is_empty() {
+            return fatal_here(stream, ErrorKind::EmptyStringNotAllowed);
+        }
+
+        make(result)
+    } else {
+        let EnvVar(name) = expect_nonterminal(stream)?;
+        if is_syntax('=', stream)? {
+            fatal_here(stream, ErrorKind::QuotesRequiredForVarValue)
+        } else {
+            make(vec![name])
+        }
+    }
+}
+
+/// `name + "=" + value`, the entry of a list setting.
+fn join_var(name: String, value: &String) -> String {
+    let mut entry = name;
+    entry.push('=');
+    let chars = chars_of(value);
+    let mut i = 0;
+    while i < chars.len() {
+        entry.push(chars[i]);
+        i += 1;
+    }
+    entry
+}
+
+/// A text setting's value: quoted or bare.
+fn parse_defaults_text(stream: &mut CharStream) -> Parsed<String> {
+    if stream.eat_char('"') {
+        let QuotedStringParameter(text) = expect_nonterminal(stream)?;
+        expect_syntax('"', stream)?;
+        make(text)
+    } else {
+        let StringParameter(name) = expect_nonterminal(stream)?;
+        make(name)
     }
 }
 

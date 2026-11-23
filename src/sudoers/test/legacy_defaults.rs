@@ -286,7 +286,16 @@ fn compare_settings(text: &str) {
     let old = || parse_string::<Vec<LegacyModifier>>(text);
     let new = || parse_string::<Vec<defaults::SettingsModifier>>(text);
     match (old(), new()) {
-        (Err(old), Err(new)) => assert_eq!(old, new, "{text:?}"),
+        (Err(old), Err(new)) => {
+            // The live parser carries a structured `ErrorKind`; the legacy copy carries a
+            // formatted message. The contract of this test is "same diagnostics (span and
+            // message)", so compare the span and the rendered text.
+            let rendered = |status: &Status| match status {
+                Status::Fatal(span, kind) => Some((span.start, span.end, kind.to_string())),
+                Status::Reject => None,
+            };
+            assert_eq!(rendered(&old), rendered(&new), "{text:?}")
+        }
         (Ok(_), Ok(_)) => {
             for (i, base) in legacy::bases().into_iter().enumerate() {
                 let mut by_old = base.clone();

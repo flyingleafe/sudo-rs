@@ -71,12 +71,12 @@ fn contains_char(text: &[char], len: usize, c: char) -> bool {
 }
 
 /// `text == word`, characterwise.
-fn equals_text(text: &[char], word: &[char]) -> bool {
+pub(super) fn equals_text(text: &[char], word: &[char]) -> bool {
     text.len() == word.len() && starts_with_text(text, word)
 }
 
 /// `text.starts_with(prefix)`, characterwise.
-fn starts_with_text(text: &[char], prefix: &[char]) -> bool {
+pub(super) fn starts_with_text(text: &[char], prefix: &[char]) -> bool {
     let mut ok = prefix.len() <= text.len();
     let mut i = 0;
     while ok && i < prefix.len() {
@@ -98,6 +98,11 @@ pub(super) fn sudo_string(text: String) -> Result<SudoString, ErrorKind> {
 }
 
 impl Many for Username {}
+
+/// The text of a `SudoString` (its `Deref<Target = str>` view), as a `String`.
+pub(super) fn sudo_string_text(name: &SudoString) -> String {
+    name.as_str().to_string()
+}
 
 pub struct DigitsU32(pub u32);
 
@@ -614,7 +619,7 @@ impl Token for EnvVar {
 
     const ALLOW_ESCAPE: bool = true;
     fn escaped(c: char) -> bool {
-        matches!(c, '\\' | '=' | '#' | '"' | ',')
+        c == escape_char() || c == '=' || c == '#' || c == '"' || c == ','
     }
 }
 
@@ -634,7 +639,7 @@ impl Token for QuotedStringParameter {
 
     const ALLOW_ESCAPE: bool = true;
     fn escaped(c: char) -> bool {
-        matches!(c, '\\' | '"') || c.is_control()
+        c == escape_char() || c == '"' || c.is_control()
     }
 }
 
@@ -657,7 +662,7 @@ impl Token for QuotedIncludePath {
 
     const ALLOW_ESCAPE: bool = true;
     fn escaped(c: char) -> bool {
-        matches!(c, '"') || c.is_control()
+        c == '"' || c.is_control()
     }
 }
 
@@ -676,7 +681,7 @@ impl Token for IncludePath {
 
     const ALLOW_ESCAPE: bool = true;
     fn escaped(c: char) -> bool {
-        matches!(c, '\\' | '"' | ' ')
+        c == escape_char() || c == '"' || c == ' '
     }
 }
 
