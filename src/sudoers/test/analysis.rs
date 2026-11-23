@@ -56,8 +56,9 @@ impl Tree {
             .canonicalize()
             .unwrap()
             .join(format!("sudo-rs-analysis-{tag}-{}", std::process::id()));
-        let _ = std::fs::remove_dir_all(&base);
-        std::fs::create_dir_all(&base).unwrap();
+        // Only an exclusively created directory is ours to remove in Drop.
+        use std::os::unix::fs::DirBuilderExt;
+        std::fs::DirBuilder::new().mode(0o700).create(&base).unwrap();
         for (name, content) in files {
             let path = base.join(name);
             match content {

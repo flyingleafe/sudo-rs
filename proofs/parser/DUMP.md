@@ -193,8 +193,9 @@ Corpus conventions that make the dump reproducible elsewhere:
 
 1. Command paths of the generated corpus start with `/sudoers-nx/`, which must not exist (the
    harness checks it). Nothing under it is canonicalized.
-2. The category `fixture` uses the fixture root `/tmp/sudo-rs-parser-dump-fixture`, which the
-   harness recreates before every run (and checks to be its own canonical path):
+2. The category `fixture` uses the fixture root `/tmp/sudo-rs-parser-dump-fixture`. The harness
+   creates it once and checks it on reuse. A different owner, writable-by-others directory,
+   or unexpected layout fails the run without deleting or replacing the existing tree:
 
    ```
    bin/             directory

@@ -421,21 +421,69 @@ fn host_paths(text: &str) -> Vec<String> {
         .collect()
 }
 
-/// Recreates the fixture directory (layout documented in `DUMP.md`).
-pub(super) fn make_fixture() -> std::io::Result<()> {
-    use std::os::unix::fs::symlink;
-    let root = Path::new(FIXTURE_ROOT);
-    if root.symlink_metadata().is_ok() {
-        std::fs::remove_dir_all(root)?;
+/// Create the documented tree once. On reuse, verify its layout without writing into it.
+/// Never remove an existing directory at a well-known path on a shared machine.
+fn ensure_fixture(root: &Path) -> std::io::Result<()> {
+    use std::fs::{self, DirBuilder, File};
+    use std::io::{Error, ErrorKind};
+    use std::os::unix::fs::{DirBuilderExt, MetadataExt, symlink};
+
+    let dirs = [("bin", 2), ("sub", 0), ("incdir", 0)];
+    let files = ["bin/tool", "include"];
+    let links = [("bin/alias", "tool"), ("link", "bin")];
+    match DirBuilder::new().mode(0o700).create(root) {
+        Ok(()) => {
+            for (d, _) in dirs {
+                DirBuilder::new().mode(0o700).create(root.join(d))?;
+            }
+            for f in files {
+                File::create_new(root.join(f))?;
+            }
+            for (l, target) in links {
+                symlink(target, root.join(l))?;
+            }
+        }
+        Err(e) if e.kind() == ErrorKind::AlreadyExists => {}
+        Err(e) => return Err(e),
     }
-    for dir in ["bin", "sub", "incdir"] {
-        std::fs::create_dir_all(root.join(dir))?;
+
+    let invalid = || Error::new(ErrorKind::InvalidData, "unexpected parser fixture; left untouched");
+    let uid = crate::system::User::effective_uid().inner();
+    for (d, count) in [("", 5)].into_iter().chain(dirs) {
+        let path = root.join(d);
+        let meta = fs::symlink_metadata(if d.is_empty() { root } else { &path })?;
+        if !meta.is_dir() || meta.uid() != uid || meta.mode() & 0o022 != 0
+            || fs::read_dir(&path)?.count() != count
+        {
+            return Err(invalid());
+        }
     }
-    std::fs::write(root.join("bin/tool"), "")?;
-    std::fs::write(root.join("include"), "")?;
-    symlink("tool", root.join("bin/alias"))?;
-    symlink("bin", root.join("link"))?;
+    for f in files {
+        let meta = fs::symlink_metadata(root.join(f))?;
+        if !meta.is_file() || meta.len() != 0 || meta.uid() != uid || meta.mode() & 0o022 != 0 {
+            return Err(invalid());
+        }
+    }
+    for (l, target) in links {
+        if fs::read_link(root.join(l))? != Path::new(target) {
+            return Err(invalid());
+        }
+    }
     Ok(())
+}
+
+#[test]
+fn fixture_reuse_preserves_unrelated_files() {
+    let tmp = std::env::temp_dir().join(format!("sudo-parser-fixture-test-{}", std::process::id()));
+    std::fs::create_dir(&tmp).unwrap();
+    let root = tmp.join("tree");
+    ensure_fixture(&root).unwrap();
+    ensure_fixture(&root).unwrap();
+    let extra = root.join("do-not-remove");
+    std::fs::write(&extra, b"untouched").unwrap();
+    assert_eq!(ensure_fixture(&root).unwrap_err().kind(), std::io::ErrorKind::InvalidData);
+    assert_eq!(std::fs::read(&extra).unwrap(), b"untouched");
+    std::fs::remove_dir_all(tmp).unwrap();
 }
 
 /// Reads a corpus: a directory (one case per regular file, label = file name, in name order) or
@@ -491,7 +539,7 @@ fn dump_corpus() {
         Path::new(ABSENT_PREFIX).symlink_metadata().is_err(),
         "{ABSENT_PREFIX} exists on this host; the corpus convention needs it absent"
     );
-    make_fixture().expect("fixture");
+    ensure_fixture(Path::new(FIXTURE_ROOT)).expect("fixture");
     assert_eq!(
         std::fs::canonicalize(FIXTURE_ROOT).expect("fixture root"),
         Path::new(FIXTURE_ROOT),
