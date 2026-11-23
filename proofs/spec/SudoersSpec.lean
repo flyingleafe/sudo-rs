@@ -72,3 +72,9 @@ import SudoersSpec.Grammar.SudoTagPosition
 import SudoersSpec.Grammar.SudoRunasExact
 import SudoersSpec.Grammar.SudoAmbiguity
 import SudoersSpec.Grammar.SudoUnique
+import SudoersSpec.Grammar.SudoCommandAt
+import SudoersSpec.Grammar.SudoCursorList
+import SudoersSpec.Grammar.SudoListFailure
+import SudoersSpec.Grammar.SudoUserFailure
+import SudoersSpec.Grammar.SudoPermissionAt
+import SudoersSpec.Grammar.SudoPermissionDispatchAt

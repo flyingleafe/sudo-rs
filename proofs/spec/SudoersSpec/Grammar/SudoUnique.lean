@@ -1,14 +1,12 @@
-import SudoersSpec.Grammar.SudoFile
+import SudoersSpec.Grammar.SudoPermissionDispatchAt
 
 /-!
-# A complete, position-aware fragment of the stable file grammar
+# Exact stable file grammar
 
 The declaration, include, and comment judgments already record enough information to run
-backwards, including the cursors of failures caught by hash dispatch. Permissions require a
-separate certificate: `SudoPermissionG` leaves ignored-tag starts and some runas failure
-boundaries underconstrained. The exact grammar below uses `PositiveSudoPermissionG` for
-permissions and does not restrict any other item. In particular, it does not rule out a
-comment reached after a failed identifier or include.
+backwards, including the failure cursors caught by hash dispatch. Permissions use the same
+dispatch but with independent, exact judgments for the command cursor, ignored-tag positions,
+and both runas recovery boundaries.
 -/
 
 namespace SudoersSpec.Grammar
@@ -132,45 +130,30 @@ theorem sudo_nonpermission_complete (O : Oracles) (D : Descriptions) {s t : Stre
     · simp [sudoMain, AParser.run_bind, AParser.run_lift, hq, hr, hd', hlen]
     · simp [sudoMain, AParser.run_bind, AParser.run_lift, hq, hr, hd', hkind]
 
-/-- A position-aware certificate for permissions can be substituted without changing any of
-the other item rules. `PositiveSudoPermissionG` is one choice whose completeness is known. -/
-def SudoWithPermissionG (O : Oracles) (P : Stream → PermissionSpec → Stream → Prop)
-    (s : Stream) (a : Sudo) (t : Stream) : Prop :=
+/-- All stable item alternatives before the trailing whitespace checked by the file driver. -/
+def ExactSudoG (O : Oracles) (s : Stream) (a : Sudo) (t : Stream) : Prop :=
   match a with
-  | .spec p => P s p t
+  | .spec p => ExactSudoPermissionG O s p t
   | _ => SudoG O s a t
 
-abbrev ExactSudoG (O : Oracles) :=
-  SudoWithPermissionG O (AtCursor (PositiveSudoPermissionG O))
+/-- A stable item with trailing whitespace, before the driver's optional comment and newline. -/
+def ExactSudoItemG (O : Oracles) : Stream → Sudo → Stream → Prop :=
+  CursorNontermG (ExactSudoG O)
 
-/-- Grammar for a full item including trailing whitespace, before the driver's optional
-comment and final newline. -/
-def ExactSudoItemG (O : Oracles) (s : Stream) (a : Sudo) (t : Stream) : Prop :=
-  ∃ u, ExactSudoG O s a u ∧ AtCursor WsG u () t
-
-theorem sudoWithPermission_complete (O : Oracles) (D : Descriptions)
-    {P : Stream → PermissionSpec → Stream → Prop}
-    (hp : ∀ {s t p}, P s p t → (sudo O D).run s = (.ok (.spec p), t))
-    {s t : Stream} {a : Sudo} (h : SudoWithPermissionG O P s a t) : (sudo O D).run s = (.ok a, t) := by
+theorem exactSudo_at_iff (O : Oracles) (D : Descriptions) {s t : Stream} {a : Sudo} :
+    (sudo O D).run s = (.ok a, t) ↔ ExactSudoG O s a t := by
   cases a with
-  | spec p => exact hp h
+  | spec p => exact sudo_permission_at_iff O D
   | decl _ | «include» _ _ | includeDir _ _ | lineComment =>
-    exact sudo_nonpermission_complete O D h (by intro p he; cases he)
+    exact ⟨sudo_sound O D, fun h => sudo_nonpermission_complete O D h (by intro p he; cases he)⟩
 
-private theorem positivePermission_at (O : Oracles) (D : Descriptions) {s t : Stream} {p : PermissionSpec}
-    (h : AtCursor (PositiveSudoPermissionG O) s p t) : (sudo O D).run s = (.ok (.spec p), t) := by
-  have hc : Complete (sudo O D) (SudoDispatchG (PositiveSudoPermissionG O)) := by
-    rintro c _ r s ⟨p, rfl, hp⟩ hr
-    exact sudo_permission_complete O D hp hr
-  obtain ⟨c, hc', hG, hpos⟩ := h
-  exact (AtCursor.complete hc ⟨c, hc', ⟨p, rfl, hG⟩, hpos⟩)
+theorem exactSudo_item_iff (O : Oracles) (D : Descriptions) {s t : Stream} {a : Sudo} :
+    (expectNonterminal D.sudo (sudo O D)).run s = (.ok a, t) ↔ ExactSudoItemG O s a t :=
+  expectNonterminal_at_iff (exactSudo_at_iff O D) D.sudo
 
 theorem exactSudo_item_complete (O : Oracles) (D : Descriptions) {s t : Stream} {a : Sudo}
-    (h : ExactSudoItemG O s a t) : (expectNonterminal D.sudo (sudo O D)).run s = (.ok a, t) := by
-  obtain ⟨u, hu, hw⟩ := h
-  apply expectNonterminal_ok_iff.mpr
-  exact run_bind_eq_ok.mpr ⟨a, u, sudoWithPermission_complete O D (positivePermission_at O D) hu,
-    run_bind_eq_ok.mpr ⟨(), t, hw.complete skipTrailingWhitespace_complete, rfl⟩⟩
+    (h : ExactSudoItemG O s a t) : (expectNonterminal D.sudo (sudo O D)).run s = (.ok a, t) :=
+  (exactSudo_item_iff O D).mpr h
 
 /-- For a fixed starting cursor, the exact grammar fixes both value and stopping cursor. -/
 theorem exactSudo_item_unique (O : Oracles) {s t₁ t₂ : Stream} {a₁ a₂ : Sudo}
@@ -195,7 +178,7 @@ theorem exactSudo_cleanFile_unique (O : Oracles) {s t₁ t₂ : Stream} {a₁ a�
       obtain ⟨rfl, rfl⟩ := ih htail
       exact ⟨rfl, rfl⟩
 
-/-- A derivation in the exact fragment gives the implementation's successful file result. -/
+/-- An exact stable grammar derivation gives the implementation's successful file result. -/
 theorem exactSudo_cleanFile_complete (D : Descriptions) (O : Oracles) {src : List Char}
     {items : List Sudo} {out : Stream}
     (h : Recovery.CleanFile (ExactSudoItemG O) (Stream.new src) items out) :
@@ -214,25 +197,14 @@ theorem exactSudo_cleanFile_complete (D : Descriptions) (O : Oracles) {src : Lis
         Except String (List (Parsed Sudo))) = Except.ok (items.map Except.ok)
   simp only [okItems, Bool.false_eq_true, ite_false]
 
-/-- The exact grammar is sound for files accepted with no permissions: the only restriction
-introduced by `ExactSudoItemG` is on the permission certificate. -/
-theorem parseSudoersWith_nonpermission_exact (D : Descriptions) (O : Oracles) (src : List Char)
-    (items : List Sudo) (h : parseSudoersWith D O src = .ok (items.map Except.ok))
-    (hn : ∀ p, .spec p ∉ items) :
-    Recovery.CleanFile (ExactSudoItemG O) (Stream.new src) items ((Stream.new src).advance src.length) := by
-  have liftFile {s out : Stream} {items : List Sudo}
-      (h : Recovery.CleanFile (SudoItemG O) s items out) (hn : ∀ p, .spec p ∉ items) :
-      Recovery.CleanFile (ExactSudoItemG O) s items out := by
-    induction h with
-    | eof he => exact .eof he
-    | @line s a stop tail out hm hi hnl hh ih =>
-      have ht : ∀ p, .spec p ∉ tail := fun p hp => hn p (List.mem_cons_of_mem a hp)
-      refine .line hm ?_ hnl (ih ht)
-      obtain ⟨u, hu, hw⟩ := hi
-      refine ⟨u, ?_, hw⟩
-      cases a with
-      | spec p => exact (hn p List.mem_cons_self).elim
-      | decl _ | «include» _ _ | includeDir _ _ | lineComment => exact hu
-  exact liftFile (parseSudoersWith_clean_sound D O src items h) hn
+/-- A clean stable parse is the exact grammar derivation of its items. This includes ignored
+spans and runas prefixes recovered without a line diagnostic. -/
+theorem parseSudoersWith_exact_iff (D : Descriptions) (O : Oracles) (src : List Char)
+    (items : List Sudo) :
+    parseSudoersWith D O src = .ok (items.map Except.ok) ↔
+      Recovery.CleanFile (ExactSudoItemG O) (Stream.new src) items ((Stream.new src).advance src.length) :=
+  ⟨fun h => Recovery.cleanFile_sound (fun _ _ _ hr => (exactSudo_item_iff O D).mp hr)
+      (parseSudoersWith_ok_lines D O src h),
+    exactSudo_cleanFile_complete D O⟩
 
 end SudoersSpec.Grammar
