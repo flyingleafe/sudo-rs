@@ -171,6 +171,24 @@ macro_rules! defaults {
             )*
         }
 
+        // test-only observer: every field in declaration order, rendered by `DumpValue`
+        #[cfg(any(test, fuzzing))]
+        impl Settings {
+            pub(crate) fn dump_fields(&self) -> Vec<(&'static str, String)> {
+                use $crate::defaults::settings_dsl::DumpValue;
+                vec![$((stringify!($name), self.$name.dump_value())),*]
+            }
+        }
+
+        $($(
+            #[cfg(any(test, fuzzing))]
+            impl $crate::defaults::settings_dsl::DumpValue for enums::$name {
+                fn dump_value(&self) -> String {
+                    match self { $(Self::$key => stringify!($key)),* }.to_string()
+                }
+            }
+        )?)*
+
         impl Default for Settings {
             fn default() -> Self {
                 Self {
@@ -216,3 +234,96 @@ pub(super) use modifier_of;
 pub(super) use referent_of;
 pub(super) use result_of;
 pub(super) use storage_of;
+
+/// Test-only rendering of a setting's value (see `proofs/parser/DUMP.md`): `true`/`false`,
+/// decimal integers, enum variant names, quoted strings, `none`/`(some "..")`, and sets as
+/// `[..]` of quoted strings in ascending order.
+#[cfg(any(test, fuzzing))]
+pub(crate) trait DumpValue {
+    fn dump_value(&self) -> String;
+}
+
+/// Quoted string: printable ASCII other than `"` and `\` verbatim, `\"`, `\\`, and `\u{h}` (lowercase
+/// hexadecimal, no leading zeros) for every other code point.
+#[cfg(any(test, fuzzing))]
+pub(crate) fn dump_quoted(s: &str) -> String {
+    let mut out = String::with_capacity(s.len() + 2);
+    out.push('"');
+    for c in s.chars() {
+        match c {
+            '"' => out.push_str("\\\""),
+            '\\' => out.push_str("\\\\"),
+            ' '..='~' => out.push(c),
+            _ => out.push_str(&format!("\\u{{{:x}}}", c as u32)),
+        }
+    }
+    out.push('"');
+    out
+}
+
+#[cfg(any(test, fuzzing))]
+impl DumpValue for bool {
+    fn dump_value(&self) -> String {
+        self.to_string()
+    }
+}
+
+#[cfg(any(test, fuzzing))]
+impl DumpValue for u64 {
+    fn dump_value(&self) -> String {
+        self.to_string()
+    }
+}
+
+#[cfg(any(test, fuzzing))]
+impl DumpValue for Box<str> {
+    fn dump_value(&self) -> String {
+        dump_quoted(self)
+    }
+}
+
+#[cfg(any(test, fuzzing))]
+impl DumpValue for Option<Box<str>> {
+    fn dump_value(&self) -> String {
+        match self {
+            None => "none".to_string(),
+            Some(s) => format!("(some {})", dump_quoted(s)),
+        }
+    }
+}
+
+#[cfg(any(test, fuzzing))]
+impl DumpValue for std::collections::HashSet<String> {
+    fn dump_value(&self) -> String {
+        let mut items: Vec<&String> = self.iter().collect();
+        items.sort();
+        let items: Vec<String> = items.into_iter().map(|s| dump_quoted(s)).collect();
+        format!("[{}]", items.join(" "))
+    }
+}
+
+#[cfg(test)]
+mod dump_test {
+    use super::super::{Settings, negate};
+
+    #[test]
+    fn dump_fields_renders_every_field() {
+        let mut settings = Settings::default();
+        let fields = settings.dump_fields();
+        assert_eq!(fields.len(), 35);
+        assert_eq!(fields[0], ("always_query_group_plugin", "false".to_string()));
+        assert_eq!(fields[5], ("lecture", "never".to_string()));
+        assert_eq!(fields[6], ("mailerpath", "none".to_string()));
+        assert_eq!(fields[22], ("umask", "18".to_string()));
+        assert_eq!(
+            fields[33],
+            (
+                "env_check",
+                r#"["COLORTERM" "LANG" "LANGUAGE" "LC_*" "LINGUAS" "TERM" "TZ"]"#.to_string()
+            )
+        );
+        negate("env_reset").unwrap()(&mut settings);
+        assert_eq!(settings.dump_fields()[2], ("env_reset", "false".to_string()));
+        assert_eq!(super::dump_quoted("a\"\\\u{e9}\n"), r#""a\"\\\u{e9}\u{a}""#);
+    }
+}
