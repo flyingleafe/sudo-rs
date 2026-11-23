@@ -46,6 +46,7 @@ import SudoersSpec.Grammar.Examples
 import SudoersSpec.Analysis.AliasOrder
 import SudoersSpec.Analysis.Collect
 import SudoersSpec.Analysis.Observations
+import SudoersSpec.Analysis.Examples
 import SudoersSpec.Grammar.PermissionAtoms
 import SudoersSpec.Grammar.PermissionRunAs
 import SudoersSpec.Grammar.PermissionTags

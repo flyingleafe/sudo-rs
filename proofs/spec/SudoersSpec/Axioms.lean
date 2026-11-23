@@ -11,6 +11,7 @@ import SudoersSpec.Syntax.Recovery
 import SudoersSpec.Grammar.Examples
 import SudoersSpec.Analysis.Collect
 import SudoersSpec.Analysis.Observations
+import SudoersSpec.Analysis.Examples
 import SudoersSpec.Grammar.PermissionExamples
 import SudoersSpec.Syntax.PanicFree
 import SudoersSpec.Settings.FromParser
@@ -338,3 +339,5 @@ open SudoersSpec
 #print axioms SudoersSpec.Grammar.sudo_permission_at_iff
 #print axioms SudoersSpec.Grammar.exactSudo_item_iff
 #print axioms SudoersSpec.Grammar.parseSudoersWith_exact_iff
+#print axioms SudoersSpec.Analysis.Examples.unlisted_reader_denied
+#print axioms SudoersSpec.Analysis.Examples.include_requires_snapshot
