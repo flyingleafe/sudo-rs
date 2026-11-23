@@ -1,5 +1,6 @@
 import SudoRsProofs.Parser.File
 import SudoRsProofs.Parser.Analysis.Input
+import SudoRsProofs.Parser.Analysis.ReferenceFit
 import SudoRsProofs.Permission
 import SudoersSpec.Analysis.Clean
 
@@ -22,7 +23,6 @@ Rust configuration. Fatal parse records are allowed. No filename observation is 
 there is a diagnostic with a source path. -/
 structure LocalFile (path : std.path.Path) (source : Option std.path.PathBuf) (items : List Item) : Prop where
   noIncludes : ∀ p span, .ok (.include p span) ∉ items ∧ .ok (.includeDir p span) ∉ items
-  names : ∀ i ∈ items, Ref.itemFits i
   size : (items.map Ref.itemSize).sum ≤ Usize.max
   sourcePath : ∀ i ∈ items, Ref.needsDiagnosticPath i → DiagnosticPath path source
 
@@ -74,7 +74,8 @@ theorem analyze_text_of_item {A : GlobAbs} {O : Syntax.Oracles} (single : sudoIt
       | _ => trivial
   obtain ⟨c, collected⟩ := (SudoersSpec.Analysis.collectFrom_some_iff {} items).mpr localItems
   obtain ⟨cfg, ds, ran, analysis⟩ := analyze_refines_of_reference A path source rs items c rel
-    collected dom.sourcePath (fun _ _ _ _ related => render related) dom.names (produced rs run) dom.size
+    collected dom.sourcePath (fun _ _ _ _ related => render related) (Ref.parseSudoers_items_fit file)
+    (produced rs run) dom.size
   refine ⟨items, c, cfg, ds, file, collected, ?_, analysis⟩
   simpa only [sudoers.analyze_text, run, Std.bind_ok] using ran
 
