@@ -1,5 +1,6 @@
 import SudoersSpec.Analysis.Collect
 import SudoersSpec.Grammar.Lexical
+import SudoersSpec.Grammar.Token
 import SudoersSpec.Syntax.Recovery
 
 /-! Accepted Defaults modifiers come from the settings table. The invariant follows the
@@ -91,6 +92,61 @@ private theorem tryNonterminal_value {p : Parser α} {s stop : Stream} {a : α}
 private theorem expectNonterminal_value {p : Parser α} {d : String} {s stop : Stream} {a : α}
     (h : (expectNonterminal d p).run s = (.ok a, stop)) : ∃ mid, p.run s = (.ok a, mid) :=
   tryNonterminal_value (Grammar.expectNonterminal_ok_iff.mp h)
+
+private theorem bytes_ofList_length (cs : List Char) :
+    (bytes (String.ofList cs)).length = utf8Len cs := by
+  simp [bytes, List.utf8Encode, List.length_flatMap,
+    String.length_utf8EncodeChar, utf8Len]
+
+private theorem numeric_char_one_byte {c : Char} (h : numericToken.accept c = true) :
+    c.utf8Size = 1 := by
+  have h' : isAsciiHexdigit c = true ∨ c = '.' := by
+    simpa only [numericToken, Bool.or_eq_true, beq_iff_eq] using h
+  rcases h' with h' | rfl
+  · apply Char.utf8Size_eq_one_iff.mpr
+    simp only [isAsciiHexdigit, isAsciiDigit, Bool.or_eq_true, Bool.and_eq_true,
+      decide_eq_true_eq, Char.le_def, UInt32.le_iff_toNat_le] at h' ⊢
+    rcases h' with (h' | h') | h'
+    all_goals exact Nat.le_trans h'.2 (by decide)
+  · rfl
+
+/-- A successful `Numeric` parse, including the actual `expectNonterminal` call of
+`settingsModifier`, supplies at most 18 UTF-8 bytes to the checker. -/
+theorem numeric_bytes_le {d : String} {s stop : Stream} {t : String}
+    (h : (expectNonterminal d (token numericToken)).run s = (.ok t, stop)) :
+    (bytes t).length ≤ 18 := by
+  obtain ⟨mid, ht⟩ := expectNonterminal_value h
+  obtain ⟨cs, _, hg⟩ := Grammar.token_sound numericToken s t mid ht
+  obtain ⟨c, tail, rfl, hc, htail, _, hlen, htext⟩ :=
+    (Grammar.tokenG_noEsc (T := numericToken) rfl).mp hg
+  change Except.ok (ε := ErrKind) (String.ofList (c :: tail)) = Except.ok t at htext
+  have he : String.ofList (c :: tail) = t := Except.ok.inj htext
+  rw [← he, bytes_ofList_length]
+  rcases hlen with rfl | hlen
+  · have hc' : numericToken.accept c = true := hc
+    simp [utf8Len, numeric_char_one_byte hc']
+  · have allAscii : ∀ x ∈ c :: tail, x.utf8Size = 1 := by
+      intro x hx
+      rcases List.mem_cons.mp hx with rfl | hx
+      · exact numeric_char_one_byte hc
+      · exact numeric_char_one_byte (htail x hx)
+    have hn : c :: tail ≠ [] := by simp
+    have last := allAscii ((c :: tail).getLast hn) (List.getLast_mem hn)
+    have eq := congrArg utf8Len (List.dropLast_concat_getLast hn)
+    rw [Grammar.utf8Len_append] at eq
+    simp only [utf8Len, List.map_cons, List.map_nil, List.sum_cons, List.sum_nil,
+      Nat.add_zero, last] at eq
+    change utf8Len ((c :: tail).dropLast) < 18 at hlen
+    simp only [utf8Len, List.map_cons, List.sum_cons] at hlen ⊢
+    omega
+
+/-- On the lexer's actual output the checked integer producer agrees with the panic-free
+checker used in the parser. -/
+theorem numeric_checker_run_eq {d : String} {s stop : Stream} {t : String}
+    (h : (expectNonterminal d (token numericToken)).run s = (.ok t, stop))
+    (id : IntegerSetting) : checkIntegerRun id t = .ok (checkInteger id t) := by
+  have hf := fractionalMinutesRun_eq t (numeric_bytes_le h)
+  cases id <;> simp [checkIntegerRun, checkInteger, hf]
 
 private theorem settingsVec_produced {O : Oracles} {D : Descriptions} {s s' : Stream}
     {ms : List SettingsModifier}
@@ -429,5 +485,26 @@ theorem settingsInForce_inRange_of_text {U G : Type} (O : Oracle U G) (req : Req
       InRange (Analysis.settingsInForce O (Analysis.policyOf c).aliases c req Settings.default) := by
   obtain ⟨c, hc⟩ := (Analysis.collectFrom_some_iff {} items).mpr hlocal
   exact ⟨c, hc, reachable_inRange (settingsInForce_reachable_of_text O req hp hc)⟩
+
+/-- Successful include-free parses satisfy the range theorem without a separate rejection
+premise: the reference line driver never emits `Reject`. -/
+theorem settingsInForce_inRange_of_includeFree_text {U G : Type} (O : Oracle U G)
+    (req : Request U G) {env : Oracles} {src : List Char} {items : List (Parsed Sudo)}
+    (hp : parseSudoers env src = .ok items)
+    (noFiles : ∀ path span, .ok (.include path span) ∉ items ∧ .ok (.includeDir path span) ∉ items) :
+    ∃ c, Analysis.collect items = some c ∧
+      InRange (Analysis.settingsInForce O (Analysis.policyOf c).aliases c req Settings.default) := by
+  apply settingsInForce_inRange_of_text O req hp
+  intro item hi
+  cases item with
+  | error e =>
+    cases e with
+    | reject => exact (parseSudoers_ne_reject env src items hp _ hi rfl).elim
+    | fatal _ _ => trivial
+  | ok a =>
+    cases a with
+    | «include» path span => exact (noFiles path span).1 hi
+    | includeDir path span => exact (noFiles path span).2 hi
+    | _ => trivial
 
 end SudoersSpec.Settings

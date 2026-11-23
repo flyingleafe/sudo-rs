@@ -278,3 +278,6 @@ open SudoersSpec
 #print axioms SudoersSpec.Settings.parseSudoersWith_defaults_produced
 #print axioms SudoersSpec.Settings.settingsInForce_reachable_of_text
 #print axioms SudoersSpec.Settings.settingsInForce_inRange_of_text
+#print axioms SudoersSpec.Settings.numeric_bytes_le
+#print axioms SudoersSpec.Settings.numeric_checker_run_eq
+#print axioms SudoersSpec.Settings.settingsInForce_inRange_of_includeFree_text
