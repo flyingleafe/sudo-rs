@@ -289,26 +289,71 @@ macro_rules! defaults {
             }
         }
 
+        /// Every setting.
+        #[allow(non_camel_case_types)]
+        #[derive(Clone, Copy)]
+        #[cfg_attr(test, derive(Debug, PartialEq, Eq))]
+        pub(crate) enum Setting {
+            $($name),*
+        }
+
+        /// The position of every setting in the table.
+        #[allow(non_upper_case_globals)]
+        mod setting_index {
+            $(pub(super) const $name: usize = super::Setting::$name as usize;)*
+        }
+
+        /// The setting at position `index` of the table, with its name.
+        fn setting_at(index: usize) -> Option<(&'static str, Setting)> {
+            match index {
+                $(setting_index::$name => Some((stringify!($name), Setting::$name)),)*
+                _ => None,
+            }
+        }
+
+        /// The setting called `name`, if any. (A loop over the table rather than a `match` on
+        /// strings: the comparisons of a string `match` nest one level per setting in the
+        /// extracted code. Aeneas translates neither promoted constants nor references to a
+        /// `static`, so the table is a function.)
+        fn setting_named(name: &str) -> Option<Setting> {
+            let mut found = None;
+            let mut index = 0;
+            let mut more = true;
+            while more {
+                match setting_at(index) {
+                    Some((key, setting)) => {
+                        if *key == *name {
+                            found = Some(setting);
+                            more = false;
+                        }
+                        index += 1;
+                    }
+                    None => more = false,
+                }
+            }
+            found
+        }
+
         pub(crate) fn negate(name: &str) -> Option<SettingsModifier> {
-            match name {
+            match setting_named(name) {
                 $(
-                stringify!($name) => ifdef!($($negate)?;
+                Some(Setting::$name) => ifdef!($($negate)?;
                     // this setting has an explicit negation; use that
                     Some(SettingsModifier::$name(initializer_of!($name, $(=int $fn;)?$(=int $first;)?$($(=enum $key;)*)? $($negate)?)));
                     // flags and lists have a standard negation (other settings have none)
                     standard_negation!($name, $value)
                 ),
                 )*
-                _ => None
+                None => None
             }
         }
 
         pub(crate) fn set(name: &str) -> Option<SettingKind> {
-            match name {
+            match setting_named(name) {
             $(
-                stringify!($name) => Some(kind_of!($name, $(=int $fn;)?$(=int $first;)?$($(=enum $key;)*)? $value)),
+                Some(Setting::$name) => Some(kind_of!($name, $(=int $fn;)?$(=int $first;)?$($(=enum $key;)*)? $value)),
             )*
-                _ => None,
+                None => None,
             }
         }
 

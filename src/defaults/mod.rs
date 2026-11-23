@@ -92,11 +92,21 @@ defaults! {
 }
 
 /// The effect of a modifier of the list `set`: `items` replace it, are added to it, or are
-/// removed from it.
+/// removed from it. (`HashSet::new` and `insert` build the set that `collect` and `extend`
+/// build.)
 fn apply_list(set: &mut HashSet<String>, mode: ListMode, items: Vec<String>) {
     match mode {
-        ListMode::Set => *set = items.into_iter().collect(),
-        ListMode::Add => set.extend(items),
+        ListMode::Set => {
+            *set = HashSet::new();
+            for item in items {
+                set.insert(item);
+            }
+        }
+        ListMode::Add => {
+            for item in items {
+                set.insert(item);
+            }
+        }
         ListMode::Del => {
             for key in items {
                 set.remove(&key);
@@ -119,27 +129,73 @@ fn integer_in_range(text: &str, radix: u32, first: u64, last: u64) -> Option<u64
     }
 }
 
+/// The position of the first `.` in `input`, or its length if there is none.
+fn find_dot(input: &[u8]) -> usize {
+    let mut dot = input.len();
+    let mut i = 0;
+    while i < input.len() && dot == input.len() {
+        if input[i] == b'.' {
+            dot = i;
+        }
+        i += 1;
+    }
+    dot
+}
+
+/// The value of `input.parse::<u64>()` (which is `u64::from_str_radix(input, 10)`), if it is a
+/// number.
+#[allow(clippy::from_str_radix_10)]
+fn decimal(input: &str) -> Option<u64> {
+    u64::from_str_radix(input, 10).ok()
+}
+
 fn octal_mode(input: &str) -> Option<u64> {
-    <libc::mode_t>::from_str_radix(input.strip_prefix('0')?, 8)
-        .ok()
-        .map(Into::into)
+    // `input.strip_prefix('0')`: '0' is one byte
+    let bytes = input.as_bytes();
+    if bytes.is_empty() || bytes[0] != b'0' {
+        return None;
+    }
+    let (_, digits) = input.split_at(1);
+    match <libc::mode_t>::from_str_radix(digits, 8) {
+        Ok(mode) => Some(u64::from(mode)),
+        Err(_) => None,
+    }
 }
 
 /// A custom parser to parse seconds as fractional "minutes", the format used by
 /// passwd_timeout and timestamp_timeout.
+// no `?` on `Option`: Aeneas has no model of `Try` for `Option`
+#[allow(clippy::question_mark)]
 fn fractional_minutes(input: &str) -> Option<u64> {
-    if let Some((integral, fractional)) = input.split_once('.') {
+    // `input.split_once('.')`: '.' is one byte
+    let dot = find_dot(input.as_bytes());
+    if dot < input.len() {
+        let (integral, rest) = input.split_at(dot);
+        let (_, fractional) = rest.split_at(1);
         // - 'input' is maximally 18 characters, making fractional.len() at most 17;
         //   1e17 < 2**63, so the definition of 'shift' will not overflow.
         // - for the same reason, if both parses in the definition of 'seconds' succeed,
         //   we will have constructed an integer < 1e17.
         //-  1e17 * 60 = 6e18 < 9e18 < 2**63, so the final line also will not overflow
-        let shift = 10u64.pow(fractional.len().try_into().ok()?);
-        let seconds = integral.parse::<u64>().ok()? * shift + fractional.parse::<u64>().ok()?;
+        let shift = match u32::try_from(fractional.len()) {
+            Ok(digits) => 10u64.pow(digits),
+            Err(_) => return None,
+        };
+        let scaled = match decimal(integral) {
+            Some(integral) => integral * shift,
+            None => return None,
+        };
+        let seconds = match decimal(fractional) {
+            Some(fractional) => scaled + fractional,
+            None => return None,
+        };
 
         Some(seconds * 60 / shift)
     } else {
-        input.parse::<u64>().ok()?.checked_mul(60)
+        match decimal(input) {
+            Some(minutes) => minutes.checked_mul(60),
+            None => None,
+        }
     }
 }
 

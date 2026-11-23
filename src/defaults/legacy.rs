@@ -436,6 +436,14 @@ mod test {
         "1.00000000000000000",
         "a.5",
         "1.a",
+        "\u{e9}",
+        "\u{e9}.5",
+        "1.\u{e9}",
+        "0\u{e9}",
+        "\u{e9}0",
+        "0\u{e9}.5",
+        "\u{661}",
+        "0.\u{661}",
     ];
 
     // every enum key, keys in another case or with blanks, non-keys, paths, and the empty string
@@ -476,6 +484,11 @@ mod test {
     #[test]
     fn same_names_and_defaults() {
         assert_eq!(NAMES, new_names().as_slice());
+        let table: Vec<&str> = (0..)
+            .map_while(super::super::setting_at)
+            .map(|(name, _)| name)
+            .collect();
+        assert_eq!(NAMES, table.as_slice());
         assert_eq!(default_settings(), super::super::Settings::default());
     }
 
