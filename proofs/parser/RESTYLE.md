@@ -1,12 +1,12 @@
-# Restricted-style parser: P1/P2 report and style guide
+# Restricted-style parser: P1–P3 report and style guide
 
-Stages P1 and P2 of `PLAN.md`, Rust side (sections 3.2, 6, 7). M1 was the lexical layer and the
-`SpecList<Hostname>` production; M2a added the rest of the tokens of a permission line and its
-productions (`Identifier`, users, runas, tags, commands, the rule itself). Everything here is
-rewritten so that Charon and Aeneas translate it, the legacy parser is kept as a test oracle,
-and the evidence that the rewrite preserves behaviour. M2b (`Def<T>`, `get_directive`,
-`parse_include`, `Sudo::parse` beyond the named entries, the `Defaults` settings parser) follows
-this guide.
+Stages P1 and P2 of `PLAN.md`, Rust side (sections 3.2, 6, 7), and the P3 lines/directives scope.
+M1 was the lexical layer and the `SpecList<Hostname>` production; M2a added the rest of the
+tokens of a permission line and its productions (`Identifier`, users, runas, tags, commands, the
+rule itself); M2b (P3) added `Def<T>`, `get_directive`, `parse_include`, the complete `Sudo::parse`,
+the `Defaults` settings parser over its data API, and the monomorphic file-level entry. Everything
+here is rewritten so that Charon and Aeneas translate it, the legacy parser is kept as a test
+oracle, and the evidence that the rewrite preserves behaviour.
 
 Evidence kinds used below: **test** (the equivalence harness and the fuzz smoke run cover only
 the inputs they ran) and **extraction** (Charon and Aeneas translate the code and the generated
@@ -16,13 +16,13 @@ Lean builds). Nothing in this file is a proof.
 
 | Item | Where |
 |---|---|
-| Live parser, P1/P2 part in the restricted style | `src/sudoers/char_stream.rs` (all), `src/sudoers/basic_parser.rs` (all), `src/sudoers/tokens.rs` (`Username`, `DigitsU32`, `Hostname`, `AliasName`, `Meta<T>`, `Command`, `SimpleCommand`, `ChDir`, `Unquoted<T>`, `StringParameter`'s classes), `src/sudoers/ast.rs` (`Qualified<T>::parse`, `Identifier`, `parse_meta`, `UserSpecifier`, `Meta<UserSpecifier>`/`Meta<Identifier>`, `RunAs`, `MetaOrTag`, `CommandSpec`, the two rule tuples, `host_list`, `user_list`, `expect_user_list`, `permissions`) |
-| Live parser, M2b part, adapted only | `Def<T>`, `get_directive`, `parse_include`, `Sudo::parse`, the `Defaults` settings parser, and the tokens only it uses (`Numeric`, `DefaultName`, `EnvVar`, `QuotedStringParameter`, `IncludePath`, `QuotedIncludePath`): closures, `format!` and the `str` API are still there |
+| Live parser, entire restricted style | `src/sudoers/char_stream.rs`, `src/sudoers/basic_parser.rs`, `src/sudoers/tokens.rs` (all tokens), `src/sudoers/ast.rs` (every production, from `Identifier` to `Sudo` and the `Defaults` settings parser) |
+| File-level entry | `ast::parse_sudo_lines` (monomorphic `parse_lines::<Sudo>`) called by `parse_sudoers` in `mod.rs`; `analyze_text` = `analyze (parse_sudoers text)` |
 | Legacy parser (ground truth, `70fdb56b`, with the `Defaults` block of the base and its data API) | `src/sudoers/legacy/`, compiled for `cfg(any(test, fuzzing))` only |
 | Equivalence harness | `src/sudoers/equiv.rs` (printer, `compare`, directed diagnostic cases, kind-coverage table), `src/sudoers/equiv/corpus.rs` (texts of the unit tests, seeded generator, mutations) |
 | Fuzz target | `fuzz/fuzz_targets/parser_equiv.rs`, entry point `fuzz_api::sudoers_parser_equiv` |
 | Extraction roots and opaque items | `Cargo.toml` `[package.metadata.charon]` |
-| External models | `proofs/lean/SudoRs/FunsExternal.lean` (sections "Sudoers parser: characters and strings", "Permission-line parser externals"), rows in `proofs/lean/ASSUMPTIONS.md` |
+| External models | `proofs/lean/SudoRs/{FunsExternal,TypesExternal}.lean` (sections "Sudoers parser: characters and strings", "Permission-line parser externals"), rows in `proofs/lean/ASSUMPTIONS.md` |
 
 ## 2. Style guide
 
@@ -149,6 +149,15 @@ The rules below were all exercised by M1; each says what fails otherwise.
 | `(Option<RunAs>, CommandSpec)::parse` (`runas.is_some()`) | `match runas` | |
 | `(SpecList<Hostname>, …)::parse` / `Sudo::parse` choices | named entries `permissions`, `user_list`, `expect_user_list` | the same calls, named |
 
+| `Def<T>::parse` (`is_reserved_alias(&name)`, `unrecoverable!`) | `is_reserved_alias(&String)` over character literals, `fatal_from(begin_pos, …, ReservedAlias)` | `ErrorKind::ReservedAlias` |
+| `get_directive` (`let Allow(Only(User(Name(k)))) = … else`, `match keyword.as_str()`, slicing `keyword[8..]`, `starts_with('@')`) | the same match on the `String`, then `equals_str`/`starts_with_str` on `chars_of`; the `Defaults` scope moved to `defaults_scope` | `ErrorKind::AmbiguousSyntax` (raised by `Sudo::parse`) |
+| `defaults_scope` (`keyword[DEFAULTS_LEN..].starts_with('@')`, column arithmetic, backtracking) | `chars_of` + index `DEFAULTS_LEN`, `begin_pos` comparison, `*stream = begin_state; advance(9)` | `DEFAULTS_LEN = 8` is a constant (`"Defaults".len()`); the index and column arithmetic stay |
+| `parse_include` (`match … if key == "include"`, nested `get_path`, `unrecoverable!`) | `char`-wise key comparison, `include_path`, `parse_remote` (feature-gated arm moved into one function) | `ErrorKind::{UnknownDirective, QuotesAroundFilenames}` |
+| `Sudo::parse` (`if let Ok`, `or_else` closure, `maybe(..)?` in an `else if let`) | `match`es and early `make(...)`: the `#` branch, the quoted-user branch, the user-list branch with `get_directive` | `ErrorKind::AmbiguousSyntax` |
+| `SettingsModifier::parse` (three closures, `let … else`, `name + "=" + value`, `unrecoverable!`) | `parse_defaults_vars`, `parse_defaults_list`, `parse_defaults_text`, `join_var`; `match`es over `defaults::set`/`check_integer`/`check_text` | `ErrorKind::{CannotUseInBoolean, UnknownSetting, NotAListParameter, CannotAssignBoolean, NotABooleanSetting, InvalidSettingValue, EnvironmentListTooLong, EmptyStringNotAllowed, QuotesRequiredForVarValue}` |
+| `Numeric`, `DefaultName`, `EnvVar`, `QuotedStringParameter`, `QuotedIncludePath`, `IncludePath` classes | `c == escape_char() \|\| …` chains, `Char.is_control` | `is_ascii_hexdigit` model for `Numeric` |
+| `read_sudoers` → `parse_lines` | `parse_sudoers` → `ast::parse_sudo_lines` (monomorphic instance) | one call site |
+
 AST types are unchanged (names, fields, representation); `Span` is unchanged. No type of the
 decision proofs changed. `ChDir::construct` is now **extracted**: its text checks moved behind
 two opaque wrappers (`classify_chdir`, `sudo_path`) that are total on the Lean `String`, so the
@@ -166,10 +175,10 @@ and compared as a value (in `cfg(test)`).
 
 | Corpus | Texts | Result |
 |---|---:|---|
-| String literals of the sudoers, defaults and policy sources and their tests (with and without a final newline), the line groups of `sudoer![..]`, `pass!([..])`, `FAIL!([..])`, `SYNTAX!([..])`, `docs/sudoers.example` | 1,393 | no difference |
+| String literals of the sudoers, defaults and policy sources and their tests (with and without a final newline), the line groups of `sudoer![..]`, `pass!([..])`, `FAIL!([..])`, `SYNTAX!([..])`, `docs/sudoers.example` | 1,373 | no difference |
 | Generated from a grammar (rules with user, host, runas, tag and command lists; the five alias kinds; `Defaults` with every scope; includes; comments; continuations; long tokens at the 255- and 1024-byte limits in 1- to 4-byte characters; host lists at the 127-item limit; command specs at the 127-tag limit), seed `0x5eed0f5ed0e50001` | 8,000 | no difference |
 | Mutations of the generated texts, 1 to 3 per text | 16,000 | no difference |
-| Directed cases (`diagnostic_kinds`, `non_utf8_canonical_path`): one text per error kind, boundary cases of `Command`, and a scratch tree with a non-UTF-8 path component | 30 | no difference |
+| Directed cases (`diagnostic_kinds`, `non_utf8_canonical_path`): one text per error kind (all of them, P1–P3), boundary cases of `Command`, and a scratch tree with a non-UTF-8 path component | 42 | no difference |
 
 Mutation operators: delete a character; insert a character of the alphabet; replace a character
 by one of the alphabet; duplicate a slice of up to 8 characters; swap two adjacent characters;
@@ -187,47 +196,66 @@ debug build (`cargo test --lib sudoers::equiv -- --nocapture` prints the summari
 ### 4.1 Error-kind coverage
 
 `corpus_kind_coverage` parses the three corpora with the live parser and prints the table below
-(hits per corpus); the test fails if a kind that a text can reach is missing. `NonUtf8Path`
-needs a file system (the scratch tree), `SuperfluousWhitespace` is the sentinel that ends the
-line loop of `parse_lines` (it never reaches a result; `basic_parser`'s
-`superfluous_whitespace_at_eof` covers it), and the two NUL kinds are unreachable from text: no
-token class that can reach `SudoString::new` or `SudoPath::try_from` accepts a control character,
-so `nul_in_constructor_arguments` checks them at the constructor level, including that their text
-equals the legacy `Error` text.
+(hits per corpus; the numbers are from the M2b run at `b64545be`); the test fails if a kind that a
+text can reach is missing. `NonUtf8Path` needs a file system (the scratch tree),
+`SuperfluousWhitespace` is the sentinel that ends the line loop of `parse_lines` (it never reaches
+a result; `basic_parser`'s `superfluous_whitespace_at_eof` covers it), and the two NUL kinds are
+unreachable from text: no token class that can reach `SudoString::new` or `SudoPath::try_from`
+accepts a control character, so `nul_in_constructor_arguments` checks them at the constructor
+level, including that their text equals the legacy `Error` text. `Message` is not in the table:
+no production of the live parser produces it any more (it survives only as test scaffolding for
+the legacy `Defaults` copy in `test/legacy_defaults.rs`).
 
 | Kind | unit | gen | mut |
 |---|---:|---:|---:|
-| `StrayEscape` | 3 | 21 | 266 |
-| `Expecting` | 145 | 946 | 4,002 |
-| `Expected` | 565 | 6,368 | 16,745 |
-| `IllegalEscape` | 8 | 187 | 394 |
-| `TokenTooLong` | 2 | 264 | 357 |
-| `TooManyItems` | 0 | 87 | 94 |
-| `MissingLineTerminator` | 190 | 674 | 1,362 |
-| `GarbageAtEndOfLine` | 208 | 5,216 | 12,100 |
-| `HostIpv4` | 8 | 671 | 1,187 |
-| `EmbeddedDollar` | 2 | 103 | 192 |
-| `ValueTooLarge` | 2 | 58 | 83 |
-| `RegexNotSupported` | 0 | 56 | 61 |
-| `GlobInArguments` | 0 | 151 | 234 |
-| `ListArguments` | 0 | 81 | 102 |
-| `WildcardPattern` | 0 | 68 | 99 |
-| `DigestNotSupported` | 0 | 80 | 109 |
-| `FullyQualifiedPath` | 0 | 240 | 602 |
-| `StarInPath` | 0 | 334 | 457 |
-| `NetgroupsNotSupported` | 0 | 90 | 158 |
-| `TagNotSupported` | 0 | 323 | 444 |
-| `SelinuxNotSupported` | 0 | 173 | 231 |
-| `UnsupportedModifier` | 0 | 86 | 191 |
-| `TooManyTags` | 0 | 126 | 37 |
-| `Message` (M2b sites: `Defaults`, directives) | 46 | 880 | 2,864 |
+| `StrayEscape` | 3 | 28 | 279 |
+| `Expecting` | 145 | 885 | 4,145 |
+| `Expected` | 551 | 6,138 | 16,291 |
+| `IllegalEscape` | 8 | 182 | 398 |
+| `TokenTooLong` | 2 | 302 | 360 |
+| `TooManyItems` | 0 | 106 | 90 |
+| `MissingLineTerminator` | 190 | 702 | 1,369 |
+| `GarbageAtEndOfLine` | 208 | 5,214 | 11,946 |
+| `HostIpv4` | 8 | 656 | 1,121 |
+| `EmbeddedDollar` | 2 | 91 | 188 |
+| `ValueTooLarge` | 2 | 46 | 79 |
+| `RegexNotSupported` | 0 | 59 | 64 |
+| `GlobInArguments` | 0 | 152 | 218 |
+| `ListArguments` | 0 | 74 | 95 |
+| `WildcardPattern` | 0 | 70 | 91 |
+| `DigestNotSupported` | 0 | 67 | 82 |
+| `FullyQualifiedPath` | 0 | 265 | 629 |
+| `StarInPath` | 0 | 389 | 548 |
+| `NetgroupsNotSupported` | 0 | 82 | 141 |
+| `TagNotSupported` | 0 | 312 | 388 |
+| `SelinuxNotSupported` | 0 | 170 | 228 |
+| `UnsupportedModifier` | 0 | 102 | 245 |
+| `TooManyTags` | 0 | 135 | 42 |
+| `AmbiguousSyntax` | 0 | 0 | 4 |
+| `UnknownDirective` | 18 | 87 | 516 |
+| `QuotesAroundFilenames` | 2 | 256 | 473 |
+| `ReservedAlias` | 22 | 253 | 393 |
+| `CannotUseInBoolean` | 0 | 17 | 17 |
+| `UnknownSetting` | 0 | 57 | 1,173 |
+| `NotAListParameter` | 0 | 50 | 46 |
+| `CannotAssignBoolean` | 0 | 28 | 52 |
+| `NotABooleanSetting` | 0 | 14 | 54 |
+| `InvalidSettingValue` | 4 | 92 | 110 |
+| `EnvironmentListTooLong` | 0 | 29 | 23 |
+| `EmptyStringNotAllowed` | 0 | 49 | 53 |
+| `QuotesRequiredForVarValue` | 0 | 24 | 42 |
+
+`AmbiguousSyntax` is produced by the generator only through mutation (the corpus has one
+directed text for it); every other kind in the table is produced by the generated corpus.
 
 Under `cfg(test)` every `UserFriendly::DESCRIPTION` is `"elem"`; the descriptions themselves are
 compared only by the fuzz target, which builds without `cfg(test)`.
 
 Fuzz smoke run: `parser_equiv` built with `fuzz/run.sh build parser_equiv`, seeded with the
-`sudoers_parse` seeds and the sudoers dictionary, run for 55 s: 36,097 executions, 6,198 edges,
-no difference, no crash. The campaign belongs on the cluster:
+`sudoers_parse` seeds and the sudoers dictionary, run for 55 s at the M2a revision: 36,097
+executions, 6,198 edges, no difference, no crash. **Not run after M2b** (the target, the harness
+and `fuzz_api::sudoers_parser_equiv` are unchanged; the corpus and the directed cases above cover
+the M2b productions as tests). The campaign belongs on the cluster:
 `FUZZ_SECONDS=1800 fuzz/run.sh campaign parser_equiv`.
 
 Historical dump comparison (v1; `proofs/parser/DUMP.md`): the corpus of
@@ -248,6 +276,9 @@ Roots added to `start_from`:
   `parse_list`, `ast::host_list`;
 - P2: `ast::user_list`, `ast::expect_user_list`, `ast::permissions` (the entries `Sudo::parse`
   calls to build a `PermissionSpec`).
+- P3: `ast::parse_sudo_lines` (the monomorphic `parse_lines::<Sudo>`; `parse_sudoers` calls it) and
+  `sudoers::analyze_text` (the file-level parse + analysis entry). `defaults::Settings::default`
+  stays a root (the proved initializer of the settings data API).
 
 Opaque items added, all thin wrappers with a hand-written model:
 - P1: `char_stream::chars_of`, `basic_parser::escape_char`;
@@ -255,6 +286,9 @@ Opaque items added, all thin wrappers with a hand-written model:
   `to_str`), `tokens::compile_pattern` (`glob::Pattern::new`), `tokens::os_string`
   (`OsString::from`), `tokens::classify_chdir` and `tokens::sudo_path` (the text checks of
   `ChDir::construct`, so that the constructor itself is extracted and total).
+- P3: `tokens::sudo_string_text` (`SudoString::as_str` followed by `to_string`, which the model
+  gives as the string field). The include/analysis oracles (`sudoers::include_file`,
+  `include_dir_files`, `fatal_message`) are opaque in the same list, owned by the analysis work.
 
 `ChDir::construct` is now extracted (`sudoers.tokens.ChDir.Insts.Sudo_rsSudoersBasic_parserToken.construct`);
 the theorem `construct_ok_eq` is unchanged and is proved by unfolding it. Extracting
@@ -331,9 +365,27 @@ the helpers their plain types. `T` below is the production's item type.
 | `Unquoted<T>` token | `sudoers.tokens.Unquoted.Insts.Sudo_rsSudoersBasic_parserToken.{construct,construct_loop,accept}` | `construct : Token T → String → Result (Result (Unquoted T) ErrorKind)` |
 | `StringParameter` classes | `sudoers.tokens.StringParameter.Insts.Sudo_rsSudoersBasic_parserToken.{accept,escaped,construct,ALLOW_ESCAPE,MAX_LEN}` | |
 
-Loops become `…_loop` functions (`partial_fixpoint`) that take the cursor fields and the loop
-variables separately and return the tuple of them; `CommandSpec`'s loop carries `tags`,
-`failure` and `found`.
+### 5.1.2 Extracted P3 functions
+
+The same shape as 5.1.1 (`CharStream → Result ((core.result.Result T Status) × CharStream)`); a
+row gives the extra arguments and `T`.
+
+| Rust | Lean | Extra arguments / type |
+|---|---|---|
+| `parse_sudo_lines` | `sudoers.ast.parse_sudo_lines` | `CharStream → Result (Vec (core.result.Result Sudo Status) × CharStream)` |
+| `parse_sudoers` | `sudoers.parse_sudoers` | `Slice Char → Result (Vec (core.result.Result Sudo Status))` |
+| `Sudo::parse` | `sudoers.ast.Sudo.Insts.Sudo_rsSudoersBasic_parserParse.parse` | `T = Sudo` |
+| `Def<T>::parse` | `sudoers.ast.Def.Insts.Sudo_rsSudoersBasic_parserParse.parse` | `UserFriendly T → Parse (Meta T) → Many (Meta T) → …`; `T = Def T` |
+| `get_directive` | `sudoers.ast.get_directive` | `Qualified (Meta UserSpecifier) → CharStream → CharStream → Result ((Result Directive Status) × CharStream)` |
+| `defaults_scope` | `sudoers.ast.defaults_scope` | `String → CharStream → CharStream → (Usize × Usize) → Result ((Result ConfigScope Status) × CharStream)` |
+| `parse_include` | `sudoers.ast.parse_include` | `T = Sudo` |
+| `include_path` | `sudoers.ast.include_path` | `CharStream → (Usize × Usize) → Result ((Result (String × Span) Status) × CharStream)` |
+| `parse_remote` | `sudoers.ast.parse_remote` | `String → CharStream → (Usize × Usize) → Result ((Result Sudo Status) × CharStream)` |
+| `is_reserved_alias`, `equals_str`, `starts_with_str` | `sudoers.ast.{is_reserved_alias, equals_str, starts_with_str}` | `String → Result Bool`; `String → Slice Char → Result Bool` |
+| `SettingsModifier::parse` | `defaults.SettingsModifier.Insts.Sudo_rsSudoersBasic_parserParse.parse` | `T = defaults.SettingsModifier` |
+| `parse_defaults_vars`, `parse_defaults_list`, `parse_defaults_text`, `join_var` | `sudoers.ast.{parse_defaults_vars, parse_defaults_list, parse_defaults_text, join_var}` (+ `_loop`) | `parse_defaults_list : ListMode → String → SettingKind → (Usize × Usize) → CharStream → Result ((Result SettingsModifier Status) × CharStream)`; `parse_defaults_text : … → Result ((Result String Status) × CharStream)`; `join_var : String → String → Result String` |
+| settings tokens | `sudoers.tokens.{Numeric, DefaultName, EnvVar, QuotedStringParameter, QuotedIncludePath, IncludePath}.Insts.Sudo_rsSudoersBasic_parserToken.{construct,accept,accept_1st,escaped,ALLOW_ESCAPE,MAX_LEN}` | `construct : String → Result (Result Token ErrorKind)` |
+| `analyze_text` (analysis work) | `sudoers.analyze_text` | `std.path.Path → Slice Char → Result (Sudoers × Vec sudoers.Error)` |
 
 ### 5.2 External models
 
@@ -357,6 +409,10 @@ All are definitions except three `opaque` Unicode predicates; each has a row in
 | `tokens::compile_pattern` (opaque for Charon) | `opaque` (oracle) returning `glob.Pattern` or the `ErrorKind` payload |
 | `tokens::os_string` (opaque for Charon) | `opaque` `String → Result OsString` over the existing byte model |
 | `tokens::classify_chdir`, `tokens::sudo_path` (opaque for Charon) | definitions over the Lean `String` (`"*"`/`*`/NUL tests) |
+| `tokens::sudo_string_text` (opaque for Charon) | `ok s.str` (the `SudoString` model's text) |
+| `char::is_ascii_hexdigit` | `c.isDigit \|\| 'A'..='F' \|\| 'a'..='f'` |
+| `Option<T>` equality, `Char` equality | the derived `PartialEq` (`none = none`, the instance on `some`, `decide (a = b)` for characters) |
+| `core.mem.maybe_uninit.MaybeUninit` | `opaque` type former, named but unused by the generated definitions |
 
 The `'\\'` defect: of the three ways round, post-processing the generated file would put a text
 rewrite of every generated file into the trusted base, and a newer Aeneas does not fix it (see
@@ -367,20 +423,22 @@ function call where the legacy code used a constant.
 
 ## 6. Measured sizes
 
-P1 (M1) against `70fdb56b`, P2 (M2a) against `ad41ddd4` (`git diff --numstat`, added/removed):
+P1 (M1) against `70fdb56b`, P2 (M2a) against `ad41ddd4`, P3 (M2b) against `059c08cf`
+(`git diff --numstat`, added/removed):
 
-| Measure | P1 | P2 |
-|---|---:|---:|
-| `char_stream.rs` | 62/20 | 0 |
-| `basic_parser.rs` | 250/76 | 72/0 (the new `ErrorKind` variants and their `Display` arms) |
-| `tokens.rs` | 130/49 | 320/92 |
-| `ast.rs` | 23/4 | 154/82 |
-| `Cargo.toml` (roots and opaque items) | 9/1 | 17/4 |
-| Non-test lines of the rewritten files | `char_stream.rs` 82, `basic_parser.rs` 514 | `tokens.rs` 775, `ast.rs` 1004 |
-| Generated Lean for the scope's functions (without doc comments) | 81 definitions, 1,156 lines | 126 new definitions, 2,572 lines |
-| `Funs.lean` growth (doc comments included) | +1,640 | +3,205 |
-| `Types.lean` growth | +188 | +137 |
-| Extraction time (`proofs/extract.sh`) | 16 to 70 s | 26 to 48 s |
+| Measure | P1 | P2 | P3 |
+|---|---:|---:|---:|
+| `char_stream.rs` | 62/20 | 0 | 0 |
+| `basic_parser.rs` | 250/76 | 72/0 (the new `ErrorKind` variants and their `Display` arms) | 40/3 |
+| `tokens.rs` | 130/49 | 320/92 | 11/6 |
+| `ast.rs` | 23/4 | 154/82 | 360/221 |
+| `mod.rs` (the `parse_sudoers` call site) | 8/3 | 0 | 1/1 |
+| `Cargo.toml` (roots and opaque items) | 9/1 | 17/4 | 3/0 |
+| Non-test lines of the rewritten files | `char_stream.rs` 82, `basic_parser.rs` 514 | `tokens.rs` 775, `ast.rs` 1004 | `ast.rs` 1200 |
+| Generated Lean for the scope's functions (without doc comments) | 81 definitions, 1,156 lines | 126 new definitions, 2,572 lines | 101 new definitions, 2,158 lines |
+| `Funs.lean` growth (doc comments included) | +1,640 | +3,205 | +2,814 |
+| `Types.lean` growth | +188 | +137 | +133 |
+| Extraction time (`proofs/extract.sh`) | 16 to 70 s | 26 to 48 s | 76 to 96 s |
 
 Generated lines of the larger P1 definitions: `accept_escaped` 87, `Qualified…parse` 63,
 `parse_lines_loop` 51, `parse_list_loop` 46, `LeadingWhitespace…parse_loop` 37,
@@ -401,6 +459,17 @@ per keyword class (`TagClass`) rather than by unfolding; if that turns out to be
 flattening the dispatch into an `if`/`else` chain over `equals_text(&chars_of(&keyword), …)`
 is the candidate rewrite (not done here: the current form is the legacy shape and the
 equivalence evidence is against it).
+
+Generated lines of the larger P3 definitions: `defaults_scope` 403, `get_directive` 246,
+`SettingsModifier…parse` 233, `Sudo…parse` 198, `parse_defaults_vars` 75, `include_path` 74,
+`parse_defaults_vars_loop` 68, `Def…parse` 66, `parse_include` 64, `parse_defaults_text` 50,
+`parse_defaults_list` 47, `parse_sudo_lines` (trivial, calls `Parse.Blanket` of `Sudo`).
+
+`defaults_scope` and `get_directive` are large because every keyword test is a character-literal
+comparison (`equals_str` = `chars_of` plus `equals_text`, a loop over the literal) and each
+`expect_nonterminal(...)?` is a `Try::branch` plus a residual conversion. They are flat if-chains,
+so a proof can take them one test at a time; the alternative (a `match` on `&str`) produced a
+deeper nesting in P2's `MetaOrTag…parse` (652 lines) and was not used here.
 
 ## 7. Aeneas pin: recommendation
 
@@ -426,11 +495,11 @@ legacy shape would; that is a measurement for the proof stage.
 
 ## 8. Notes for the next stages
 
-- M2b scope: `Def<T>`, `get_directive`, `parse_include`, `Sudo::parse` beyond the named entries
-  (`user_list`, `expect_user_list`, `permissions`), and the `Defaults` settings parser with the
-  tokens only it uses (`Numeric`, `DefaultName`, `EnvVar`, `QuotedStringParameter`,
-  `IncludePath`, `QuotedIncludePath`). The `Defaults` settings parser is the only remaining
-  `unrecoverable!` user; every other message site of P1/P2 has an `ErrorKind` variant.
+- All Rust parser code is in the restricted style. No production of the live parser constructs
+  `ErrorKind::Message`; the variant and the `unrecoverable!` macro survive only as test
+  scaffolding for the legacy `Defaults` parser copy in `src/sudoers/test/legacy_defaults.rs`
+  (which compares the closure-based modifiers with the data-based ones). Removing them needs that
+  test module to carry its own message builder.
 - The legacy snapshot's `Defaults` block is the legacy-style parser at the branch's base (with
   the data API); the printer in `equiv.rs` (`settings_modifier`) and `bases()` follow it.
 - For the proof: `Status` is in the result, not in a separate error channel (`Result
@@ -438,6 +507,14 @@ legacy shape would; that is a measurement for the proof stage.
   overflow, slice indexing, `chars_of`/`String::len` on texts beyond `usize`, the opaque
   character predicates, and the oracles (`canonical`, `compile_pattern`, `os_string`). The
   token text is a Lean `String` built by `String.push`, and the length check reads
-  `utf8ByteSize`. `String::as_str` appears in `MetaOrTag::parse` (`match keyword.as_str()`), so
-  the `Str` model of `as_str` is now on the parser path as well.
-- `MetaOrTag::parse` (652 generated lines) and `Command::construct` (290) dominate; see section 6.
+  `utf8ByteSize`. `String::as_str` is on the parser path (`MetaOrTag::parse`,
+  `SettingsModifier::parse`, `sudo_string_text`), so the `Str` model of `as_str` matters.
+- The file-level entry is `sudoers.parse_sudoers : Slice Char → Result (Vec (Result Sudo Status))`
+  (`parse_sudoers` → `ast::parse_sudo_lines` → `parse_lines<Sudo>`), and `sudoers.analyze_text`
+  adds the analysis. Include directives reach the opaque `include_file`/`include_dir_files`
+  oracles, i.e. only through `Sudo::Include`/`IncludeDir` items.
+- Largest generated functions: `defaults_scope` (403), `get_directive` (246),
+  `SettingsModifier…parse` (233), `Sudo…parse` (198), and from P2 `MetaOrTag…parse` (652),
+  `Command…construct` (290); see section 6.
+- The M2b fuzz smoke run was not repeated; the target and harness are unchanged and the corpus
+  and directed cases cover the new productions as tests (section 4).
