@@ -5,7 +5,9 @@ use super::char_stream::CharStream;
 use super::*;
 use basic_parser::{Status, parse_eval, parse_fatal, parse_lines, parse_string};
 
+pub(super) mod analysis;
 mod differential;
+mod legacy_analysis;
 mod legacy_defaults;
 mod parser_dump;
 mod runtime;
@@ -124,13 +126,14 @@ macro_rules! sudoer {
         CharStream::with_text(&[$($e),*, ""].join("\n"), parse_lines)
             .into_iter()
             .map(|x| Ok::<_,basic_parser::Status>(x.unwrap()))
+            .collect::<Vec<_>>()
     }
 }
 
 // alternative to parse_eval, but goes through sudoer! directly
 #[must_use]
 fn parse_line(s: &str) -> Sudo {
-    sudoer![s].next().unwrap().unwrap()
+    sudoer![s].into_iter().next().unwrap().unwrap()
 }
 
 /// Returns `None` if a syntax error is encountered

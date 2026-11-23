@@ -16,11 +16,11 @@ mod tokens;
 
 use std::collections::HashSet;
 use std::ffi::OsString;
-use std::fmt;
 use std::io;
 use std::path::{Path, PathBuf};
 
 use crate::common::resolve::{is_valid_executable, resolve_path};
+use crate::common::{HARDENED_ENUM_VALUE_0, HARDENED_ENUM_VALUE_1, HARDENED_ENUM_VALUE_2};
 use crate::defaults;
 use crate::log::auth_warn;
 use crate::system::interface::{GroupId, UnixGroup, UnixUser, UserId};
@@ -92,25 +92,31 @@ type MatchedCommand<'a> = (Option<&'a RunAs>, (Tag, &'a Spec<Command>));
 /// This function takes a file argument for a sudoers file and processes it.
 impl Sudoers {
     pub fn open(path: impl AsRef<Path>) -> Result<(Sudoers, Vec<Error>), io::Error> {
-        let sudoers = open_sudoers(path.as_ref())?;
-        Ok(analyze(path.as_ref(), sudoers))
+        let text = open_sudoers(path.as_ref())?;
+        Ok(analyze_text(path.as_ref(), &text))
     }
 
     pub fn read<R: io::Read, P: AsRef<Path>>(
         reader: R,
         path: P,
     ) -> Result<(Sudoers, Vec<Error>), io::Error> {
-        let sudoers = read_sudoers(reader)?;
-        Ok(analyze(path.as_ref(), sudoers))
+        let text = read_sudoers(reader)?;
+        Ok(analyze_text(path.as_ref(), &text))
     }
 
+    /// Apply the `Defaults` with a host, user or runas scope (and the generic ones) that match:
+    /// the modifiers of every matching line in file order. Each scope is matched by
+    /// [find_item] with the aliases that the host, the user and the target user belong to.
+    /// Afterwards these customisers are gone: a second call applies nothing.
     fn specify_host_user_runas<User: UnixUser + PartialEq<User>>(
         &mut self,
         hostname: &system::Hostname,
         requesting_user: &User,
         target_user: Option<&User>,
     ) {
-        let customisers = std::mem::take(&mut self.customisers.non_cmnd);
+        // `std::mem::take` has no Aeneas model; `replace` with an empty vector is the same
+        #[allow(clippy::mem_replace_with_default)]
+        let customisers = std::mem::replace(&mut self.customisers.non_cmnd, Vec::new());
 
         let host_matcher = &match_token(hostname);
         let host_aliases = get_aliases(&self.aliases.host, host_matcher);
@@ -118,49 +124,62 @@ impl Sudoers {
         let user_matcher = &match_user(requesting_user);
         let user_aliases = get_aliases(&self.aliases.user, user_matcher);
 
-        let runas_matcher_aliases = target_user.map(|target_user| {
-            let runas_matcher = match_user(target_user);
-            let runas_aliases = get_aliases(&self.aliases.runas, &runas_matcher);
-
-            (runas_matcher, runas_aliases)
-        });
-
-        let match_scope = |scope| match scope {
-            ConfigScope::Generic => true,
-            ConfigScope::Host(list) => find_item(&list, host_matcher, &host_aliases),
-            ConfigScope::User(list) => find_item(&list, user_matcher, &user_aliases),
-            ConfigScope::RunAs(list) => {
-                runas_matcher_aliases
-                    .as_ref()
-                    .is_some_and(|(runas_matcher, runas_aliases)| {
-                        find_item(&list, runas_matcher, runas_aliases)
-                    })
+        let runas_matcher_aliases = match target_user {
+            Some(target_user) => {
+                let runas_matcher = match_user(target_user);
+                let runas_aliases = get_aliases(&self.aliases.runas, &runas_matcher);
+                Some((runas_matcher, runas_aliases))
             }
-            ConfigScope::Command(_list) => {
-                unreachable!("command-specific defaults are filtered out")
-            }
+            None => None,
         };
 
-        for (scope, modifiers) in customisers {
-            if match_scope(scope) {
-                for modifier in modifiers {
-                    modifier.apply(&mut self.settings);
+        let mut customisers = customisers.into_iter();
+        let mut more = true;
+        while more {
+            match customisers.next() {
+                Some((scope, modifiers)) => {
+                    let matched = match &scope {
+                        ConfigScope::Generic => true,
+                        ConfigScope::Host(list) => find_item(list, host_matcher, &host_aliases),
+                        ConfigScope::User(list) => find_item(list, user_matcher, &user_aliases),
+                        ConfigScope::RunAs(list) => match &runas_matcher_aliases {
+                            Some((runas_matcher, runas_aliases)) => {
+                                find_item(list, runas_matcher, runas_aliases)
+                            }
+                            None => false,
+                        },
+                        ConfigScope::Command(_list) => {
+                            unreachable!("command-specific defaults are filtered out")
+                        }
+                    };
+                    if matched {
+                        apply_settings(modifiers, &mut self.settings);
+                    }
                 }
+                None => more = false,
             }
         }
     }
 
+    /// Apply the `Defaults` with a command scope that match the command line, in file order (as
+    /// [Sudoers::specify_host_user_runas]).
     fn specify_command(&mut self, command: &Path, arguments: &[OsString]) {
-        let customisers = std::mem::take(&mut self.customisers.cmnd);
+        #[allow(clippy::mem_replace_with_default)]
+        let customisers = std::mem::replace(&mut self.customisers.cmnd, Vec::new());
 
         let cmnd_matcher = &match_command((command, arguments));
         let cmnd_aliases = get_aliases(&self.aliases.cmnd, cmnd_matcher);
 
-        for (scope, modifiers) in customisers {
-            if find_item(&scope, cmnd_matcher, &cmnd_aliases) {
-                for modifier in modifiers {
-                    modifier.apply(&mut self.settings);
+        let mut customisers = customisers.into_iter();
+        let mut more = true;
+        while more {
+            match customisers.next() {
+                Some((scope, modifiers)) => {
+                    if find_item(&scope, cmnd_matcher, &cmnd_aliases) {
+                        apply_settings(modifiers, &mut self.settings);
+                    }
                 }
+                None => more = false,
             }
         }
     }
@@ -350,27 +369,31 @@ fn group_cmd_specs_per_runas<'a>(
     })
 }
 
-fn read_sudoers<R: io::Read>(mut reader: R) -> io::Result<Vec<basic_parser::Parsed<Sudo>>> {
+/// The text of a sudoers file, as characters: the only effect of reading one after opening it.
+fn read_sudoers<R: io::Read>(mut reader: R) -> io::Result<Vec<char>> {
     // it's a bit frustrating that BufReader.chars() does not exist
     let mut buffer = String::new();
     reader.read_to_string(&mut buffer)?;
 
-    use basic_parser::parse_lines;
-    use char_stream::*;
-    let chars = chars_of(&buffer);
-    Ok(parse_lines(&mut CharStream::from_chars(&chars)))
+    Ok(char_stream::chars_of(&buffer))
 }
 
-fn open_sudoers(path: &Path) -> io::Result<Vec<basic_parser::Parsed<Sudo>>> {
+fn open_sudoers(path: &Path) -> io::Result<Vec<char>> {
+    #[cfg(test)]
+    if let Some(source) = test::analysis::open_fixture(path) {
+        return read_sudoers(source?);
+    }
     let source = audit::secure_open_sudoers(path)?;
     read_sudoers(source)
 }
 
+/// Parse the text of a sudoers file.
+fn parse_sudoers(text: &[char]) -> Vec<basic_parser::Parsed<Sudo>> {
+    basic_parser::parse_lines(&mut char_stream::CharStream::from_chars(text))
+}
+
 #[cfg(feature = "unstable-remote-sudoers")]
-fn open_remote_sudoers(
-    path: &Path,
-    peer: &PeerSpec,
-) -> io::Result<Vec<basic_parser::Parsed<Sudo>>> {
+fn open_remote_sudoers(path: &Path, peer: &PeerSpec) -> io::Result<Vec<char>> {
     use system::{Group, User};
 
     fn check_validity<T, E>(
@@ -977,305 +1000,26 @@ fn match_identifier(user: &impl UnixUser, ident: &ast::Identifier) -> bool {
     }
 }
 
-/// Process a sudoers-parsing file into a workable AST
-fn analyze(
-    path: &Path,
-    sudoers: impl IntoIterator<Item = basic_parser::Parsed<Sudo>>,
-) -> (Sudoers, Vec<Error>) {
-    use crate::common::{HARDENED_ENUM_VALUE_0, HARDENED_ENUM_VALUE_1, HARDENED_ENUM_VALUE_2};
-    use Directive::*;
+/// Read a sudoers file: parse its text and [analyze] the items. `path` is the file the text was
+/// read from. Pure apart from the include oracle ([include_file], [include_dir_files]), which
+/// only items that include other files reach.
+fn analyze_text(path: &Path, text: &[char]) -> (Sudoers, Vec<Error>) {
+    analyze(path, parse_sudoers(text))
+}
 
+/// Process a sudoers-parsing file into a workable AST: the rules, the alias definitions and the
+/// `Defaults` of the file at `path` and of the files it includes, in file order (an include
+/// directive stands for the items of the included file), then the processing order of the alias
+/// tables ([sanitize_alias_tables]). The diagnostics are those of the items in the same order,
+/// then those of the alias tables.
+fn analyze(path: &Path, items: Vec<basic_parser::Parsed<Sudo>>) -> (Sudoers, Vec<Error>) {
     let mut result: Sudoers = Default::default();
+    let mut diagnostics = Vec::new();
 
-    /// The IncludeState allows to tell whether including new files is allowed.
-    /// There are two situations:
-    /// - inclusion is forbidden (as when the @socket directive is used)
-    /// - inclusion is allowed but we need to ensure we didn't go beyond the limit
-    #[derive(Clone, Copy)]
-    #[repr(u32)]
-    enum IncludeState {
-        #[cfg(feature = "unstable-remote-sudoers")]
-        Forbidden = HARDENED_ENUM_VALUE_0,
-        Allowed(u8) = HARDENED_ENUM_VALUE_1,
-    }
-
-    impl IncludeState {
-        #[inline]
-        fn inc(&mut self) -> &mut Self {
-            #[cfg_attr(
-                not(feature = "unstable-remote-sudoers"),
-                allow(irrefutable_let_patterns)
-            )]
-            if let IncludeState::Allowed(x) = self {
-                *x += 1;
-            }
-            self
-        }
-
-        #[inline]
-        fn limit_reached(&self) -> bool {
-            match self {
-                #[cfg(feature = "unstable-remote-sudoers")]
-                IncludeState::Forbidden => true,
-                IncludeState::Allowed(x) => *x >= INCLUDE_LIMIT,
-            }
-        }
-    }
-
-    /// The directive that produced the inclusion.
-    #[repr(u32)]
-    enum IncludeDirective {
-        Include = HARDENED_ENUM_VALUE_0,
-        IncludeDir = HARDENED_ENUM_VALUE_1,
-        #[cfg(feature = "unstable-remote-sudoers")]
-        Remote(PeerSpec) = HARDENED_ENUM_VALUE_2,
-    }
-
-    impl fmt::Display for IncludeDirective {
-        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-            let s = match self {
-                IncludeDirective::Include => "@include",
-                IncludeDirective::IncludeDir => "@includedir",
-                #[cfg(feature = "unstable-remote-sudoers")]
-                IncludeDirective::Remote(_) => "@socket",
-            };
-            write!(f, "{s}")
-        }
-    }
-
-    fn resolve_relative(base: &Path, path: impl AsRef<Path>) -> PathBuf {
-        if path.as_ref().is_relative() {
-            // there should always be a parent since we start with /etc/sudoers, and make every other path
-            // absolute based on previous inputs; not having a parent is therefore a serious bug
-            base.parent()
-                .expect("invalid hardcoded path in sudo-rs")
-                .join(path)
-        } else {
-            path.as_ref().into()
-        }
-    }
-
-    struct IncludeContext<'a> {
-        path: &'a Path,
-        parent: &'a Path,
-        span: Span,
-        diagnostics: &'a mut Vec<Error>,
-        include_state: &'a mut IncludeState,
-        include_source: IncludeDirective,
-    }
-
-    fn include(cfg: &mut Sudoers, ctx: IncludeContext) {
-        // IncludeState::limit_reached() will also detect forbidden includes
-        if ctx.include_state.limit_reached() {
-            let message = match ctx.include_state {
-                IncludeState::Allowed(_) => {
-                    format!(
-                        "include file limit reached opening '{}'",
-                        ctx.path.display()
-                    )
-                }
-                #[cfg(feature = "unstable-remote-sudoers")]
-                IncludeState::Forbidden => {
-                    format!("{} forbidden at this stage", ctx.include_source)
-                }
-            };
-            ctx.diagnostics.push(Error {
-                source: Some(ctx.parent.to_owned()),
-                location: Some(ctx.span),
-                message,
-            });
-        } else {
-            let (res, next_state, kind) = match ctx.include_source {
-                #[cfg(feature = "unstable-remote-sudoers")]
-                IncludeDirective::Remote(peer) => (
-                    open_remote_sudoers(ctx.path, &peer),
-                    &mut IncludeState::Forbidden,
-                    "socket",
-                ),
-                _ => (open_sudoers(ctx.path), ctx.include_state.inc(), "file"),
-            };
-
-            match res {
-                Ok(subsudoer) => process(cfg, ctx.path, subsudoer, ctx.diagnostics, next_state),
-                Err(e) => {
-                    let message = if e.kind() == io::ErrorKind::NotFound {
-                        // improve the error message in this case
-                        format!("cannot open sudoers {} '{}'", kind, ctx.path.display())
-                    } else {
-                        e.to_string()
-                    };
-
-                    ctx.diagnostics.push(Error {
-                        source: Some(ctx.parent.to_owned()),
-                        location: Some(ctx.span),
-                        message,
-                    })
-                }
-            }
-        }
-    }
-
-    fn process(
-        cfg: &mut Sudoers,
-        cur_path: &Path,
-        sudoers: impl IntoIterator<Item = basic_parser::Parsed<Sudo>>,
-        diagnostics: &mut Vec<Error>,
-        include_state: &mut IncludeState,
-    ) {
-        for item in sudoers {
-            match item {
-                Ok(line) => match line {
-                    Sudo::LineComment => {}
-
-                    Sudo::Spec(permission) => {
-                        diagnostics.extend(get_ignored_tags(&permission).map(|span| Error {
-                            source: Some(cur_path.to_owned()),
-                            location: Some(span),
-                            message: "this tag is ignored by sudo-rs".to_string(),
-                        }));
-                        cfg.rules.push(permission);
-                    }
-
-                    Sudo::Decl(HostAlias(mut def)) => cfg.aliases.host.1.append(&mut def),
-                    Sudo::Decl(UserAlias(mut def)) => cfg.aliases.user.1.append(&mut def),
-                    Sudo::Decl(RunasAlias(mut def)) => cfg.aliases.runas.1.append(&mut def),
-                    Sudo::Decl(CmndAlias(mut def)) => cfg.aliases.cmnd.1.append(&mut def),
-
-                    Sudo::Decl(Defaults(params, scope)) => {
-                        if let ConfigScope::Command(specs) = scope {
-                            cfg.customisers.cmnd.push((
-                                specs
-                                    .into_iter()
-                                    .map(|spec| {
-                                        spec.map(|simple_command| {
-                                            (simple_command, Args::Prefix(Box::default()))
-                                        })
-                                    })
-                                    .collect(),
-                                params,
-                            ));
-                        } else {
-                            cfg.customisers.non_cmnd.push((scope, params));
-                        }
-                    }
-
-                    Sudo::Include(path, span) => include(
-                        cfg,
-                        IncludeContext {
-                            path: &resolve_relative(cur_path, path),
-                            parent: cur_path,
-                            span,
-                            diagnostics,
-                            include_state,
-                            include_source: IncludeDirective::Include,
-                        },
-                    ),
-
-                    #[cfg(feature = "unstable-remote-sudoers")]
-                    Sudo::Remote(path, peer_spec, span) => {
-                        let socket_path = Path::new(&path);
-                        if socket_path.is_relative() {
-                            diagnostics.push(Error {
-                                source: Some(cur_path.to_owned()),
-                                location: Some(span),
-                                message: format!(
-                                    "cannot open socket {path}: path must be absolute"
-                                ),
-                            });
-                        } else {
-                            include(
-                                cfg,
-                                IncludeContext {
-                                    path: socket_path,
-                                    parent: cur_path,
-                                    span,
-                                    diagnostics,
-                                    include_state,
-                                    include_source: IncludeDirective::Remote(peer_spec),
-                                },
-                            );
-                        }
-                    }
-
-                    Sudo::IncludeDir(path, span) => {
-                        if path.contains("%h") {
-                            diagnostics.push(Error {
-                                source: Some(cur_path.to_owned()),
-                                location: Some(span),
-                                message: format!(
-                                    "cannot open sudoers file {path}: \
-                                     percent escape %h in includedir is unsupported"
-                                ),
-                            });
-                            continue;
-                        }
-
-                        let path = resolve_relative(cur_path, path);
-                        let Ok(files) = std::fs::read_dir(&path) else {
-                            diagnostics.push(Error {
-                                source: Some(cur_path.to_owned()),
-                                location: Some(span),
-                                message: format!("cannot open sudoers file {}", path.display()),
-                            });
-                            continue;
-                        };
-                        let mut safe_files = files
-                            .filter_map(|direntry| {
-                                let path = direntry.ok()?.path();
-                                let text = path.file_name()?.to_str()?;
-                                if text.ends_with('~') || text.contains('.') {
-                                    None
-                                } else {
-                                    Some(path)
-                                }
-                            })
-                            .collect::<Vec<_>>();
-                        safe_files.sort();
-                        for file in safe_files {
-                            include(
-                                cfg,
-                                IncludeContext {
-                                    path: file.as_ref(),
-                                    parent: cur_path,
-                                    span,
-                                    diagnostics,
-                                    include_state,
-                                    include_source: IncludeDirective::IncludeDir,
-                                },
-                            )
-                        }
-                    }
-                },
-
-                Err(basic_parser::Status::Fatal(pos, kind)) => diagnostics.push(Error {
-                    source: Some(cur_path.to_owned()),
-                    location: Some(pos),
-                    message: kind.to_string(),
-                }),
-                Err(_) => panic!("internal parser error"),
-            }
-        }
-    }
-
-    fn get_ignored_tags(
-        PermissionSpec { permissions, .. }: &PermissionSpec,
-    ) -> impl Iterator<Item = Span> + '_ {
-        permissions
-            .iter()
-            .flat_map(|(_host, runas_cmds)| runas_cmds)
-            .flat_map(|(_runas, CommandSpec(tags, _cmd))| tags)
-            .flat_map(|modifier| {
-                let mut tag = Tag::default();
-                modifier.apply(&mut tag);
-                tag.ignored
-            })
-    }
-
-    let mut diagnostics = vec![];
     process(
         &mut result,
         path,
-        sudoers,
+        items,
         &mut diagnostics,
         &mut IncludeState::Allowed(0),
     );
@@ -1283,6 +1027,417 @@ fn analyze(
     sanitize_alias_tables(&mut result.aliases, &mut diagnostics);
 
     (result, diagnostics)
+}
+
+/// The IncludeState allows to tell whether including new files is allowed.
+/// There are two situations:
+/// - inclusion is forbidden (as when the @socket directive is used)
+/// - inclusion is allowed but we need to ensure we didn't go beyond the limit: `Allowed(n)`
+///   counts the include files opened (or attempted) so far, in the whole tree of includes
+#[derive(Clone, Copy)]
+#[repr(u32)]
+enum IncludeState {
+    #[cfg(feature = "unstable-remote-sudoers")]
+    Forbidden = HARDENED_ENUM_VALUE_0,
+    Allowed(u8) = HARDENED_ENUM_VALUE_1,
+}
+
+impl IncludeState {
+    /// Count an include file that is opened (whether or not that succeeds).
+    fn inc(&mut self) {
+        match self {
+            #[cfg(feature = "unstable-remote-sudoers")]
+            IncludeState::Forbidden => {}
+            IncludeState::Allowed(x) => *x += 1,
+        }
+    }
+
+    fn limit_reached(&self) -> bool {
+        match self {
+            #[cfg(feature = "unstable-remote-sudoers")]
+            IncludeState::Forbidden => true,
+            IncludeState::Allowed(x) => *x >= INCLUDE_LIMIT,
+        }
+    }
+}
+
+/// A file that an include directive names, for [include_file].
+#[repr(u32)]
+enum IncludeFile {
+    /// `@include path`: the path as written; a relative path is relative to the directory of
+    /// the including file
+    Named(String) = HARDENED_ENUM_VALUE_0,
+    /// an entry of the directory of an `@includedir` ([include_dir_files])
+    Listed(PathBuf) = HARDENED_ENUM_VALUE_1,
+    /// `@socket path` (an absolute path) with its peer credentials
+    #[cfg(feature = "unstable-remote-sudoers")]
+    Socket(String, PeerSpec) = HARDENED_ENUM_VALUE_2,
+}
+
+/// The items of the file at `cur_path`, in order.
+fn process(
+    cfg: &mut Sudoers,
+    cur_path: &Path,
+    items: Vec<basic_parser::Parsed<Sudo>>,
+    diagnostics: &mut Vec<Error>,
+    include_state: &mut IncludeState,
+) {
+    let mut items = items.into_iter();
+    let mut more = true;
+    while more {
+        match items.next() {
+            Some(item) => process_item(cfg, cur_path, item, diagnostics, include_state),
+            None => more = false,
+        }
+    }
+}
+
+/// One item of the file at `cur_path`.
+fn process_item(
+    cfg: &mut Sudoers,
+    cur_path: &Path,
+    item: basic_parser::Parsed<Sudo>,
+    diagnostics: &mut Vec<Error>,
+    include_state: &mut IncludeState,
+) {
+    use Directive::*;
+
+    match item {
+        Ok(Sudo::LineComment) => {}
+
+        Ok(Sudo::Spec(permission)) => {
+            ignored_tags(cur_path, &permission, diagnostics);
+            cfg.rules.push(permission);
+        }
+
+        Ok(Sudo::Decl(HostAlias(def))) => append_defs(&mut cfg.aliases.host.1, def),
+        Ok(Sudo::Decl(UserAlias(def))) => append_defs(&mut cfg.aliases.user.1, def),
+        Ok(Sudo::Decl(RunasAlias(def))) => append_defs(&mut cfg.aliases.runas.1, def),
+        Ok(Sudo::Decl(CmndAlias(def))) => append_defs(&mut cfg.aliases.cmnd.1, def),
+
+        Ok(Sudo::Decl(Defaults(params, ConfigScope::Command(specs)))) => {
+            cfg.customisers.cmnd.push((command_scope(specs), params))
+        }
+        Ok(Sudo::Decl(Defaults(params, scope))) => cfg.customisers.non_cmnd.push((scope, params)),
+
+        Ok(Sudo::Include(path, span)) => include(
+            cfg,
+            cur_path,
+            IncludeFile::Named(path),
+            span,
+            diagnostics,
+            include_state,
+        ),
+
+        #[cfg(feature = "unstable-remote-sudoers")]
+        Ok(Sudo::Remote(path, peer_spec, span)) => include_remote(
+            cfg,
+            cur_path,
+            path,
+            peer_spec,
+            span,
+            diagnostics,
+            include_state,
+        ),
+
+        Ok(Sudo::IncludeDir(path, span)) => {
+            include_dir(cfg, cur_path, path, span, diagnostics, include_state)
+        }
+
+        Err(basic_parser::Status::Fatal(pos, kind)) => {
+            report(diagnostics, cur_path, pos, fatal_message(&kind))
+        }
+        Err(basic_parser::Status::Reject) => panic!("internal parser error"),
+    }
+}
+
+/// A diagnostic for the item at `span` of the file at `cur_path`.
+fn report(diagnostics: &mut Vec<Error>, cur_path: &Path, span: Span, message: String) {
+    diagnostics.push(Error {
+        source: Some(cur_path.to_path_buf()),
+        location: Some(span),
+        message,
+    });
+}
+
+/// The message of a fatal parse error (the `Display` of its kind). Opaque for Charon: the
+/// formatting is not extracted.
+fn fatal_message(kind: &basic_parser::ErrorKind) -> String {
+    kind.to_string()
+}
+
+/// One diagnostic for every tag of the rule that sudo-rs ignores (`Modifier::Ignored`), in the
+/// order of the rule.
+fn ignored_tags(cur_path: &Path, permission: &PermissionSpec, diagnostics: &mut Vec<Error>) {
+    let permissions = &permission.permissions;
+    let mut i = 0;
+    while i < permissions.len() {
+        let runas_cmds = &permissions[i].1;
+        let mut j = 0;
+        while j < runas_cmds.len() {
+            let (_, CommandSpec(modifiers, _)) = &runas_cmds[j];
+            ignored_modifiers(cur_path, modifiers, diagnostics);
+            j += 1;
+        }
+        i += 1;
+    }
+}
+
+/// The diagnostics of [ignored_tags] for the modifiers of one command.
+fn ignored_modifiers(cur_path: &Path, modifiers: &[Modifier], diagnostics: &mut Vec<Error>) {
+    let mut i = 0;
+    while i < modifiers.len() {
+        if let Modifier::Ignored(span) = &modifiers[i] {
+            let message = String::from("this tag is ignored by sudo-rs");
+            report(diagnostics, cur_path, *span, message);
+        }
+        i += 1;
+    }
+}
+
+/// Append the definitions of one alias line to a table, in order.
+fn append_defs<T>(table: &mut Vec<Def<T>>, defs: Defs<T>) {
+    let mut defs = defs.into_iter();
+    let mut more = true;
+    while more {
+        match defs.next() {
+            Some(def) => table.push(def),
+            None => more = false,
+        }
+    }
+}
+
+/// The scope of a `Defaults!` line as commands: every command with any arguments.
+fn command_scope(specs: SpecList<SimpleCommand>) -> SpecList<Command> {
+    let mut result = Vec::new();
+    let mut specs = specs.into_iter();
+    let mut more = true;
+    while more {
+        match specs.next() {
+            Some(spec) => result.push(any_arguments(spec)),
+            None => more = false,
+        }
+    }
+    result
+}
+
+/// One item of [command_scope].
+fn any_arguments(spec: Spec<SimpleCommand>) -> Spec<Command> {
+    match spec {
+        Qualified::Allow(meta) => Qualified::Allow(any_arguments_meta(meta)),
+        Qualified::Forbid(meta) => Qualified::Forbid(any_arguments_meta(meta)),
+    }
+}
+
+fn any_arguments_meta(meta: Meta<SimpleCommand>) -> Meta<Command> {
+    match meta {
+        Meta::All => Meta::All,
+        Meta::Alias(alias) => Meta::Alias(alias),
+        Meta::Only(simple_command) => Meta::Only((simple_command, Args::Prefix(Box::default()))),
+    }
+}
+
+/// An include file (`@include`, or an entry of `@includedir`), at `span` of the file at
+/// `cur_path`. If the include limit is reached the result is a diagnostic; otherwise the file
+/// is opened and counted (whether or not opening succeeds), and its items are processed in
+/// place of the directive, or the failure is a diagnostic.
+fn include(
+    cfg: &mut Sudoers,
+    cur_path: &Path,
+    file: IncludeFile,
+    span: Span,
+    diagnostics: &mut Vec<Error>,
+    include_state: &mut IncludeState,
+) {
+    let refused = include_state.limit_reached();
+    let refusal = if refused { Some(*include_state) } else { None };
+    let opened = include_file(cur_path, file, refusal);
+    if !refused {
+        include_state.inc();
+    }
+    match opened {
+        Ok((path, items)) => process(cfg, path.as_path(), items, diagnostics, include_state),
+        Err(message) => report(diagnostics, cur_path, span, message),
+    }
+}
+
+/// An `@includedir` directive at `span` of the file at `cur_path`: every file of the listing
+/// [include_dir_files] in order, or the diagnostic.
+fn include_dir(
+    cfg: &mut Sudoers,
+    cur_path: &Path,
+    path: String,
+    span: Span,
+    diagnostics: &mut Vec<Error>,
+    include_state: &mut IncludeState,
+) {
+    match include_dir_files(cur_path, path) {
+        Ok(files) => {
+            let mut files = files.into_iter();
+            let mut more = true;
+            while more {
+                match files.next() {
+                    Some(file) => include(
+                        cfg,
+                        cur_path,
+                        IncludeFile::Listed(file),
+                        span,
+                        diagnostics,
+                        include_state,
+                    ),
+                    None => more = false,
+                }
+            }
+        }
+        Err(message) => report(diagnostics, cur_path, span, message),
+    }
+}
+
+/// An `@socket` directive at `span` of the file at `cur_path`: as [include], but the socket is
+/// not counted, and the items it provides may not include anything.
+#[cfg(feature = "unstable-remote-sudoers")]
+fn include_remote(
+    cfg: &mut Sudoers,
+    cur_path: &Path,
+    path: String,
+    peer_spec: PeerSpec,
+    span: Span,
+    diagnostics: &mut Vec<Error>,
+    include_state: &mut IncludeState,
+) {
+    if Path::new(&path).is_relative() {
+        let message = format!("cannot open socket {path}: path must be absolute");
+        report(diagnostics, cur_path, span, message);
+    } else {
+        let refusal = if include_state.limit_reached() {
+            Some(*include_state)
+        } else {
+            None
+        };
+        match include_file(cur_path, IncludeFile::Socket(path, peer_spec), refusal) {
+            Ok((path, items)) => process(
+                cfg,
+                path.as_path(),
+                items,
+                diagnostics,
+                &mut IncludeState::Forbidden,
+            ),
+            Err(message) => report(diagnostics, cur_path, span, message),
+        }
+    }
+}
+
+/// The include oracle, part 1 (`proofs/parser/ANALYSIS.md`); opaque for Charon. One include
+/// file named in the file at `cur_path`: its path (a relative `@include` path is resolved
+/// against the directory of `cur_path`) and, when `refusal` is the state in which the include
+/// limit was reached, the message of that diagnostic without opening the file; otherwise the
+/// file opened and parsed (its path, which is the source of its diagnostics and the base of its
+/// relative includes, and its items), or the message of the failure.
+fn include_file(
+    cur_path: &Path,
+    file: IncludeFile,
+    refusal: Option<IncludeState>,
+) -> Result<(PathBuf, Vec<basic_parser::Parsed<Sudo>>), String> {
+    #[cfg(feature = "unstable-remote-sudoers")]
+    let directive = match &file {
+        IncludeFile::Named(_) => "@include",
+        IncludeFile::Listed(_) => "@includedir",
+        IncludeFile::Socket(..) => "@socket",
+    };
+    #[cfg(feature = "unstable-remote-sudoers")]
+    let mut peer = None;
+    let path = match file {
+        IncludeFile::Named(path) => resolve_relative(cur_path, path),
+        IncludeFile::Listed(path) => path,
+        #[cfg(feature = "unstable-remote-sudoers")]
+        IncludeFile::Socket(path, peer_spec) => {
+            peer = Some(peer_spec);
+            PathBuf::from(path)
+        }
+    };
+
+    match refusal {
+        Some(IncludeState::Allowed(_)) => Err(format!(
+            "include file limit reached opening '{}'",
+            path.display()
+        )),
+        #[cfg(feature = "unstable-remote-sudoers")]
+        Some(IncludeState::Forbidden) => Err(format!("{directive} forbidden at this stage")),
+        None => {
+            #[cfg(feature = "unstable-remote-sudoers")]
+            let (res, kind) = match &peer {
+                Some(peer) => (open_remote_sudoers(&path, peer), "socket"),
+                None => (open_sudoers(&path), "file"),
+            };
+            #[cfg(not(feature = "unstable-remote-sudoers"))]
+            let (res, kind) = (open_sudoers(&path), "file");
+
+            match res {
+                Ok(text) => Ok((path, parse_sudoers(&text))),
+                Err(e) => Err(if e.kind() == io::ErrorKind::NotFound {
+                    // improve the error message in this case
+                    format!("cannot open sudoers {} '{}'", kind, path.display())
+                } else {
+                    e.to_string()
+                }),
+            }
+        }
+    }
+}
+
+/// The include oracle, part 2; opaque for Charon. The files of the directory of an
+/// `@includedir path` in the file at `cur_path` (resolved as in [include_file]) that sudo
+/// reads, in sorted order: names without `.` that do not end in `~`. Or the message of the
+/// diagnostic: for a path with `%h`, or a directory that cannot be read.
+fn include_dir_files(cur_path: &Path, path: String) -> Result<Vec<PathBuf>, String> {
+    if path.contains("%h") {
+        return Err(format!(
+            "cannot open sudoers file {path}: \
+             percent escape %h in includedir is unsupported"
+        ));
+    }
+
+    let path = resolve_relative(cur_path, path);
+    let Ok(files) = std::fs::read_dir(&path) else {
+        return Err(format!("cannot open sudoers file {}", path.display()));
+    };
+    let mut safe_files = files
+        .filter_map(|direntry| {
+            let path = direntry.ok()?.path();
+            let text = path.file_name()?.to_str()?;
+            if text.ends_with('~') || text.contains('.') {
+                None
+            } else {
+                Some(path)
+            }
+        })
+        .collect::<Vec<_>>();
+    safe_files.sort();
+    Ok(safe_files)
+}
+
+fn resolve_relative(base: &Path, path: impl AsRef<Path>) -> PathBuf {
+    if path.as_ref().is_relative() {
+        // there should always be a parent since we start with /etc/sudoers, and make every other path
+        // absolute based on previous inputs; not having a parent is therefore a serious bug
+        base.parent()
+            .expect("invalid hardcoded path in sudo-rs")
+            .join(path)
+    } else {
+        path.as_ref().into()
+    }
+}
+
+/// Apply the modifiers of one `Defaults` line, in order.
+fn apply_settings(modifiers: Vec<defaults::SettingsModifier>, settings: &mut Settings) {
+    let mut modifiers = modifiers.into_iter();
+    let mut more = true;
+    while more {
+        match modifiers.next() {
+            Some(modifier) => modifier.apply(settings),
+            None => more = false,
+        }
+    }
 }
 
 /// Compute the processing order of every alias table, in the order user, host, command, runas
