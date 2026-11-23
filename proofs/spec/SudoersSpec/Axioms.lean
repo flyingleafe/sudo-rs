@@ -156,3 +156,10 @@ open SudoersSpec
 #print axioms SudoersSpec.Settings.applyList_equiv
 #print axioms SudoersSpec.Settings.settingNamed_name
 #print axioms SudoersSpec.Settings.reachable_inRange
+#print axioms SudoersSpec.Syntax.parseList_ne_nil
+#print axioms SudoersSpec.Syntax.Parser.whileSomeBody_progressive
+#print axioms SudoersSpec.Syntax.tryNonterminal_parseOption_consumesSome
+#print axioms SudoersSpec.Syntax.identifier_consumes
+#print axioms SudoersSpec.Syntax.userSpecifier_consumes
+#print axioms SudoersSpec.Syntax.parseMeta_consumes
+#print axioms SudoersSpec.Syntax.metaOrTag_consumes

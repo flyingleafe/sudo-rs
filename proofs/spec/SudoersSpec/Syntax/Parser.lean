@@ -419,6 +419,127 @@ def whileMaybe (q : Parser γ) (hq : q.Consumes) (k : σ → γ → Parser (Step
     (finish : σ → β) (st : σ) : Parser β :=
   loop (whileMaybeBody q k finish) (whileMaybeBody_progressive hq k finish) st
 
+/-! ## `while let Some(a) = q? { ... }` with `q` returning an `Option` -/
+
+/-- `q` returns `some` only after consuming at least one character. -/
+def ConsumesSome (q : Parser (Option γ)) : Prop :=
+  ∀ s a s', q.run s = (.ok (some a), s') → s'.rest.length < s.rest.length
+
+theorem Consumes.maybe_consumesSome {p : Parser α} (hp : p.Consumes) : (maybe p).ConsumesSome :=
+  fun _ _ _ h => hp.maybe_some h
+
+/-- One iteration of `whileSome`. -/
+def whileSomeBody (q : Parser (Option γ)) (k : σ → γ → Parser (Step σ β)) (finish : σ → β)
+    (st : σ) : Parser (Step σ β) := do
+  match ← q with
+  | none => pure (.done (finish st))
+  | some a => k st a
+
+theorem whileSomeBody_progressive {q : Parser (Option γ)} (hq : q.ConsumesSome)
+    (k : σ → γ → Parser (Step σ β)) (finish : σ → β) :
+    Progressive (whileSomeBody q k finish) := by
+  intro st s st' s' h
+  obtain ⟨a?, s₁, h1, h2⟩ := run_bind_eq_ok.mp h
+  cases a? with
+  | none => cases h2
+  | some a => exact Nat.lt_of_le_of_lt (length_le_of_run h2) (hq _ _ _ h1)
+
+/-- The Rust loop `while let Some(a) = q? { body }` where `q` itself returns an `Option`
+(`try_nonterminal::<Option<T>>`): as `whileMaybe`, for a `q` that consumes when it returns
+`some`. -/
+def whileSome (q : Parser (Option γ)) (hq : q.ConsumesSome) (k : σ → γ → Parser (Step σ β))
+    (finish : σ → β) (st : σ) : Parser β :=
+  loop (whileSomeBody q k finish) (whileSomeBody_progressive hq k finish) st
+
+/-! ## A second stream -/
+
+/-- Run `p` on a separate stream `s` and return its result; the current stream does not move.
+`parse_user(&mut CharStream::new_with_pos(&text, begin_pos))` in `UserSpecifier::parse`. -/
+def nested (p : Parser α) (s : Stream) : Parser (Parsed α) where
+  run s' := (.ok (p.run s).1, s')
+  reaches s' := .refl s'
+
+@[simp] theorem run_nested (p : Parser α) (s s' : Stream) :
+    (nested p s).run s' = (.ok (p.run s).1, s') := rfl
+
 end Parser
+
+/-! ## Parsers that move the stream back -/
+
+/-- A parser that may move the stream anywhere reached from the anchor `s0`, also backwards:
+`*stream = begin_state` in `get_directive`, where `begin_state` is a clone of the stream at
+the anchor. Every `Parser` is one (`MonadLift`); `Parser.anchored` turns a family of them back
+into a `Parser`. -/
+structure AParser (s0 : Stream) (α : Type) where
+  run : Stream → Parsed α × Stream
+  reaches : ∀ s, Reaches s0 s → Reaches s0 (run s).2
+
+namespace AParser
+
+protected def pure (a : α) : AParser s0 α where
+  run s := (.ok a, s)
+  reaches _ h := h
+
+protected def bind (p : AParser s0 α) (f : α → AParser s0 β) : AParser s0 β where
+  run s :=
+    match p.run s with
+    | (.ok a, s₁) => (f a).run s₁
+    | (.error e, s₁) => (.error e, s₁)
+  reaches s h := by
+    have h1 := p.reaches s h
+    revert h1
+    cases p.run s with
+    | mk r s₁ =>
+      cases r with
+      | error e => exact id
+      | ok a => exact fun h1 => (f a).reaches s₁ h1
+
+instance : Monad (AParser s0) where
+  pure := AParser.pure
+  bind := AParser.bind
+
+instance : MonadLift Parser (AParser s0) where
+  monadLift p := ⟨p.run, fun s h => h.trans (p.reaches s)⟩
+
+/-- `*stream = begin_state`: back to the anchor. -/
+def restore : AParser s0 Unit where
+  run _ := (.ok (), s0)
+  reaches _ _ := .refl s0
+
+@[simp] theorem run_pure (a : α) (s : Stream) : (pure a : AParser s0 α).run s = (.ok a, s) := rfl
+
+theorem run_bind (p : AParser s0 α) (f : α → AParser s0 β) (s : Stream) :
+    (p >>= f).run s =
+      match p.run s with
+      | (.ok a, s₁) => (f a).run s₁
+      | (.error e, s₁) => (.error e, s₁) := rfl
+
+@[simp] theorem run_lift (p : Parser α) (s : Stream) :
+    (monadLift p : AParser s0 α).run s = p.run s := rfl
+
+@[simp] theorem run_restore (s : Stream) : (restore : AParser s0 Unit).run s = (.ok (), s0) := rfl
+
+/-- `maybe(p)` for an `AParser`. -/
+def maybe (p : AParser s0 α) : AParser s0 (Option α) where
+  run s := match p.run s with | (r, s') => (Syntax.maybe r, s')
+  reaches s h := by
+    have h1 := p.reaches s h
+    revert h1
+    cases p.run s with | mk r s' => exact id
+
+@[simp] theorem run_maybe (p : AParser s0 α) (s : Stream) :
+    (maybe p).run s = (Syntax.maybe (p.run s).1, (p.run s).2) := by
+  simp only [maybe]
+
+end AParser
+
+/-- A production that clones the stream at its start and may restore the clone later:
+`f s0` runs with the anchor `s0`, the stream at the start. -/
+def Parser.anchored (f : (s0 : Stream) → AParser s0 α) : Parser α where
+  run s := (f s).run s
+  reaches s := (f s).reaches s (.refl s)
+
+@[simp] theorem Parser.run_anchored (f : (s0 : Stream) → AParser s0 α) (s : Stream) :
+    (Parser.anchored f).run s = (f s).run s := rfl
 
 end SudoersSpec.Syntax

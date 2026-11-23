@@ -28,3 +28,5 @@ import SudoersSpec.Settings.Model
 import SudoersSpec.Settings.Properties
 import SudoersSpec.Settings.Dump
 import SudoersSpec.Settings.Tests
+import SudoersSpec.Syntax.Oracles
+import SudoersSpec.Syntax.TestsGrammar

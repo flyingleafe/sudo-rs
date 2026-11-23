@@ -108,6 +108,10 @@ inductive ErrKind where
   /-- `SudoPath::try_from(s).map_err(|e| e.to_string())` in `ChDir::construct`: the text of
   `Error::PathValidation`, opaque. -/
   | sudoPathValidation (msg : String)
+  /-- Not a diagnostic: `Command::construct` calls `cmd_iter.next().unwrap()`, and `unwrap` on
+  `None` panics. The panic is carried as this error; `parseSudoers` turns it into the panic of
+  the whole parse. The text is the panic message. -/
+  | unwrapNone
   deriving DecidableEq, Repr, Inhabited
 
 /-- The Rust message text of an `ErrKind`, byte for byte. -/
@@ -155,6 +159,7 @@ def ErrKind.render : ErrKind → String
   | .nonUtf8Filesystem => "non-UTF8 characters in filesystem"
   | .pathContainsStar => "path cannot contain '*'"
   | .sudoPathValidation msg => msg
+  | .unwrapNone => "called `Option::unwrap()` on a `None` value"
 
 /-- `basic_parser.rs` `Status`: `Fatal(Span, String)` (not recoverable) or `Reject` (the
 production does not apply). The `String` is `kind.render`. -/

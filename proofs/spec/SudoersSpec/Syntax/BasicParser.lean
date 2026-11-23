@@ -375,6 +375,46 @@ theorem parseList_consumes {p : Parser α} (hp : p.Consumes) (sepBy : Char) (max
     (description : String) : (parseList sepBy max description p).Consumes :=
   Consumes.bind_left (tryNonterminal_consumes hp) _
 
+/-- `parse_list` returns at least one element (so `users[0]` in `Sudo::parse` exists). -/
+theorem parseList_ne_nil {sepBy : Char} {max : Nat} {description : String} {p : Parser α}
+    {s s' : Stream} {l : List α} (h : (parseList sepBy max description p).run s = (.ok l, s')) :
+    l ≠ [] := by
+  obtain ⟨first, s₁, -, h⟩ := run_bind_eq_ok.mp h
+  have key := loop_invariant (whileMaybeBody_progressive (trySyntax_consumes sepBy)
+      (parseListBody max description p) id)
+    (fun elems => elems ≠ []) (fun r _ => ∀ l, r = .ok l → l ≠ [])
+    (by
+      intro st s st' s' hst hrun
+      obtain ⟨a?, s₁, -, hrun⟩ := run_bind_eq_ok.mp hrun
+      cases a? with
+      | none => simp at hrun
+      | some u =>
+        simp only [parseListBody] at hrun
+        split at hrun
+        · simp at hrun
+        · obtain ⟨x, s₂, -, hrun⟩ := run_bind_eq_ok.mp hrun
+          simp only [run_pure, Prod.mk.injEq, Except.ok.injEq, Step.next.injEq] at hrun
+          rw [← hrun.1]; simp)
+    (by
+      intro st s b s' hst hrun
+      obtain ⟨a?, s₁, -, hrun⟩ := run_bind_eq_ok.mp hrun
+      cases a? with
+      | none =>
+        simp only [run_pure, Prod.mk.injEq, Except.ok.injEq, Step.done.injEq] at hrun
+        intro l hl; cases hl; rw [← hrun.1]; exact hst
+      | some u =>
+        simp only [parseListBody] at hrun
+        split at hrun
+        · simp at hrun
+        · obtain ⟨x, s₂, -, hrun⟩ := run_bind_eq_ok.mp hrun
+          simp at hrun)
+    (by intro _ _ _ _ _ _ l hl; cases hl)
+    [first] s₁ (by simp)
+  exact key l (by
+    show ((whileMaybe (trySyntax sepBy) (trySyntax_consumes sepBy) (parseListBody max description p)
+      id [first]).run s₁).1 = .ok l
+    rw [h])
+
 /-- `trait Many`: the separator and the maximum number of elements of a `Vec<T>`. -/
 structure Many where
   /-- `Many::SEP`. -/
