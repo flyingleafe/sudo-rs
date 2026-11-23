@@ -61,10 +61,36 @@ uninlined_format_args = "warn"
 # Options for Charon (https://github.com/AeneasVerif/charon), which extracts the sudoers
 # authorization decision, its mapping to restrictions, the alias order producer, the argument
 # escaping of `sudo -s`/`-i`, and the restricted-style sudoers parser: lexical layer, host lists,
-# user lists and permission lines (`proofs/parser/RESTYLE.md`) for formal verification (see
-# `proofs/`).
+# user lists and permission lines (`proofs/parser/RESTYLE.md`), and policy analysis with
+# Defaults scoping (`proofs/parser/ANALYSIS.md`).
 [package.metadata.charon]
-start_from = ["crate::sudoers::permission_flags", "crate::sudoers::sanitize_alias_tables", "crate::sudoers::list_flags", "crate::sudoers::validate_flags", "crate::sudoers::Judgement::authorization", "crate::common::command::escaped", "crate::sudoers::basic_parser::parse_lines", "crate::sudoers::basic_parser::expect_syntax", "crate::sudoers::basic_parser::is_syntax", "crate::sudoers::basic_parser::expect_nonterminal", "crate::sudoers::basic_parser::parse_list", "crate::sudoers::ast::host_list", "crate::defaults::SettingsModifier::apply", "crate::defaults::set", "crate::defaults::negate", "crate::defaults::check_integer", "crate::defaults::check_text", "crate::defaults::build_list", "crate::sudoers::ast::user_list", "crate::sudoers::ast::expect_user_list", "crate::sudoers::ast::permissions"]
+start_from = [
+    "crate::sudoers::permission_flags",
+    "crate::sudoers::sanitize_alias_tables",
+    "crate::sudoers::list_flags",
+    "crate::sudoers::validate_flags",
+    "crate::sudoers::Judgement::authorization",
+    "crate::common::command::escaped",
+    "crate::sudoers::basic_parser::parse_lines",
+    "crate::sudoers::basic_parser::expect_syntax",
+    "crate::sudoers::basic_parser::is_syntax",
+    "crate::sudoers::basic_parser::expect_nonterminal",
+    "crate::sudoers::basic_parser::parse_list",
+    "crate::sudoers::ast::host_list",
+    "crate::defaults::SettingsModifier::apply",
+    "crate::defaults::set",
+    "crate::defaults::negate",
+    "crate::defaults::check_integer",
+    "crate::defaults::check_text",
+    "crate::defaults::build_list",
+    "crate::sudoers::ast::user_list",
+    "crate::sudoers::ast::expect_user_list",
+    "crate::sudoers::ast::permissions",
+    "crate::sudoers::analyze",
+    "crate::sudoers::Sudoers::check",
+    "crate::sudoers::Sudoers::check_list_permission",
+    "crate::sudoers::Sudoers::check_validate_permission",
+]
 opaque = [
     "crate::common::string",
     "crate::sudoers::warn_ignored",
@@ -77,4 +103,8 @@ opaque = [
     "crate::sudoers::tokens::compile_pattern",
     "crate::sudoers::tokens::classify_chdir",
     "crate::sudoers::tokens::sudo_path",
+    "crate::sudoers::include_file",
+    "crate::sudoers::include_dir_files",
+    "crate::sudoers::fatal_message",
+    "{impl core::default::Default for crate::defaults::Settings}::default",
 ]
