@@ -37,10 +37,10 @@ the `sudo -l` printing code are not verified.
 `SudoersSpec.authorization`: the mapping from the decision and the Defaults values to
 `Authorization::{Allowed(Authentication, Restrictions), Forbidden}`. It assumes
 `SettingsInRange` (`passwd_tries` fits `u16`, `umask` fits `u32`); two further theorems
-show that the function panics outside that range. The Defaults parser appears to keep
-both values in range, but that is not proved. `authorization_permission_flags_eq`
-composes the result with `permission_flags_eq`. `ChDir::construct`, used for `runcwd`,
-is a hand-written model, and the `apparmor` restriction is not covered.
+show that the function panics outside that range. [The extracted Defaults producers](lean/SudoRsProofs/Defaults/Range.lean)
+keep reachable settings in range; [the reference text parser](spec/SudoersSpec/Settings/FromParser.lean)
+establishes that property after scope selection on include-free input. `ChDir::construct`
+is extracted and uses modeled path/classification primitives. The `apparmor` restriction is not covered.
 
 The [proof witnesses](lean/SudoRsProofs/NonVacuity.lean) apply the theorem to a
 synthetic policy that permits one user with explicit tags and denies another.
@@ -66,10 +66,12 @@ premise of the decision theorem. If a call adds no diagnostic, its order is a pe
 of the definitions with unique names in which every referenced alias comes earlier, so
 `SudoersSpec.demonstration` applies: deciding with the precomputed table equals deciding
 on the fully expanded items. Both functions always return, given names that fit in memory
-and room in the diagnostics vector. These proofs rely on the list model of `HashSet` and
-on the model of `alias_diagnostic`. Nothing is proved about which diagnostics are emitted,
-about the order when diagnostics are present beyond those index properties, or that a
-given sudoers text produces none.
+and room in the diagnostics vector. [`sanitize_alias_tables_exact`](lean/SudoRsProofs/Parser/Analysis/AliasOrder.lean)
+also proves the exact order and appended messages, even for non-clean tables. These facts
+rely on the list model of `HashSet` and on `alias_diagnostic`. For an include-free stream
+of parsed items, [`analyze_refines_of_reference`](lean/SudoRsProofs/Parser/Analysis/Input.lean)
+establishes the actual policy, Defaults lists and diagnostics under its input-size, path
+and rendering conditions; it does not require the input file to be diagnostic-free.
 
 The [policy-level properties](spec/SudoersSpec/Properties.lean) are kernel-checked for
 every oracle, policy and request: an allowed request has a witness line, host group and
@@ -192,7 +194,7 @@ Each item says what kind of evidence it is. A test covers only the inputs it ran
 | `kani/` | Runner and results of the Kani bounded proofs (harnesses in `src/**/kani_proofs.rs`). |
 | `machine-code/` | AArch64 machine-code proof of `NameOrId::<UserId>::parse` (own Lean project, pinned engine) and its re-check script. |
 | `compliance/` | Docker comparison of upstream and refactored sudo-rs. |
-| [`parser/`](parser/PLAN.md) | Parser verification plan, evidence and limits: [Lean/Rust comparison](parser/P0.md), [reference grammar](spec/SudoersSpec/Grammar/README.md), [line recovery](spec/SudoersSpec/Syntax/Recovery.lean). |
+| [`parser/`](parser/README.md) | Evidence index for the stable text parser, its grammar, extraction, local analysis, and the [P0–P5 plan](parser/PLAN.md). |
 
 ## Prerequisites
 

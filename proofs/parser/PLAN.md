@@ -189,8 +189,9 @@ Names are provisional.
 account for the whole input: leading blanks, the attempted item, an optional comment, and
 the terminator or text skipped on recovery. `garbage_point` shows why coverage by the
 *reported diagnostic spans* is false: the span has zero width even when the parser discards
-one or more characters. For PT6, `cleanFile_sound` transfers single-item grammar soundness
-to a clean file; its single-item premise still has to be discharged for the full grammar.
+one or more characters. For PT6, [`parseSudoersWith_clean_sound`](../spec/SudoersSpec/Grammar/SudoFile.lean)
+discharges the single-item premise for the stable grammar. It establishes a derivation,
+not uniqueness of every possible derivation of the broad grammar.
 
 **E2E-clean, alias expansion.** Diagnostic-free sanitization proves the dependency order
 needed for equivalence of an *item list* with its expansion. For a flattened *whole policy*,

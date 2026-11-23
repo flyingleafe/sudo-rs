@@ -28,9 +28,9 @@ call, so the proofs describe a run in which those lookups give consistent answer
 | `core.ffi.c_str.CStr` | `structure { str : String }` | Only ever produced by `SudoString::as_cstr` in the extracted code; represented by its text without the trailing NUL. |
 | `std.ffi.os_str.OsString` | `structure { inner : alloc.vec.Vec U8 }` | `std/src/ffi/os_str.rs`: `struct OsString { inner: Buf }`; on Unix `sys/os_str/mod.rs` selects `sys/os_str/bytes.rs`, `struct Buf { inner: Vec<u8> }`. The bytes. Command arguments in the decision (compared for equality and read as text through `GlobAbs.os`); the input of `escaped`. |
 | `std.ffi.os_str.OsStr` | `structure { inner : Slice U8 }` | `struct OsStr { inner: Slice }`, on Unix `struct Slice { inner: [u8] }` (`#[repr(transparent)]` wrappers of `[u8]`). The argument of `Path::new("list")` in `list_flags` (never inspected) and the `Deref` target read by `escaped`. |
-| `std.path.Path` | `opaque` type | Command path; only passed to the glob matcher (and produced by `Path::new("list")` in `list_flags`). |
-| `std.path.PathBuf` | `opaque` type | The sanitizer's diagnostics have no source path. |
-| `std.collections.hash.set.HashSet` | list of keys | The sanitizer observes only `new` and `insert`, not bucket layout or key order. |
+| `std.path.Path` | `opaque` type | Used for resolved commands and source paths; command matching, cloning a diagnostic path and include I/O have separate contracts. |
+| `std.path.PathBuf` | `opaque` type | Local analysis reports carry an owned source path; alias sanitizer messages have none. |
+| `std.collections.hash.set.HashSet` | list of keys | The sanitizer uses membership/insertion. Settings also use deletion and initialization; only membership, not hash seeding or iteration order, is observable. |
 | `std.hash.random.RandomState`, `std.hash.random.DefaultHasher` | `opaque` types | Hash seeding and hash states are not observed by the extensional set model. |
 | `glob.Pattern` | `opaque` type | Glob semantics is not modelled. |
 | `common.string.SudoString` | `structure { str : String }` | Opaque for Charon; Rust `struct SudoString { inner: String }` where `inner` = text + NUL; modelled by the text its `Deref<Target = str>` exposes. |
@@ -158,7 +158,7 @@ the order a sorted permutation; it is not discharged for any concrete sudoers fi
 `AliasTableOK.of_sanitize_alias_tables` need only what `sanitize_alias_table_tableWF` needs;
 its diagnostics-prefix conjunct comes from `sanitize_alias_table_distinct` and has the same
 reliance as the order theorems. `sanitize_alias_tables_sorted` takes the clean premise on the
-whole call. Parsing and the rest of `analyze` are not covered.
+whole call. [`analyze_refines_of_reference`](SudoRsProofs/Parser/Analysis/Input.lean) separately composes sanitization with local parsed-item collection.
 
 `SudoRsProofs/SanitizeTotal.lean` proves termination and absence of panics:
 `sanitize_alias_table_returns` and `sanitize_alias_tables_returns` give `∃ r, … = ok r` under
@@ -178,7 +178,7 @@ above is discharged inside the proofs.
 | `hO : InstOracle uInst eqInst gInst O` (`AbsMatch.lean`) | The `UnixUser`/`PartialEq`/`UnixGroup` instances of the Rust user and group types are pure, total and agree with the spec oracle `O` (whose user and group types are the Rust ones): `has_name` (text linked by UTF-8 bytes), `has_uid`, `is_root`, `in_group_by_name` (on the `CStr` content), `in_group_by_gid`, `eq`, `ne` (= `!eq`), `as_gid`, `try_as_name`. | The decision is generic in these traits; the spec takes their answers as an oracle. |
 | `hG : GlobOracle A O` (`AbsMatch.lean`) | `glob::Pattern::matches_path_with` with the options of `match_command` (`require_literal_separator: true`, other fields as `MatchOptions::new()`) returns `ok (O.globMatches (A.pat pat) (A.path path))`; `A.os` (the reading of an `OsString` as text) is injective. | `matches_path_with` is `opaque`; `Pattern` and `Path` are opaque types, and the decision proofs read them and `OsString` (whose model is its bytes) as text through `A : GlobAbs`. |
 | `hH : O.SudoRsHosts` | `O.hostMatches p h = (p == h)`. | sudo-rs (`match_token`) compares host names by string equality; the spec allows any host predicate. |
-| `hpol : PolicyOK rules aliases` (`AbsPolicy.lean`) | Alias tables: valid processing orders (`TableWF`), names that fit (`TableFits`), identifier names that fit (`TableGood`). Rules: user/host lists and runas user/group lists with names that fit (`ItemsFit`, `ItemsGood UserSpecFits / IdentFits / Fits`), command alias names that fit (`CmdOK`), and modifier counts per line that fit in `usize`. | This collects the side conditions required by the decision proof. There is no checked theorem here that parsing and `analyze` establish them. |
+| `hpol : PolicyOK rules aliases` (`AbsPolicy.lean`) | Valid alias-order indices, representable names and modifier counts, and the matcher preconditions on user, host and runas lists. | A premise for an independently supplied policy. `Parser.Analysis.analyze_refines_of_reference` establishes it for the analyzed local items from name and count bounds on the reference inputs and provenance of the parsed modifiers, not from an assumed analyzed output. |
 | `hhost : Fits onHost.inner` | The current host name fits in memory. | `Deref<str>` of `system::Hostname`. |
 
 ## Hypotheses of the `sudo -v` / `sudo -l` theorems
@@ -212,6 +212,23 @@ carries only `SettingsInRange j.settings`, for an arbitrary `Judgement j`.
 hypotheses above plus `SettingsInRange settings`. The `env_keep`/`env_check` sets are passed
 through and compared in the extensional list model of `HashSet`. The `apparmor` feature is not
 enabled during extraction, so its `apparmor_profile` restriction is not covered.
+
+## Parser and analysis boundaries
+
+`StreamOK` excludes cursor/counter overflow; `QuoteRoom` reserves room for a nested
+re-escaped token and follows from `1 + 2 * character_count ≤ usize::MAX` at file start.
+[`P2Oracle`](SudoRsProofs/Parser/P2Oracle.lean) relates character classes, command
+canonicalization, glob compilation and native argument conversion to a fixed external
+snapshot. Release and test diagnostic descriptions differ; implementation refinement uses
+release descriptions. Dump comparisons from `#[cfg(test)]` use test descriptions.
+
+The local analysis proof supplies `PolicyOK`; it assumes representability on the parsed
+inputs, agreement of the primitive error renderer, and an owned source path when a
+diagnostic actually needs one. The apply/range proofs do not require a particular ordering
+of native hash tables. [`observeAuthorization`](../spec/SudoersSpec/Analysis/Observations.lean)
+keeps all other fields and compares `env_keep` and `env_check` by membership. File ownership,
+UTF-8 decoding before the character cursor, PAM, NSS consistency, and OS execution are
+not established by these theorems. `@socket` is not in the default extraction.
 
 ## Hypotheses of the argument-escaping theorems
 

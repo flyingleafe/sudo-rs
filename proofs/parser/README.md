@@ -1,0 +1,15 @@
+
+
+# Sudoers text verification
+
+The source boundary is a slice of characters from the stable parser, not a call to an installed `sudo`. Opening a trusted file, decoding its bytes, resolving OS identities and executing commands are separate boundaries. [PLAN.md](PLAN.md) gives the target statements and records where a proposed property is too strong.
+
+| Question | Evidence |
+|----|----|
+| What does the text mean, including errors? | [Executable reference parser](../spec/SudoersSpec/Syntax/README.md), [clean-file grammar](../spec/SudoersSpec/Grammar/SudoFile.lean), [recovery and source accounting](../spec/SudoersSpec/Syntax/Recovery.lean). Diagnostic spans locate errors; they need not cover all skipped characters. |
+| Which Rust functions does Lean check? | [Extraction map](RESTYLE.md), [parser refinement lemmas](PR-NOTES.md), [verified permission-list entries](../lean/SudoRsProofs/Parser/PermissionLines/Refinement.lean). A generic parser refinement theorem still requires a proof for the concrete item parser. |
+| How are parsed lines turned into policy? | [Collection and scoping spec](../spec/SudoersSpec/Analysis/Collect.lean), [Rust analysis boundary](ANALYSIS.md), [include-free analysis theorem](../lean/SudoRsProofs/Parser/Analysis/Input.lean). File order, sanitizer order and the order of the two Defaults passes are distinct. |
+| Which settings and environment assumptions matter? | [Settings types](DEFAULTS.md), [range from parsed text](../spec/SudoersSpec/Settings/FromParser.lean), [trusted models and oracle agreements](../lean/ASSUMPTIONS.md). Native environment sets are observed by membership. |
+| What did the tests compare? | [Lean vs Rust](P0.md), [versioned AST format](DUMP.md), [separate C sudo comparison](C-SUDO.md). Counts apply only to the specified corpus, host, observer and revision. |
+
+From the repository root, `nix develop -c proofs/check.sh tokens spec lean axioms rust` checks the project and `nix develop -c proofs/check.sh extract` independently checks generated-source drift. Neither a successful extraction nor matching test outputs is a proof of the final text-to-authorization statement; check the [proof boundary](../README.md#verification-boundary) for that claim.
