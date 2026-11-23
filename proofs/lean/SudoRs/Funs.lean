@@ -346,7 +346,7 @@ impl_def common.string.SudoString.Insts.CoreCmpPartialEqStr :
 }
 
 /-- [sudo_rs::defaults::apply_list]: loop 0:
-    Source: 'src/defaults/mod.rs', lines 101:12-103:13 -/
+    Source: 'src/defaults/mod.rs', lines 102:12-104:13 -/
 @[rust_loop]
 def defaults.apply_list_loop0
   (iter : alloc.vec.into_iter.IntoIter String)
@@ -369,7 +369,7 @@ def defaults.apply_list_loop0
 partial_fixpoint
 
 /-- [sudo_rs::defaults::apply_list]: loop 1:
-    Source: 'src/defaults/mod.rs', lines 106:12-108:13 -/
+    Source: 'src/defaults/mod.rs', lines 107:12-109:13 -/
 @[rust_loop]
 def defaults.apply_list_loop1
   (iter : alloc.vec.into_iter.IntoIter String)
@@ -392,7 +392,7 @@ def defaults.apply_list_loop1
 partial_fixpoint
 
 /-- [sudo_rs::defaults::apply_list]: loop 2:
-    Source: 'src/defaults/mod.rs', lines 111:12-113:13 -/
+    Source: 'src/defaults/mod.rs', lines 112:12-114:13 -/
 @[rust_loop]
 def defaults.apply_list_loop2
   (iter : alloc.vec.into_iter.IntoIter String)
@@ -417,7 +417,7 @@ def defaults.apply_list_loop2
 partial_fixpoint
 
 /-- [sudo_rs::defaults::apply_list]:
-    Source: 'src/defaults/mod.rs', lines 97:0-116:1 -/
+    Source: 'src/defaults/mod.rs', lines 98:0-117:1 -/
 def defaults.apply_list
   (set : std.collections.hash.set.HashSet String std.hash.random.RandomState
   alloc.alloc.Global) (mode : defaults.ListMode) (items : alloc.vec.Vec String)
@@ -438,7 +438,7 @@ def defaults.apply_list
     defaults.apply_list_loop2 iter set
 
 /-- [sudo_rs::defaults::{sudo_rs::defaults::SettingsModifier}::apply]:
-    Source: 'src/defaults/settings_dsl.rs', lines 285:12-289:13; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 38:0-92:1 -/
+    Source: 'src/defaults/settings_dsl.rs', lines 286:12-290:13; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 39:0-93:1 -/
 def defaults.SettingsModifier.apply
   (self : defaults.SettingsModifier) (obj : defaults.Settings) :
   Result defaults.Settings
@@ -512,7 +512,7 @@ def defaults.SettingsModifier.apply
     ok { obj with env_delete := hs }
 
 /-- [sudo_rs::defaults::setting_at]:
-    Source: 'src/defaults/settings_dsl.rs', lines 307:8-312:9; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 38:0-92:1 -/
+    Source: 'src/defaults/settings_dsl.rs', lines 308:8-313:9; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 39:0-93:1 -/
 def defaults.setting_at
   (index : Std.Usize) : Result (Option (Str × defaults.Setting)) := do
   match index.val with
@@ -561,7 +561,7 @@ def defaults.setting_at
   | _ => ok none
 
 /-- [sudo_rs::defaults::setting_named]: loop 0:
-    Source: 'src/defaults/mod.rs', lines 38:0-92:1 -/
+    Source: 'src/defaults/mod.rs', lines 39:0-93:1 -/
 @[rust_loop]
 def defaults.setting_named_loop
   («name» : Str) (found : Option defaults.Setting) (index : Std.Usize)
@@ -586,14 +586,14 @@ def defaults.setting_named_loop
 partial_fixpoint
 
 /-- [sudo_rs::defaults::setting_named]:
-    Source: 'src/defaults/settings_dsl.rs', lines 318:8-335:9; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 38:0-92:1 -/
+    Source: 'src/defaults/settings_dsl.rs', lines 319:8-336:9; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 39:0-93:1 -/
 @[reducible]
 def defaults.setting_named
   («name» : Str) : Result (Option defaults.Setting) := do
   defaults.setting_named_loop «name» none 0#usize true
 
 /-- [sudo_rs::defaults::set]:
-    Source: 'src/defaults/settings_dsl.rs', lines 351:8-358:9; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 38:0-92:1 -/
+    Source: 'src/defaults/settings_dsl.rs', lines 352:8-359:9; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 39:0-93:1 -/
 def defaults.set («name» : Str) : Result (Option defaults.SettingKind) := do
   let o ← defaults.setting_named «name»
   match o with
@@ -696,7 +696,7 @@ def defaults.set («name» : Str) : Result (Option defaults.SettingKind) := do
       ok (some (defaults.SettingKind.List defaults.ListSetting.env_delete))
 
 /-- [sudo_rs::defaults::negate]:
-    Source: 'src/defaults/settings_dsl.rs', lines 337:8-349:9; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 38:0-92:1 -/
+    Source: 'src/defaults/settings_dsl.rs', lines 338:8-350:9; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 39:0-93:1 -/
 def defaults.negate
   («name» : Str) : Result (Option defaults.SettingsModifier) := do
   let o ← defaults.setting_named «name»
@@ -777,13 +777,13 @@ def defaults.negate
         alloc.vec.Vec.new String)))
 
 /-- [sudo_rs::defaults::decimal]:
-    Source: 'src/defaults/mod.rs', lines 148:0-150:1 -/
+    Source: 'src/defaults/mod.rs', lines 149:0-151:1 -/
 def defaults.decimal (input : Str) : Result (Option Std.U64) := do
   let r ← core.num.U64.from_str_radix input 10#u32
   core.result.Result.ok r
 
 /-- [sudo_rs::defaults::find_dot]: loop 0:
-    Source: 'src/defaults/mod.rs', lines 136:4-141:5 -/
+    Source: 'src/defaults/mod.rs', lines 137:4-142:5 -/
 @[rust_loop]
 def defaults.find_dot_loop
   (input : Slice Std.U8) (dot : Std.Usize) (i : Std.Usize) :
@@ -806,13 +806,13 @@ def defaults.find_dot_loop
 partial_fixpoint
 
 /-- [sudo_rs::defaults::find_dot]:
-    Source: 'src/defaults/mod.rs', lines 133:0-143:1 -/
+    Source: 'src/defaults/mod.rs', lines 134:0-144:1 -/
 def defaults.find_dot (input : Slice Std.U8) : Result Std.Usize := do
   let dot := Slice.len input
   defaults.find_dot_loop input dot 0#usize
 
 /-- [sudo_rs::defaults::fractional_minutes]:
-    Source: 'src/defaults/mod.rs', lines 169:0-200:1 -/
+    Source: 'src/defaults/mod.rs', lines 170:0-201:1 -/
 def defaults.fractional_minutes (input : Str) : Result (Option Std.U64) := do
   let s ← core.str.Str.as_bytes input
   let dot ← defaults.find_dot s
@@ -847,7 +847,7 @@ def defaults.fractional_minutes (input : Str) : Result (Option Std.U64) := do
     | some minutes => ok (U64.checked_mul minutes 60#u64)
 
 /-- [sudo_rs::defaults::octal_mode]:
-    Source: 'src/defaults/mod.rs', lines 152:0-163:1 -/
+    Source: 'src/defaults/mod.rs', lines 153:0-164:1 -/
 def defaults.octal_mode (input : Str) : Result (Option Std.U64) := do
   let bytes ← core.str.Str.as_bytes input
   let b ← core.slice.Slice.is_empty bytes
@@ -867,7 +867,7 @@ def defaults.octal_mode (input : Str) : Result (Option Std.U64) := do
       | core.result.Result.Err _ => ok none
 
 /-- [sudo_rs::defaults::integer_in_range]:
-    Source: 'src/defaults/mod.rs', lines 119:0-130:1 -/
+    Source: 'src/defaults/mod.rs', lines 120:0-131:1 -/
 def defaults.integer_in_range
   (text : Str) (radix : Std.U32) (first : Std.U64) (last : Std.U64) :
   Result (Option Std.U64)
@@ -883,7 +883,7 @@ def defaults.integer_in_range
   | core.result.Result.Err _ => ok none
 
 /-- [sudo_rs::defaults::check_integer]:
-    Source: 'src/defaults/settings_dsl.rs', lines 169:8-173:9; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 38:0-92:1 -/
+    Source: 'src/defaults/settings_dsl.rs', lines 169:8-173:9; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 39:0-93:1 -/
 def defaults.check_integer
   (setting : defaults.IntegerSetting) (text : Str) :
   Result (Option defaults.SettingsModifier)
@@ -912,7 +912,7 @@ def defaults.check_integer
       ok (some (defaults.SettingsModifier.timestamp_timeout value))
 
 /-- [sudo_rs::defaults::check_text]:
-    Source: 'src/defaults/settings_dsl.rs', lines 176:8-180:9; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 38:0-92:1 -/
+    Source: 'src/defaults/settings_dsl.rs', lines 176:8-180:9; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 39:0-93:1 -/
 def defaults.check_text
   (setting : defaults.TextSetting) (text : Str) :
   Result (Option defaults.SettingsModifier)
@@ -997,7 +997,7 @@ def defaults.check_text
     ok (some (defaults.SettingsModifier.editor s))
 
 /-- [sudo_rs::defaults::build_list]:
-    Source: 'src/defaults/settings_dsl.rs', lines 183:8-187:9; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 38:0-92:1 -/
+    Source: 'src/defaults/settings_dsl.rs', lines 183:8-187:9; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 39:0-93:1 -/
 def defaults.build_list
   (setting : defaults.ListSetting) (mode : defaults.ListMode)
   (items : alloc.vec.Vec String) :
@@ -1012,32 +1012,32 @@ def defaults.build_list
     ok (defaults.SettingsModifier.env_delete (mode, items))
 
 /-- [sudo_rs::defaults::{sudo_rs::defaults::Settings}::apparmor_profile]:
-    Source: 'src/defaults/settings_dsl.rs', lines 243:16-245:17; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 38:0-92:1 -/
+    Source: 'src/defaults/settings_dsl.rs', lines 243:16-245:17; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 39:0-93:1 -/
 def defaults.Settings.impl.apparmor_profile
   (self : defaults.Settings) : Result (Option Str) := do
   core.option.Option.as_deref (core.ops.deref.DerefBoxInst Str)
     self.apparmor_profile
 
 /-- [sudo_rs::defaults::{sudo_rs::defaults::Settings}::use_pty]:
-    Source: 'src/defaults/settings_dsl.rs', lines 243:16-245:17; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 38:0-92:1 -/
+    Source: 'src/defaults/settings_dsl.rs', lines 243:16-245:17; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 39:0-93:1 -/
 def defaults.Settings.impl.use_pty
   (self : defaults.Settings) : Result Bool := do
   ok self.use_pty
 
 /-- [sudo_rs::defaults::{sudo_rs::defaults::Settings}::setenv]:
-    Source: 'src/defaults/settings_dsl.rs', lines 243:16-245:17; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 38:0-92:1 -/
+    Source: 'src/defaults/settings_dsl.rs', lines 243:16-245:17; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 39:0-93:1 -/
 def defaults.Settings.impl.setenv
   (self : defaults.Settings) : Result Bool := do
   ok self.setenv
 
 /-- [sudo_rs::defaults::{sudo_rs::defaults::Settings}::noexec]:
-    Source: 'src/defaults/settings_dsl.rs', lines 243:16-245:17; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 38:0-92:1 -/
+    Source: 'src/defaults/settings_dsl.rs', lines 243:16-245:17; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 39:0-93:1 -/
 def defaults.Settings.impl.noexec
   (self : defaults.Settings) : Result Bool := do
   ok self.noexec
 
 /-- [sudo_rs::defaults::{sudo_rs::defaults::Settings}::env_keep]:
-    Source: 'src/defaults/settings_dsl.rs', lines 243:16-245:17; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 38:0-92:1 -/
+    Source: 'src/defaults/settings_dsl.rs', lines 243:16-245:17; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 39:0-93:1 -/
 def defaults.Settings.impl.env_keep
   (self : defaults.Settings) :
   Result (std.collections.hash.set.HashSet String std.hash.random.RandomState
@@ -1046,7 +1046,7 @@ def defaults.Settings.impl.env_keep
   ok self.env_keep
 
 /-- [sudo_rs::defaults::{sudo_rs::defaults::Settings}::env_check]:
-    Source: 'src/defaults/settings_dsl.rs', lines 243:16-245:17; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 38:0-92:1 -/
+    Source: 'src/defaults/settings_dsl.rs', lines 243:16-245:17; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 39:0-93:1 -/
 def defaults.Settings.impl.env_check
   (self : defaults.Settings) :
   Result (std.collections.hash.set.HashSet String std.hash.random.RandomState
@@ -1055,80 +1055,80 @@ def defaults.Settings.impl.env_check
   ok self.env_check
 
 /-- [sudo_rs::defaults::{sudo_rs::defaults::Settings}::secure_path]:
-    Source: 'src/defaults/settings_dsl.rs', lines 243:16-245:17; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 38:0-92:1 -/
+    Source: 'src/defaults/settings_dsl.rs', lines 243:16-245:17; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 39:0-93:1 -/
 def defaults.Settings.impl.secure_path
   (self : defaults.Settings) : Result (Option Str) := do
   core.option.Option.as_deref (core.ops.deref.DerefBoxInst Str)
     self.secure_path
 
 /-- [sudo_rs::defaults::{sudo_rs::defaults::Settings}::umask]:
-    Source: 'src/defaults/settings_dsl.rs', lines 243:16-245:17; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 38:0-92:1 -/
+    Source: 'src/defaults/settings_dsl.rs', lines 243:16-245:17; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 39:0-93:1 -/
 def defaults.Settings.impl.umask
   (self : defaults.Settings) : Result Std.U64 := do
   ok self.umask
 
 /-- [sudo_rs::defaults::{sudo_rs::defaults::Settings}::umask_override]:
-    Source: 'src/defaults/settings_dsl.rs', lines 243:16-245:17; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 38:0-92:1 -/
+    Source: 'src/defaults/settings_dsl.rs', lines 243:16-245:17; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 39:0-93:1 -/
 def defaults.Settings.impl.umask_override
   (self : defaults.Settings) : Result Bool := do
   ok self.umask_override
 
 /-- [sudo_rs::defaults::{sudo_rs::defaults::Settings}::log_allowed]:
-    Source: 'src/defaults/settings_dsl.rs', lines 243:16-245:17; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 38:0-92:1 -/
+    Source: 'src/defaults/settings_dsl.rs', lines 243:16-245:17; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 39:0-93:1 -/
 def defaults.Settings.impl.log_allowed
   (self : defaults.Settings) : Result Bool := do
   ok self.log_allowed
 
 /-- [sudo_rs::defaults::{sudo_rs::defaults::Settings}::passwd_tries]:
-    Source: 'src/defaults/settings_dsl.rs', lines 243:16-245:17; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 38:0-92:1 -/
+    Source: 'src/defaults/settings_dsl.rs', lines 243:16-245:17; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 39:0-93:1 -/
 def defaults.Settings.impl.passwd_tries
   (self : defaults.Settings) : Result Std.U64 := do
   ok self.passwd_tries
 
 /-- [sudo_rs::defaults::{sudo_rs::defaults::Settings}::timestamp_timeout]:
-    Source: 'src/defaults/settings_dsl.rs', lines 243:16-245:17; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 38:0-92:1 -/
+    Source: 'src/defaults/settings_dsl.rs', lines 243:16-245:17; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 39:0-93:1 -/
 def defaults.Settings.impl.timestamp_timeout
   (self : defaults.Settings) : Result Std.U64 := do
   ok self.timestamp_timeout
 
 /-- [sudo_rs::defaults::{sudo_rs::defaults::Settings}::pwfeedback]:
-    Source: 'src/defaults/settings_dsl.rs', lines 243:16-245:17; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 38:0-92:1 -/
+    Source: 'src/defaults/settings_dsl.rs', lines 243:16-245:17; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 39:0-93:1 -/
 def defaults.Settings.impl.pwfeedback
   (self : defaults.Settings) : Result Bool := do
   ok self.pwfeedback
 
 /-- [sudo_rs::defaults::{sudo_rs::defaults::Settings}::passwd_timeout]:
-    Source: 'src/defaults/settings_dsl.rs', lines 243:16-245:17; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 38:0-92:1 -/
+    Source: 'src/defaults/settings_dsl.rs', lines 243:16-245:17; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 39:0-93:1 -/
 def defaults.Settings.impl.passwd_timeout
   (self : defaults.Settings) : Result Std.U64 := do
   ok self.passwd_timeout
 
 /-- [sudo_rs::defaults::{sudo_rs::defaults::Settings}::timestamp_type]:
-    Source: 'src/defaults/settings_dsl.rs', lines 243:16-245:17; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 38:0-92:1 -/
+    Source: 'src/defaults/settings_dsl.rs', lines 243:16-245:17; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 39:0-93:1 -/
 def defaults.Settings.impl.timestamp_type
   (self : defaults.Settings) : Result defaults.enums.timestamp_type := do
   ok self.timestamp_type
 
 /-- [sudo_rs::defaults::{sudo_rs::defaults::Settings}::noninteractive_auth]:
-    Source: 'src/defaults/settings_dsl.rs', lines 243:16-245:17; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 38:0-92:1 -/
+    Source: 'src/defaults/settings_dsl.rs', lines 243:16-245:17; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 39:0-93:1 -/
 def defaults.Settings.impl.noninteractive_auth
   (self : defaults.Settings) : Result Bool := do
   ok self.noninteractive_auth
 
 /-- [sudo_rs::defaults::{sudo_rs::defaults::Settings}::rootpw]:
-    Source: 'src/defaults/settings_dsl.rs', lines 243:16-245:17; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 38:0-92:1 -/
+    Source: 'src/defaults/settings_dsl.rs', lines 243:16-245:17; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 39:0-93:1 -/
 def defaults.Settings.impl.rootpw
   (self : defaults.Settings) : Result Bool := do
   ok self.rootpw
 
 /-- [sudo_rs::defaults::{sudo_rs::defaults::Settings}::targetpw]:
-    Source: 'src/defaults/settings_dsl.rs', lines 243:16-245:17; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 38:0-92:1 -/
+    Source: 'src/defaults/settings_dsl.rs', lines 243:16-245:17; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 39:0-93:1 -/
 def defaults.Settings.impl.targetpw
   (self : defaults.Settings) : Result Bool := do
   ok self.targetpw
 
 /-- [sudo_rs::defaults::{sudo_rs::defaults::Settings}::runcwd]:
-    Source: 'src/defaults/settings_dsl.rs', lines 243:16-245:17; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 38:0-92:1 -/
+    Source: 'src/defaults/settings_dsl.rs', lines 243:16-245:17; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 39:0-93:1 -/
 def defaults.Settings.impl.runcwd
   (self : defaults.Settings) : Result (Option Str) := do
   core.option.Option.as_deref (core.ops.deref.DerefBoxInst Str) self.runcwd

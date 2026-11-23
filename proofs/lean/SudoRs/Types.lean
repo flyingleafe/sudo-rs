@@ -47,7 +47,7 @@ structure common.path.SudoPath where
   inner : String
 
 /-- [sudo_rs::defaults::ListMode]
-    Source: 'src/defaults/mod.rs', lines 5:0-9:1
+    Source: 'src/defaults/mod.rs', lines 6:0-10:1
     Visibility: public -/
 @[discriminant isize]
 inductive defaults.ListMode where
@@ -56,7 +56,7 @@ inductive defaults.ListMode where
 | Del : defaults.ListMode
 
 /-- [sudo_rs::defaults::ListSetting]
-    Source: 'src/defaults/settings_dsl.rs', lines 166:8-166:50; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 38:0-92:1 -/
+    Source: 'src/defaults/settings_dsl.rs', lines 166:8-166:50; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 39:0-93:1 -/
 @[discriminant isize]
 inductive defaults.ListSetting where
 | env_keep : defaults.ListSetting
@@ -64,7 +64,7 @@ inductive defaults.ListSetting where
 | env_delete : defaults.ListSetting
 
 /-- [sudo_rs::defaults::IntegerSetting]
-    Source: 'src/defaults/settings_dsl.rs', lines 154:8-154:52; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 38:0-92:1 -/
+    Source: 'src/defaults/settings_dsl.rs', lines 154:8-154:52; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 39:0-93:1 -/
 @[discriminant isize]
 inductive defaults.IntegerSetting where
 | umask : defaults.IntegerSetting
@@ -73,7 +73,7 @@ inductive defaults.IntegerSetting where
 | timestamp_timeout : defaults.IntegerSetting
 
 /-- [sudo_rs::defaults::TextSetting]
-    Source: 'src/defaults/settings_dsl.rs', lines 160:8-160:50; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 38:0-92:1 -/
+    Source: 'src/defaults/settings_dsl.rs', lines 160:8-160:50; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 39:0-93:1 -/
 @[discriminant isize]
 inductive defaults.TextSetting where
 | lecture : defaults.TextSetting
@@ -86,14 +86,14 @@ inductive defaults.TextSetting where
 | editor : defaults.TextSetting
 
 /-- [sudo_rs::defaults::enums::timestamp_type]
-    Source: 'src/defaults/settings_dsl.rs', lines 229:16-229:62; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 38:0-92:1 -/
+    Source: 'src/defaults/settings_dsl.rs', lines 229:16-229:62; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 39:0-93:1 -/
 @[discriminant isize]
 inductive defaults.enums.timestamp_type where
 | tty : defaults.enums.timestamp_type
 | ppid : defaults.enums.timestamp_type
 
 /-- [sudo_rs::defaults::enums::verifypw]
-    Source: 'src/defaults/settings_dsl.rs', lines 229:16-229:62; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 38:0-92:1 -/
+    Source: 'src/defaults/settings_dsl.rs', lines 229:16-229:62; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 39:0-93:1 -/
 @[discriminant isize]
 inductive defaults.enums.verifypw where
 | all : defaults.enums.verifypw
@@ -102,7 +102,7 @@ inductive defaults.enums.verifypw where
 | never : defaults.enums.verifypw
 
 /-- [sudo_rs::defaults::enums::lecture]
-    Source: 'src/defaults/settings_dsl.rs', lines 229:16-229:62; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 38:0-92:1 -/
+    Source: 'src/defaults/settings_dsl.rs', lines 229:16-229:62; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 39:0-93:1 -/
 @[discriminant isize]
 inductive defaults.enums.lecture where
 | always : defaults.enums.lecture
@@ -110,7 +110,7 @@ inductive defaults.enums.lecture where
 | never : defaults.enums.lecture
 
 /-- [sudo_rs::defaults::SettingsModifier]
-    Source: 'src/defaults/settings_dsl.rs', lines 280:8-282:9; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 38:0-92:1 -/
+    Source: 'src/defaults/settings_dsl.rs', lines 281:8-283:9; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 39:0-93:1 -/
 @[discriminant isize]
 inductive defaults.SettingsModifier where
 | always_query_group_plugin : Bool → defaults.SettingsModifier
@@ -156,7 +156,7 @@ inductive defaults.SettingsModifier where
   defaults.SettingsModifier
 
 /-- [sudo_rs::defaults::SettingKind]
-    Source: 'src/defaults/mod.rs', lines 16:0-21:1
+    Source: 'src/defaults/mod.rs', lines 17:0-22:1
     Visibility: public -/
 @[discriminant u32 [86649125,181786330,1775640520,371843127]]
 inductive defaults.SettingKind where
@@ -166,7 +166,7 @@ inductive defaults.SettingKind where
 | List : defaults.ListSetting → defaults.SettingKind
 
 /-- [sudo_rs::defaults::Settings]
-    Source: 'src/defaults/settings_dsl.rs', lines 235:8-237:9; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 38:0-92:1 -/
+    Source: 'src/defaults/settings_dsl.rs', lines 235:8-237:9; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 39:0-93:1 -/
 structure defaults.Settings where
   always_query_group_plugin : Bool
   always_set_home : Bool
@@ -208,7 +208,7 @@ structure defaults.Settings where
     std.hash.random.RandomState alloc.alloc.Global
 
 /-- [sudo_rs::defaults::Setting]
-    Source: 'src/defaults/settings_dsl.rs', lines 296:8-298:9; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 38:0-92:1 -/
+    Source: 'src/defaults/settings_dsl.rs', lines 297:8-299:9; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 39:0-93:1 -/
 @[discriminant isize]
 inductive defaults.Setting where
 | always_query_group_plugin : defaults.Setting
