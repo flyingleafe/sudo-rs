@@ -26,6 +26,7 @@ import SudoRsProofs.Parser.Scoping.NonCommand
 import SudoRsProofs.Parser.Scoping.Command
 import SudoRsProofs.Parser.Analysis.Includes
 import SudoRsProofs.Parser.Analysis.Provenance
+import SudoRsProofs.Parser.DefaultsParse.Main
 
 /-!
 # Axiom audit
@@ -221,3 +222,14 @@ of `SudoRs/{Types,Funs}External.lean` are definitions or `opaque` constants, nev
 #print axioms SudoRsProofs.Parser.Analysis.vec_parse_on_return
 #print axioms SudoRsProofs.Parser.Analysis.parse_lines_on_return
 #print axioms SudoRsProofs.Parser.Analysis.parse_sudoers_produced
+#print axioms SudoRsProofs.Parser.DefaultsParse.numeric_parse_refines
+#print axioms SudoRsProofs.Parser.DefaultsParse.defaultName_parse_refines
+#print axioms SudoRsProofs.Parser.DefaultsParse.envVar_parse_refines
+#print axioms SudoRsProofs.Parser.DefaultsParse.quotedStringParameter_parse_refines
+#print axioms SudoRsProofs.Parser.DefaultsParse.join_var_eq
+#print axioms SudoRsProofs.Parser.DefaultsParse.parse_defaults_text_refines
+#print axioms SudoRsProofs.Parser.DefaultsParse.parse_defaults_vars_refines
+#print axioms SudoRsProofs.Parser.parse_defaults_list_refines
+#print axioms SudoRsProofs.Parser.settingsModifier_parse_refines
+#print axioms SudoRsProofs.Parser.settingsModifier_vec_refines
+#print axioms SudoRsProofs.Parser.parsed_modifier_produced
