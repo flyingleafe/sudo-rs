@@ -547,3 +547,13 @@ def std.collections.hash.set.HashSet.Insts.CoreCloneClone.clone {T S A : Type}
 the set model; only fills the dictionary of the `HashSet` clone. -/
 opaque std.hash.random.RandomState.Insts.CoreCloneClone.clone :
   std.hash.random.RandomState → Result std.hash.random.RandomState
+
+/-- [alloc::vec::{alloc::vec::Vec<T, A>}::append]: move the other vector's elements in order
+after the original elements, and leave the other vector empty. Allocation capacity is erased;
+an unrepresentable combined length fails, as for `Vec.push`. -/
+def alloc.vec.Vec.append {T : Type _} (_A : Type _)
+    (xs ys : alloc.vec.Vec T) : Result (alloc.vec.Vec T × alloc.vec.Vec T) :=
+  let joined := xs.val ++ ys.val
+  if h : joined.length ≤ Usize.max then
+    ok (alloc.vec.Vec.from joined h, alloc.vec.Vec.new T)
+  else fail .maximumSizeExceeded

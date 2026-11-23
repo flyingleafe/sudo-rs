@@ -318,7 +318,7 @@ fn run(live: bool, path: &Path, text: &str) -> Result<Vec<String>, String> {
                 sudoers.customisers.non_cmnd.len(),
                 sudoers.customisers.cmnd.len()
             ));
-            // a second call applies nothing
+            // Consumed customisers must not reapply; list/validate may have left other scopes.
             if live {
                 sudoers.specify_host_user_runas(&hostname, &user, Some(&user));
                 sudoers.specify_command(command, &args);
@@ -459,7 +459,7 @@ fn include_tree() {
                 Some(
                     "Defaults env_keep += \"MAIN\"\nalice ALL = NOPASSWD: /bin/ls\n\
                      @include sub/a\n@include $ROOT/sub/b\n#include sub/b\n@includedir dir\n\
-                     @includedir nodir\n@includedir dir/%h\n@include missing\n@include sub\n\
+                     @includedir nodir\n@includedir dir/%h\n@include sub/%h\n@include missing\n@include sub\n\
                      User_Alias U = alice, B\nU ALL = (root) /bin/echo\n",
                 ),
             ),
@@ -475,6 +475,7 @@ fn include_tree() {
                      this is junk\nDefaults!C setenv\n",
                 ),
             ),
+            ("sub/%h", Some("alice ALL = /bin/literal-host\n")),
             ("dir/10", Some("alice ALL = /bin/ten\n@include ../sub/c\n")),
             ("dir/02", Some("Host_Alias H = localhost\n")),
             ("dir/x~", Some("alice ALL = /bin/tilde\n")),
@@ -509,7 +510,7 @@ fn include_tree() {
     assert_eq!(limit.len(), 1);
     assert_eq!(sudoers.customisers.non_cmnd.len(), 1 + usize::from(INCLUDE_LIMIT));
     // files of `@includedir` are sorted and filtered; diagnostics name the included file
-    let (sudoers, errors) = analyze_text(&tree.path("sudoers"), &char_stream::chars_of(&texts[0]));
+    let (sudoers, errors) = Sudoers::open(tree.path("sudoers")).unwrap();
     let sources: Vec<String> = errors
         .iter()
         .map(|e| format!("{:?} {}", e.source, e.message))
@@ -518,7 +519,9 @@ fn include_tree() {
     assert!(sources.iter().any(|s| s.contains("nodir")), "{sources:#?}");
     assert!(sources.iter().any(|s| s.contains("percent escape %h")), "{sources:#?}");
     assert!(sources.iter().any(|s| s.contains("cannot open sudoers file") && s.contains("missing")));
-    assert!(!format!("{:?}", sudoers.rules.iter().map(rule).collect::<Vec<_>>()).contains("tilde"));
+    let rules = sudoers.rules.iter().map(rule).collect::<Vec<_>>();
+    assert!(rules.iter().any(|r| r.contains("/bin/literal-host")));
+    assert!(rules.iter().all(|r| !r.contains("/bin/tilde") && !r.contains("/bin/dot")));
 }
 
 /// The same tree opened with the ownership checks of `audit` (the files are not owned by root),

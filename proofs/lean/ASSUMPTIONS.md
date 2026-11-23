@@ -28,8 +28,8 @@ call, so the proofs describe a run in which those lookups give consistent answer
 | `core.ffi.c_str.CStr` | `structure { str : String }` | Only ever produced by `SudoString::as_cstr` in the extracted code; represented by its text without the trailing NUL. |
 | `std.ffi.os_str.OsString` | `structure { inner : alloc.vec.Vec U8 }` | `std/src/ffi/os_str.rs`: `struct OsString { inner: Buf }`; on Unix `sys/os_str/mod.rs` selects `sys/os_str/bytes.rs`, `struct Buf { inner: Vec<u8> }`. The bytes. Command arguments in the decision (compared for equality and read as text through `GlobAbs.os`); the input of `escaped`. |
 | `std.ffi.os_str.OsStr` | `structure { inner : Slice U8 }` | `struct OsStr { inner: Slice }`, on Unix `struct Slice { inner: [u8] }` (`#[repr(transparent)]` wrappers of `[u8]`). The argument of `Path::new("list")` in `list_flags` (never inspected) and the `Deref` target read by `escaped`. |
-| `std.path.Path` | `opaque` type | Command path; only passed to the glob matcher (and produced by `Path::new("list")` in `list_flags`). In the analysis: the path of the file whose items are processed, only passed to the include oracle and to `to_path_buf`. |
-| `std.path.PathBuf` | `opaque` type | The sanitizer's diagnostics have no source path. The analysis's diagnostics carry `to_path_buf` of the file path; the include oracle returns the paths of included files. |
+| `std.path.Path` | `opaque` type | Command path; only passed to the glob matcher (and produced by `Path::new("list")` in `list_flags`). |
+| `std.path.PathBuf` | `opaque` type | The sanitizer's diagnostics have no source path. |
 | `std.collections.hash.set.HashSet` | list of keys | The sanitizer observes only `new` and `insert`, not bucket layout or key order. |
 | `std.hash.random.RandomState`, `std.hash.random.DefaultHasher` | `opaque` types | Hash seeding and hash states are not observed by the extensional set model. |
 | `glob.Pattern` | `opaque` type | Glob semantics is not modelled. |
@@ -112,6 +112,7 @@ Helpers: `sudo_rs.stringBytes s` = the UTF-8 bytes of `s` as `U8`s; `sudo_rs.str
 | `BoxStr.Insts.CoreCloneClone.clone` | `ok s` | `impl Clone for Box<str>` copies the bytes; boxes are erased. Reached by `Clone for Settings` (`Sudoers::check` returns a copy of the settings). |
 | `std.collections.hash.set.HashSet.Insts.CoreCloneClone.clone` | the keys, each cloned with the key's `Clone` (`List.mapM`) | `HashSet::clone` clones the table element by element; the list model keeps the order of its keys. Reached by `Clone for Settings` (`env_keep`, `env_check`, `env_delete`). |
 | `std.hash.random.RandomState.Insts.CoreCloneClone.clone` | **`opaque`** | Hash seeding is not observed by the set model; it only fills the dictionary of the `HashSet` clone, which the model above does not call. |
+| `alloc.vec.Vec.append` | concatenate the two element lists in order, return the concatenation and an empty second vector; fail if the new length does not fit | `Vec::append` (`alloc/src/vec/mod.rs`): reserves for the other vector's length, copies those elements after the current ones, and sets the other length to zero. Allocation capacities are erased and the bound is the same as for the Aeneas model of `Vec::push`. Used for the entries of alias directives. |
 
 ## Hypotheses of the theorems
 
