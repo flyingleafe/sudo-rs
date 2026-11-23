@@ -757,7 +757,7 @@ def sudoers.tokens.Hostname.Insts.Sudo_rsSudoersBasic_parserToken.accept
     Source: 'src/sudoers/tokens.rs', lines 114:4-126:5 -/
 @[rust_loop]
 def sudoers.tokens.resembles_ipv4_loop
-  (text : Slice Char) (parts : Std.I32) (part_len : Std.Usize) (ok1 : Bool)
+  (text : Slice Char) (parts : Std.Usize) (part_len : Std.Usize) (ok1 : Bool)
   (i : Std.Usize) :
   Result (Std.Usize × Bool)
   := do
@@ -773,9 +773,9 @@ def sudoers.tokens.resembles_ipv4_loop
           do
           let ok3 ←
             if part_len != 0#usize
-            then ok (parts < 4#i32)
+            then ok (parts < 4#usize)
             else ok false
-          let parts2 ← parts + 1#i32
+          let parts2 ← parts + 1#usize
           ok (parts2, 0#usize, ok3)
         else
           do
@@ -796,7 +796,7 @@ partial_fixpoint
     Source: 'src/sudoers/tokens.rs', lines 109:0-128:1 -/
 def sudoers.tokens.resembles_ipv4 (text : Slice Char) : Result Bool := do
   let (part_len, ok1) ←
-    sudoers.tokens.resembles_ipv4_loop text 1#i32 0#usize true 0#usize
+    sudoers.tokens.resembles_ipv4_loop text 1#usize 0#usize true 0#usize
   if ok1
   then ok (part_len != 0#usize)
   else ok false
