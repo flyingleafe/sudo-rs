@@ -44,3 +44,4 @@ import SudoersSpec.Grammar.RoundTrip
 import SudoersSpec.Grammar.Follow
 import SudoersSpec.Grammar.Examples
 import SudoersSpec.Analysis.AliasOrder
+import SudoersSpec.Analysis.Collect

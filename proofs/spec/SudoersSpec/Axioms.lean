@@ -9,6 +9,7 @@ import SudoersSpec.Settings.Properties
 import SudoersSpec.Syntax.Sudo
 import SudoersSpec.Syntax.Recovery
 import SudoersSpec.Grammar.Examples
+import SudoersSpec.Analysis.Collect
 
 /-! Axiom audit: every main result depends on at most `propext`, `Classical.choice` and
 `Quot.sound`. `lake build` prints the lists. -/
@@ -234,3 +235,6 @@ open SudoersSpec
 #print axioms SudoersSpec.Syntax.Recovery.parseLines_end
 #print axioms SudoersSpec.Syntax.Recovery.cleanFile_sound
 #print axioms SudoersSpec.Syntax.Recovery.cleanFile_complete
+#print axioms SudoersSpec.Analysis.collectFrom_some_iff
+#print axioms SudoersSpec.Analysis.reachable_applyModifiers
+#print axioms SudoersSpec.Analysis.authorizationOfText_defined
