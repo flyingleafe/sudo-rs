@@ -30,7 +30,7 @@ private theorem sudo_leaves {A : GlobAbs} {O : Syntax.Oracles} (hO : P2Oracle A 
     (fun _ _ _ h => username_token_value_bound h)
     (fun _ _ _ h => meta_username_only_value_bound h) h
   permissions _ hs hq := permissions_refines hO hs hq
-  includes _ hs := parse_include_refines hO.chars A hs
+  includes _ hs := parse_include_refines A hO.chars hs
   directives := directive_leaves hO
 
 /-- P3 item refinement, for the actual `Parse Sudo` instance of the stable feature set. -/
