@@ -3,10 +3,10 @@
 //!
 //! Both parsers produce values of the same AST types. Each result is printed to text: every
 //! field, every span, the message text of every fatal error (the live side renders its error
-//! kind). A `Defaults` modifier is a closure; it is printed as its effect on a base `Settings`
-//! value (the fields of `Settings::dump_fields` that it changes). [compare] parses the text twice
-//! on each side and uses two different bases, so that modifiers which depend on the old value
-//! (`+=`, `-=`) are compared on two inputs.
+//! kind). A `Defaults` modifier is printed as its data and as its effect on a base `Settings`
+//! value (the fields of `Settings::dump_fields` that `apply` changes). [compare] parses the text
+//! twice on each side and uses two different bases, so that modifiers which depend on the old
+//! value (`+=`, `-=`) are compared on two inputs.
 //!
 //! Evidence kind: test. Used by the unit tests below (texts of the existing unit tests and a
 //! seeded generated corpus) and by the `parser_equiv` fuzz target (`crate::fuzz_api`).
@@ -133,11 +133,13 @@ fn scope(s: &ConfigScope) -> String {
     }
 }
 
-/// The effect of a `Defaults` modifier on `base`: the fields it changes, with their new values.
+/// A `Defaults` modifier: its data, and its effect on `base` (the fields it changes, with their
+/// new values).
 fn settings_modifier(m: defaults::SettingsModifier, base: &Settings) -> String {
+    let data = format!("{m:?}");
     let before = base.dump_fields();
     let mut settings = base.clone();
-    m(&mut settings);
+    m.apply(&mut settings);
     let changed: Vec<String> = settings
         .dump_fields()
         .into_iter()
@@ -145,7 +147,7 @@ fn settings_modifier(m: defaults::SettingsModifier, base: &Settings) -> String {
         .filter(|(after, before)| after != before)
         .map(|((name, value), _)| format!("{name}={value}"))
         .collect();
-    format!("{{{}}}", changed.join(" "))
+    format!("{data} {{{}}}", changed.join(" "))
 }
 
 fn sudo(item: Sudo, base: &Settings) -> String {
@@ -236,14 +238,16 @@ pub(crate) fn bases() -> [Settings; 2] {
     let first = Settings::default();
     let mut second = Settings::default();
     for (name, _) in first.dump_fields() {
-        if let Some(negate) = defaults::negate(name) {
-            negate(&mut second);
+        if let Some(negation) = defaults::negate(name) {
+            negation.apply(&mut second);
         }
-        if let Some(defaults::SettingKind::List(checker)) = defaults::set(name) {
-            checker(
+        if let Some(defaults::SettingKind::List(setting)) = defaults::set(name) {
+            defaults::build_list(
+                setting,
                 defaults::ListMode::Add,
                 vec!["SUDO_RS_EQUIV".to_string(), "PATH".to_string()],
-            )(&mut second);
+            )
+            .apply(&mut second);
         }
     }
     [first, second]

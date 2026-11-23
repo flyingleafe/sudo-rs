@@ -616,11 +616,11 @@ impl Parse for defaults::SettingsModifier {
         let list_items =
             |mode: defaults::ListMode, name: String, cfg: defaults::SettingKind, stream: &mut _| {
                 expect_syntax('=', stream)?;
-                let defaults::SettingKind::List(checker) = cfg else {
+                let defaults::SettingKind::List(setting) = cfg else {
                     unrecoverable!(pos = id_pos, stream, "{name} is not a list parameter");
                 };
 
-                make(checker(mode, parse_vars(stream)?))
+                make(defaults::build_list(setting, mode, parse_vars(stream)?))
             };
 
         // Parse a text parameter
@@ -667,9 +667,9 @@ impl Parse for defaults::SettingsModifier {
                     defaults::SettingKind::Flag(_) => {
                         unrecoverable!(stream, "can't assign to boolean setting '{name}'")
                     }
-                    defaults::SettingKind::Integer(checker) => {
+                    defaults::SettingKind::Integer(setting) => {
                         let Numeric(denotation) = expect_nonterminal(stream)?;
-                        if let Some(modifier) = checker(&denotation) {
+                        if let Some(modifier) = defaults::check_integer(setting, &denotation) {
                             make(modifier)
                         } else {
                             unrecoverable!(
@@ -679,14 +679,18 @@ impl Parse for defaults::SettingsModifier {
                             );
                         }
                     }
-                    defaults::SettingKind::List(checker) => {
+                    defaults::SettingKind::List(setting) => {
                         let items = parse_vars(stream)?;
 
-                        make(checker(defaults::ListMode::Set, items))
+                        make(defaults::build_list(
+                            setting,
+                            defaults::ListMode::Set,
+                            items,
+                        ))
                     }
-                    defaults::SettingKind::Text(checker) => {
+                    defaults::SettingKind::Text(setting) => {
                         let text = text_item(stream)?;
-                        let Some(modifier) = checker(&text) else {
+                        let Some(modifier) = defaults::check_text(setting, &text) else {
                             unrecoverable!(
                                 pos = value_pos,
                                 stream,

@@ -276,7 +276,8 @@ macro_rules! defaults {
         /// A change to the settings made by one entry of a `Defaults` line: for every setting
         /// its new value, for a list the change to make to it (see `apply`).
         #[allow(non_camel_case_types)]
-        #[cfg_attr(test, derive(Debug, PartialEq, Eq))]
+        #[cfg_attr(any(test, fuzzing), derive(Debug))]
+        #[cfg_attr(test, derive(PartialEq, Eq))]
         pub(crate) enum SettingsModifier {
             $($name(payload_of!($name, $(=int $fn;)?$(=int $first;)?$($(=enum $key;)*)? $value))),*
         }

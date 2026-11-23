@@ -1,7 +1,8 @@
 #![forbid(unsafe_code)]
 use std::collections::HashSet;
 
-#[cfg_attr(test, derive(Clone, Copy, Debug, PartialEq, Eq))]
+#[cfg_attr(any(test, fuzzing), derive(Debug))]
+#[cfg_attr(test, derive(Clone, Copy, PartialEq, Eq))]
 pub enum ListMode {
     Set,
     Add,
