@@ -40,8 +40,10 @@ theorem line_follows_eq {s : CS} (h : StreamOK s) :
 variable {T α : Type} {P : sudo_rs.sudoers.basic_parser.Parse T}
   {UF : sudo_rs.sudoers.ast_names.UserFriendly T} {f : T → α} {p : Parser α} {d : String}
 
-theorem parse_lines_item_eq (hP : ParseRefines P f p) (hD : DescRel UF d) (s1 : CS)
-    (h1 : StreamOK s1) (v : alloc.vec.Vec (RParsed T)) (acc : List (Parsed α))
+/-- Only the item parser at the current cursor has to be refined for this iteration. -/
+theorem parse_lines_item_eq_at (hD : DescRel UF d) (s1 : CS)
+    (itemAt : Refines f (P.parse s1) (p.run (absStream s1)))
+    (v : alloc.vec.Vec (RParsed T)) (acc : List (Parsed α))
     (hacc : List.Forall₂ (ResultRel f) v.val acc) (hv : v.val.length + 2 ≤ Usize.max) :
     ∃ (st' : CS) (v' : alloc.vec.Vec (RParsed T)) (acc' : List (Parsed α)),
       (∀ more s5, sudo_rs.sudoers.basic_parser.line_follows st' = ok (more, s5) →
@@ -49,7 +51,7 @@ theorem parse_lines_item_eq (hP : ParseRefines P f p) (hD : DescRel UF d) (s1 : 
           sudo_rs.sudoers.basic_parser.parse_lines_loop P UF s5 v' more) ∧
       (SudoersSpec.Syntax.parseLinesItem d p acc).run (absStream s1) = (.ok acc', absStream st') ∧
       List.Forall₂ (ResultRel f) v'.val acc' ∧ StreamOK st' ∧ v'.val.length ≤ v.val.length + 2 := by
-  obtain ⟨item, s2, e2, hr2, h2, a2⟩ := expect_nonterminal_refines hP hD h1
+  obtain ⟨item, s2, e2, hr2, h2, a2⟩ := expect_nonterminal_refines_at itemAt hD
   obtain ⟨v1, hv1, hv1v⟩ := exists_eq_ok_of_spec (alloc.vec.Vec.push_spec v item (by omega))
   obtain ⟨rc, s3, e3, hrc, h3, a3⟩ := comment_refines h2
   obtain ⟨m, hm, -⟩ := maybe_rel hrc
@@ -104,6 +106,17 @@ theorem parse_lines_item_eq (hP : ParseRefines P f p) (hD : DescRel UF d) (s1 : 
         simp only [Bool.false_eq_true, ↓reduceIte, bind_ok, uncurry_apply_pair, e5, hl]
       · simp [a5, Except.isOk, Except.toBool, Parser.run_bind]
 
+theorem parse_lines_item_eq (hP : ParseRefines P f p) (hD : DescRel UF d) (s1 : CS)
+    (h1 : StreamOK s1) (v : alloc.vec.Vec (RParsed T)) (acc : List (Parsed α))
+    (hacc : List.Forall₂ (ResultRel f) v.val acc) (hv : v.val.length + 2 ≤ Usize.max) :
+    ∃ (st' : CS) (v' : alloc.vec.Vec (RParsed T)) (acc' : List (Parsed α)),
+      (∀ more s5, sudo_rs.sudoers.basic_parser.line_follows st' = ok (more, s5) →
+        sudo_rs.sudoers.basic_parser.parse_lines_loop P UF s1 v true =
+          sudo_rs.sudoers.basic_parser.parse_lines_loop P UF s5 v' more) ∧
+      (SudoersSpec.Syntax.parseLinesItem d p acc).run (absStream s1) = (.ok acc', absStream st') ∧
+      List.Forall₂ (ResultRel f) v'.val acc' ∧ StreamOK st' ∧ v'.val.length ≤ v.val.length + 2 :=
+  parse_lines_item_eq_at hD s1 (hP.parse s1 h1) v acc hacc hv
+
 /-! ## The loop -/
 
 /-- The reference loop of `parseLines` from the results `acc` collected so far. -/
@@ -119,8 +132,9 @@ theorem parse_lines_loop_false (s : CS) (v : alloc.vec.Vec (RParsed T)) :
 
 /-- The loop of `parse_lines`, from the stream `st` before `line_follows`: `line_follows st`
 returned `(more, s1)`, the loop runs on `s1`. -/
-theorem parse_lines_loop_eq (hP : ParseRefines P f p) (hD : DescRel UF d) (st : CS)
-    (h : StreamOK st) (v : alloc.vec.Vec (RParsed T)) (acc : List (Parsed α))
+theorem parse_lines_loop_eq_on {I : Stream → Prop} (stable : ForwardStable I)
+    (hP : ParseRefinesOn I P f p) (hD : DescRel UF d) (st : CS)
+    (h : StreamOK st) (dom : I (absStream st)) (v : alloc.vec.Vec (RParsed T)) (acc : List (Parsed α))
     (hacc : List.Forall₂ (ResultRel f) v.val acc)
     (hb : v.val.length + 2 * (absStream st).rest.length ≤ Usize.max) (more : Bool) (s1 : CS)
     (hl : sudo_rs.sudoers.basic_parser.line_follows st = ok (more, s1)) :
@@ -149,12 +163,14 @@ theorem parse_lines_loop_eq (hP : ParseRefines P f p) (hD : DescRel UF d) (st : 
         (absStream st)
       rwa [hL] at this
     have hpos : 0 < (absStream s1).rest.length := List.length_pos_iff.2 hne
+    have dom1 := stable dom (Parser.reaches_of_run hL)
     obtain ⟨st', v1, acc1, hrust, hitem, hF, h', hlen⟩ :=
-      parse_lines_item_eq hP hD s1 h1 v acc hacc (by omega)
+      parse_lines_item_eq_at hD s1 (hP s1 h1 dom1) v acc hacc (by omega)
     have hlt := SudoersSpec.Syntax.parseLinesItem_lt hne hitem
     obtain ⟨s5, e5, -, -⟩ := line_follows_eq h'
     obtain ⟨v', s', items, eL, eR, hF', hS⟩ :=
-      parse_lines_loop_eq hP hD st' h' v1 acc1 hF (by omega) _ s5 e5
+      parse_lines_loop_eq_on stable hP hD st' h' (stable dom1 (Parser.reaches_of_run hitem))
+        v1 acc1 hF (by omega) _ s5 e5
     refine ⟨v', s', items, ?_, ?_, hF', hS⟩
     · show sudo_rs.sudoers.basic_parser.parse_lines_loop P UF s1 v true = _
       rw [hrust _ _ e5]; exact eL
@@ -163,25 +179,47 @@ theorem parse_lines_loop_eq (hP : ParseRefines P f p) (hD : DescRel UF d) (st : 
 termination_by (absStream st).rest.length
 decreasing_by omega
 
+theorem parse_lines_loop_eq (hP : ParseRefines P f p) (hD : DescRel UF d) (st : CS)
+    (h : StreamOK st) (v : alloc.vec.Vec (RParsed T)) (acc : List (Parsed α))
+    (hacc : List.Forall₂ (ResultRel f) v.val acc)
+    (hb : v.val.length + 2 * (absStream st).rest.length ≤ Usize.max) (more : Bool) (s1 : CS)
+    (hl : sudo_rs.sudoers.basic_parser.line_follows st = ok (more, s1)) :
+    ∃ (v' : alloc.vec.Vec (RParsed T)) (s' : CS) (items : List (Parsed α)),
+      sudo_rs.sudoers.basic_parser.parse_lines_loop P UF s1 v more =
+        ok (s'.src, s'.pos, s'.line, s'.col, v') ∧
+      (refLinesLoop d p acc).run (absStream st) = (.ok items, absStream s') ∧
+      List.Forall₂ (ResultRel f) v'.val items ∧ StreamOK s' :=
+  parse_lines_loop_eq_on (I := fun _ => True) (fun {_ _} _ _ => trivial) hP.on hD st h trivial v acc
+    hacc hb more s1 hl
+
 /-! ## `parse_lines` -/
 
 /-- **`parse_lines` refines `parseLines`**: one result per line, the stream after the last line;
 `hbound` keeps the `Vec::push`es (at most two per line, at least one character per line) within
 `usize`. -/
-theorem parse_lines_refines (hP : ParseRefines P f p) (hD : DescRel UF d) {s : CS}
-    (h : StreamOK s) (hbound : 2 * (s.src.val.length - s.pos.val) ≤ Usize.max) :
+theorem parse_lines_refines_on {I : Stream → Prop} (stable : ForwardStable I)
+    (hP : ParseRefinesOn I P f p) (hD : DescRel UF d) {s : CS}
+    (h : StreamOK s) (dom : I (absStream s)) (hbound : 2 * (s.src.val.length - s.pos.val) ≤ Usize.max) :
     ∃ (v : alloc.vec.Vec (RParsed T)) (s' : CS) (items : List (Parsed α)),
       sudo_rs.sudoers.basic_parser.parse_lines P UF s = ok (v, s') ∧
       (SudoersSpec.Syntax.parseLines d p).run (absStream s) = (.ok items, absStream s') ∧
       List.Forall₂ (ResultRel f) v.val items ∧ StreamOK s' := by
   obtain ⟨s1, e1, -, -⟩ := line_follows_eq h
   obtain ⟨v', s', items, eL, eR, hF, hS⟩ :=
-    parse_lines_loop_eq hP hD s h (alloc.vec.Vec.new _) [] (by simp) (by simpa using hbound) _ s1
-      e1
+    parse_lines_loop_eq_on stable hP hD s h dom (alloc.vec.Vec.new _) [] (by simp)
+      (by simpa using hbound) _ s1 e1
   refine ⟨v', s', items, ?_, eR, hF, hS⟩
   unfold sudo_rs.sudoers.basic_parser.parse_lines
   rw [e1, bind_ok, uncurry_apply_pair, eL]
   simp only [bind_ok, uncurry_apply_pair]
+
+theorem parse_lines_refines (hP : ParseRefines P f p) (hD : DescRel UF d) {s : CS}
+    (h : StreamOK s) (hbound : 2 * (s.src.val.length - s.pos.val) ≤ Usize.max) :
+    ∃ (v : alloc.vec.Vec (RParsed T)) (s' : CS) (items : List (Parsed α)),
+      sudo_rs.sudoers.basic_parser.parse_lines P UF s = ok (v, s') ∧
+      (SudoersSpec.Syntax.parseLines d p).run (absStream s) = (.ok items, absStream s') ∧
+      List.Forall₂ (ResultRel f) v.val items ∧ StreamOK s' :=
+  parse_lines_refines_on (I := fun _ => True) (fun {_ _} _ _ => trivial) hP.on hD h trivial hbound
 
 /-- `parse_lines` on a whole input `src` (cursor at position 0, line 1, column 1): the only
 precondition is the input length, `2 * len ≤ usize::MAX`. -/
