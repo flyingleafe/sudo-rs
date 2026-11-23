@@ -7,17 +7,15 @@ on:
   push:
     paths:
       - "proofs/**"
-      - "src/**"
+      - "src/sudoers/**"
       - "Cargo.toml"
-      - "Cargo.lock"
       - "flake.*"
       - ".github/workflows/verification.yml"
   pull_request:
     paths:
       - "proofs/**"
-      - "src/**"
+      - "src/sudoers/**"
       - "Cargo.toml"
-      - "Cargo.lock"
       - "flake.*"
       - ".github/workflows/verification.yml"
   workflow_dispatch:
