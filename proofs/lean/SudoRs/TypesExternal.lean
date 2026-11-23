@@ -56,3 +56,16 @@ nanoseconds below one billion. -/
 structure core.time.Duration where
   secs : U64
   nanos : U32
+
+/-- [core::num::error::IntErrorKind] (`core/src/num/error.rs`): why parsing an integer failed. -/
+inductive core.num.error.IntErrorKind where
+  | Empty
+  | InvalidDigit
+  | PosOverflow
+  | NegOverflow
+  | Zero
+
+/-- [core::num::error::ParseIntError]: `struct ParseIntError { kind: IntErrorKind }`
+(`core/src/num/error.rs`). -/
+structure core.num.error.ParseIntError where
+  kind : core.num.error.IntErrorKind

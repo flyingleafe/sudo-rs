@@ -338,3 +338,113 @@ def sudoers.char_stream.chars_of (s : String) : Result (alloc.vec.Vec Char) :=
 /-- [sudo_rs::sudoers::basic_parser::escape_char]: `'\\'`, kept opaque for Charon because the
 pinned Aeneas prints this literal as `'\'`, which Lean rejects. -/
 def sudoers.basic_parser.escape_char : Result Char := ok '\\'
+
+/-! ### Models used by the `Defaults` modifiers and value checkers (`src/defaults`) -/
+
+/-- [alloc::boxed::convert::{impl From<&str> for Box<str>}::from]: copies the bytes; boxes are
+erased. -/
+def BoxStr.Insts.CoreConvertFromShared0Str.from (s : Str) : Result Str := ok s
+
+/-- [core::str::{str}::as_bytes]: a `&str` is represented by its bytes. -/
+def core.str.Str.as_bytes (s : Str) : Result (Slice U8) := ok s
+
+/-- [core::str::{str}::len]: the number of bytes. -/
+def core.str.Str.len (s : Str) : Result Usize := ok (Slice.len s)
+
+namespace sudo_rs
+
+/-- `str::is_char_boundary` (`core/src/str/mod.rs`): `0`, the length, or an index whose byte is not
+a UTF-8 continuation byte (`u8::is_utf8_char_boundary`: `(b as i8) >= -0x40`, i.e. `b < 0x80` or
+`b ≥ 0xC0`). -/
+def strIsCharBoundary (s : Str) (i : Nat) : Bool :=
+  i == 0 || i == s.length ||
+    (match s.val[i]? with
+     | some b => b.val < 0x80 || 0xC0 ≤ b.val
+     | none => false)
+
+/-- `(b as char).to_digit(radix)` for a byte `b` and `2 ≤ radix ≤ 36` (`core/src/char/methods.rs`):
+`0`-`9`, then `a`-`z` and `A`-`Z` from 10, if below `radix`. -/
+def asciiDigit (b radix : Nat) : Option Nat :=
+  let d :=
+    if 48 ≤ b ∧ b ≤ 57 then some (b - 48)
+    else if 97 ≤ b ∧ b ≤ 122 then some (b - 87)
+    else if 65 ≤ b ∧ b ≤ 90 then some (b - 55)
+    else none
+  match d with
+  | some x => if x < radix then some x else none
+  | none => none
+
+/-- The digit loop of `from_ascii_bytes_radix_impl` for an unsigned type with maximum `max`:
+the first byte that is not a digit is `InvalidDigit`; a value above `max` is `PosOverflow`. Both
+loops of the Rust code (the unchecked one runs only where no overflow is possible; the checked one
+tests the digit before the overflow of the multiplication) give these results. -/
+def parseDigits (radix max : Nat) : List Nat → Nat → core.result.Result Nat core.num.error.IntErrorKind
+  | [], acc => .Ok acc
+  | b :: rest, acc =>
+    match asciiDigit b radix with
+    | none => .Err .InvalidDigit
+    | some x =>
+      if acc * radix + x ≤ max then parseDigits radix max rest (acc * radix + x)
+      else .Err .PosOverflow
+
+/-- `from_ascii_bytes_radix_impl` for an unsigned type (`core/src/num/mod.rs`): panics unless
+`2 ≤ radix ≤ 36`; the empty input is `Empty`; a lone `+` or `-` is `InvalidDigit`; one leading
+`+` is skipped (a leading `-` is not a digit of an unsigned type); then the digits. -/
+def fromStrRadix (ty : UScalarTy) (src : Str) (radix : U32) :
+    Result (core.result.Result (UScalar ty) core.num.error.ParseIntError) :=
+  if radix.val < 2 ∨ 36 < radix.val then fail .panic
+  else
+    let digits : core.result.Result Nat core.num.error.IntErrorKind :=
+      match src.val.map (·.val) with
+      | [] => .Err .Empty
+      | [43] => .Err .InvalidDigit
+      | [45] => .Err .InvalidDigit
+      | 43 :: rest => parseDigits radix.val (UScalar.max ty) rest 0
+      | bytes => parseDigits radix.val (UScalar.max ty) bytes 0
+    match digits with
+    | .Err kind => ok (.Err { kind })
+    | .Ok n => do
+      -- `n ≤ UScalar.max ty` by `parseDigits`, so this cannot fail
+      let x ← UScalar.tryMk ty n
+      ok (.Ok x)
+
+end sudo_rs
+
+/-- [core::str::{str}::split_at]: the first `mid` bytes and the rest; panics unless `mid` is a
+char boundary (`split_at_checked`, else `slice_error_fail`). -/
+def core.str.Str.split_at (s : Str) (mid : Usize) : Result (Str × Str) :=
+  if sudo_rs.strIsCharBoundary s mid.val then
+    ok (Slice.from (s.val.take mid.val)
+          (by have := s.property; simp only [List.length_take]; omega),
+        Slice.from (s.val.drop mid.val)
+          (by have := s.property; simp only [List.length_drop]; omega))
+  else fail .panic
+
+/-- [core::num::{u32}::from_str_radix] -/
+def core.num.U32.from_str_radix (src : Str) (radix : U32) :
+    Result (core.result.Result U32 core.num.error.ParseIntError) :=
+  sudo_rs.fromStrRadix .U32 src radix
+
+/-- [core::num::{u64}::from_str_radix] -/
+def core.num.U64.from_str_radix (src : Str) (radix : U32) :
+    Result (core.result.Result U64 core.num.error.ParseIntError) :=
+  sudo_rs.fromStrRadix .U64 src radix
+
+/-- [core::num::{u64}::pow]: with overflow checks (`strict_pow`) an overflow panics; modelled as
+the integer overflow of the other arithmetic operations. -/
+def core.num.U64.pow (x : U64) (exp : U32) : Result U64 :=
+  UScalar.tryMk .U64 (x.val ^ exp.val)
+
+/-- [std::collections::hash::set::{HashSet<T, S, A>}::remove]: drops the keys whose borrow equals
+`key`; `true` iff there was one. Extensional, as `insert`. -/
+def std.collections.hash.set.HashSet.remove
+    {T S A Q H : Type} (_ : core.cmp.Eq T) (_ : core.hash.Hash T)
+    (_ : sudo_rs.core.hash.BuildHasher S H) (borrow : core.borrow.Borrow T Q)
+    (_ : core.hash.Hash Q) (eqQ : core.cmp.Eq Q)
+    (keys : std.collections.hash.set.HashSet T S A) (key : Q) :
+    Result (Bool × std.collections.hash.set.HashSet T S A) := do
+  let kept ← keys.filterM fun k => do
+    let q ← borrow.borrow k
+    let same ← eqQ.partialEqInst.eq q key
+    ok (!same)
+  ok (kept.length != keys.length, kept)
