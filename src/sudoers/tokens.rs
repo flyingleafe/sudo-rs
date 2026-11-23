@@ -107,8 +107,8 @@ impl Token for Hostname {
 /// that is: at most four `.`-separated parts, each of one to three bytes (UTF-8), all of them
 /// numeric characters. One pass from the left; `ok` turns false as soon as that fails.
 fn resembles_ipv4(text: &[char]) -> bool {
-    let mut parts = 1; // parts begun so far
-    let mut part_len = 0; // UTF-8 length of the current part
+    let mut parts: usize = 1; // parts begun so far
+    let mut part_len: usize = 0; // UTF-8 length of the current part
     let mut ok = true;
     let mut i = 0;
     while ok && i < text.len() {
