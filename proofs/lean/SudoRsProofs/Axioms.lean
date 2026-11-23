@@ -16,6 +16,11 @@ import SudoRsProofs.Parser.Analysis.AliasOrder
 import SudoRsProofs.Parser.Analysis.Collect
 import SudoRsProofs.Parser.Analysis.Input
 import SudoRsProofs.Parser.PermissionLines.Refinement
+import SudoRsProofs.Parser.AliasName
+import SudoRsProofs.Parser.Username
+import SudoRsProofs.Parser.Digits
+import SudoRsProofs.Parser.Parameters
+import SudoRsProofs.Parser.Command
 
 /-!
 # Axiom audit
@@ -183,3 +188,19 @@ of `SudoRs/{Types,Funs}External.lean` are definitions or `opaque` constants, nev
 #print axioms SudoRsProofs.Parser.user_list_refines_text
 #print axioms SudoRsProofs.Parser.expect_user_list_refines_text
 #print axioms SudoRsProofs.Parser.permissions_refines_text
+#print axioms SudoRsProofs.Parser.alias_name_parse_refines
+#print axioms SudoRsProofs.Parser.username_parse_refines
+#print axioms SudoRsProofs.Parser.meta_username_parse_refines
+#print axioms SudoRsProofs.Parser.digits_u32_construct_iff
+#print axioms SudoRsProofs.Parser.digits_u32_parse_refines
+#print axioms SudoRsProofs.Parser.string_parameter_token_refines
+#print axioms SudoRsProofs.Parser.unquoted_token_refines
+#print axioms SudoRsProofs.Parser.string_parameter_parse_refines
+#print axioms SudoRsProofs.Parser.unquoted_parse_refines
+#print axioms SudoRsProofs.Parser.unquoted_construct_size
+#print axioms SudoRsProofs.Parser.chdir_parse_refines
+#print axioms SudoRsProofs.Parser.split_words_refines
+#print axioms SudoRsProofs.Parser.simple_command_token_refines
+#print axioms SudoRsProofs.Parser.command_construct_refines
+#print axioms SudoRsProofs.Parser.command_parse_refines_at
+#print axioms SudoRsProofs.Parser.meta_command_parse_refines_at

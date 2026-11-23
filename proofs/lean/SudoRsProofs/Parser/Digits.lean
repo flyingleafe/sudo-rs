@@ -330,6 +330,34 @@ theorem digits_u32_token_refines :
         have he : (some x.val : Option Nat) = some a := (hov.trans h).trans hfs
         exact Option.some.inj he
 
+/-- The constructor agreement predicate is necessary as well as sufficient. -/
+theorem digits_u32_construct_iff (s : String) (hs : s.utf8ByteSize ≤ Usize.max) :
+    (∃ r, Sudo_rsSudoersBasic_parserToken.construct s = ok r ∧
+      ConstructRel (fun x : U32 => x.val) r (digitsU32Token.construct s.toList)) ↔
+      DigitsU32Pre s.toList := by
+  constructor
+  · rintro ⟨r, er, hr⟩
+    obtain ⟨v, hv, hd⟩ := chars_of_eq s hs
+    obtain ⟨o, ho, hov⟩ := parse_u32_spec (alloc.vec.Vec.deref v)
+    rw [hd] at hov
+    have hcon : Sudo_rsSudoersBasic_parserToken.construct s =
+        ok (match o with
+          | some x => core.result.Result.Ok x
+          | none => core.result.Result.Err .ValueTooLarge) := by
+      simp only [Sudo_rsSudoersBasic_parserToken.construct, hv, bind_ok, ho]
+      cases o <;> rfl
+    rw [hcon, ok.injEq] at er
+    subst r
+    change ConstructRel _ _ (match fromStrRadix 10 32 s.toList with
+      | some x => .ok x
+      | none => .error .valueTooLarge) at hr
+    unfold DigitsU32Pre
+    rw [← hov]
+    cases o <;> cases hread : fromStrRadix 10 32 s.toList <;>
+      simp only [hread, ConstructRel] at hr <;>
+      first | rfl | exact congrArg some hr
+  · exact digits_u32_token_refines.construct s hs
+
 /-- The scanner only emits digit texts, so the blanket parser needs no extra hypothesis. -/
 theorem digits_u32_parse_refines :
     ParseRefines (sudo_rs.sudoers.basic_parser.Parse.Blanket

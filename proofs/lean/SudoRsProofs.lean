@@ -40,3 +40,12 @@ import SudoRsProofs.Parser.Analysis.AliasOrder
 import SudoRsProofs.Parser.Analysis.Collect
 import SudoRsProofs.Parser.Analysis.Input
 import SudoRsProofs.Parser.PermissionLines.Refinement
+import SudoRsProofs.Parser.P2Oracle
+import SudoRsProofs.Parser.AliasName
+import SudoRsProofs.Parser.Username
+import SudoRsProofs.Parser.Digits
+import SudoRsProofs.Parser.Parameters
+import SudoRsProofs.Parser.Words
+import SudoRsProofs.Parser.CommandArgs
+import SudoRsProofs.Parser.SimpleCommand
+import SudoRsProofs.Parser.Command
