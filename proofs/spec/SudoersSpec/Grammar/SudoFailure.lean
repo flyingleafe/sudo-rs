@@ -14,6 +14,10 @@ input. The diagnostic itself is not part of the grammar. -/
 def FailureSound (p : Parser α) (F : Gram Unit) : Prop :=
   ∀ s e t, p.run s = (.error e, t) → ∃ c, s.rest = c ++ t.rest ∧ F c () t.rest
 
+/-- A derived failure reproduces its consumed prefix regardless of the starting position. -/
+def FailureComplete (p : Parser α) (F : Gram Unit) : Prop :=
+  ∀ c r s, F c () r → s.rest = c ++ r → ∃ e t, p.run s = (.error e, t) ∧ t.rest = r
+
 theorem FailureSound.mono {p : Parser α} {F F' : Gram Unit} (h : FailureSound p F)
     (hf : ∀ c u r, F c u r → F' c u r) : FailureSound p F' := by
   intro s e t hr
@@ -81,6 +85,25 @@ private theorem acceptEscaped_fatal_sound (T : TokenSpec α) (pred : Char → Bo
     | none => simp
     | some d => simp only; split <;> simp
 
+private theorem acceptEscaped_fatal_complete (T : TokenSpec α) (pred : Char → Bool)
+    {rest : List Char} {s : Stream} (h : EscIllegal T pred rest) (hs : s.rest = '\\' :: rest) :
+    ∃ sp k t, (acceptEscaped T pred).run s = (.error (.fatal sp k), t) ∧ t.rest = rest := by
+  obtain ⟨hA, hb, hn⟩ := h
+  have hp : s.peek = some '\\' := by rw [Stream.peek_eq_head, hs]; rfl
+  have hr : s.pop.rest = rest := by rw [Stream.pop_rest, hs]; rfl
+  rw [acceptEscaped_run_esc T pred s hA hp]
+  cases hp₂ : s.pop.peek with
+  | none =>
+    simp only [hb, Bool.false_eq_true, ite_false]
+    exact ⟨_, _, s.pop, rfl, hr⟩
+  | some d =>
+    have hd := hn d (by rw [← hr, ← Stream.peek_eq_head, hp₂])
+    have hne : T.escaped d ≠ true := fun he => hd (.inl he)
+    have he : T.escaped d = false := by simpa using hne
+    have hd' : d ≠ '\n' := fun h' => hd (.inr h')
+    simp only [he, hb, hd', Bool.false_eq_true, ite_false]
+    exact ⟨_, _, s.pop, rfl, hr⟩
+
 /-- A failure during the tail of the token, from the decoded characters `str` accumulated so
 far. For the length error the triggering unit has been consumed but not appended. -/
 inductive TokLoopFailure (T : TokenSpec α) : List Char → List Char → List Char → Prop
@@ -144,6 +167,29 @@ private theorem tokenLoop_failure_sound (T : TokenSpec α) (str : List Char) (s 
           rw [← hc]; exact hunit
       | error e₁ => cases e₁ <;> simp
 
+private theorem tokenLoop_fatal_complete (T : TokenSpec α) {str c rest : List Char}
+    (h : TokLoopFailure T str c rest) {s : Stream} (hs : s.rest = c ++ rest) :
+    ∃ sp k t, (tokenLoop T str).run s = (.error (.fatal sp k), t) ∧ t.rest = rest := by
+  induction h generalizing s with
+  | illegal hi =>
+    obtain ⟨sp, k, t, ht, hr⟩ := acceptEscaped_fatal_complete T T.accept hi hs
+    unfold tokenLoop whileMaybe
+    rw [loop_run, whileMaybeBody_run, ht]
+    exact ⟨sp, k, t, rfl, hr⟩
+  | length hu hlen =>
+    obtain ⟨t, ht, hr⟩ := acceptEscaped_complete T T.accept hu hs
+    unfold tokenLoop whileMaybe
+    rw [loop_run, whileMaybeBody_run, ht]
+    simp only [maybe_ok, tokenBody_run, hlen, ite_true]
+    exact ⟨_, _, t, rfl, hr⟩
+  | cons hu hlen _ ih =>
+    obtain ⟨s₁, h₁, hs₁⟩ := acceptEscaped_complete T T.accept hu (by rw [hs, List.append_assoc])
+    have hlt := Nat.not_le_of_gt hlen
+    unfold tokenLoop whileMaybe
+    rw [loop_run, whileMaybeBody_run, h₁]
+    simp only [maybe_ok, tokenBody_run, hlt, ite_false]
+    exact ih hs₁
+
 /-- A token fails fatally on an illegal opening escape, during the loop, or when constructing
 its value from a successfully scanned token. -/
 inductive TokenFatalG (T : TokenSpec α) : Gram Unit
@@ -202,6 +248,33 @@ theorem token_failure_sound (T : TokenSpec α) : FailureSound (token T) (TokenFa
     obtain ⟨c, hc, hd⟩ := token_fatal_sound T h
     exact ⟨c, hc, .inr hd⟩
 
+/-- Reverse the fatal-token grammar without fixing the diagnostic span or error kind. -/
+theorem token_fatal_complete (T : TokenSpec α) :
+    ∀ c r s, TokenFatalG T c () r → s.rest = c ++ r →
+      ∃ span kind t, (token T).run s = (.error (.fatal span kind), t) ∧ t.rest = r := by
+  intro c r s h hs
+  cases h with
+  | illegal hi =>
+    obtain ⟨sp, k, t, ht, hr⟩ := acceptEscaped_fatal_complete T T.accept1st hi hs
+    exact ⟨sp, k, t, by rw [token_run, ht], hr⟩
+  | loop hu hl =>
+    obtain ⟨s₁, h₁, hs₁⟩ := acceptEscaped_complete T T.accept1st hu (by rw [hs, List.append_assoc])
+    obtain ⟨sp, k, t, ht, hr⟩ := tokenLoop_fatal_complete T hl hs₁
+    exact ⟨sp, k, t, by simp only [token_run, h₁, ht], hr⟩
+  | @construct u x c xs rest k hu ht hl hk =>
+    obtain ⟨s₁, h₁, hs₁⟩ := acceptEscaped_complete T T.accept1st hu (by rw [hs, List.append_assoc])
+    obtain ⟨t, h₂, hr⟩ := tokenLoop_complete T ht [x] s₁ hl hs₁
+    change (tokenLoop T [x]).run s₁ = (.ok (x :: xs), t) at h₂
+    exact ⟨⟨s.getPos, t.getPos⟩, k, t, by simp only [token_run, h₁, h₂, hk], hr⟩
+
+theorem token_failure_complete (T : TokenSpec α) : FailureComplete (token T) (TokenFailureG T) := by
+  intro c r s h hs
+  rcases h with h | h
+  · obtain ⟨t, ht, hr⟩ := token_rejectComplete T c r s h hs
+    exact ⟨.reject, t, ht, hr⟩
+  · obtain ⟨sp, k, t, ht, hr⟩ := token_fatal_complete T c r s h hs
+    exact ⟨.fatal sp k, t, ht, hr⟩
+
 /-! ## Whitespace -/
 
 /-- Blanks and complete continuations, ending with a backslash not followed by a newline.
@@ -254,5 +327,36 @@ theorem ws_failure_sound : FailureSound skipTrailingWhitespace WsFailureG := by
           _ = _ := by rw [Stream.rest_of_peek h₁, Stream.rest_of_peek h₂, hc]; simp
       · simp at hb
     · simp at hb
+
+theorem ws_failure_complete : FailureComplete skipTrailingWhitespace WsFailureG := by
+  intro c r s h hs
+  rw [skipTrailingWhitespace_run]
+  change ∃ e t, (loop trailingWhitespaceBody trailingWhitespaceBody_progressive ()).run s =
+    (.error e, t) ∧ t.rest = r
+  have afterBlanks {s : Stream} {bs rest : List Char} (hb : ∀ x ∈ bs, blank x = true)
+      (hs : s.rest = bs ++ '\\' :: rest) : (s.skipWhile blank).rest = '\\' :: rest :=
+    skipWhile_blank_rest hb
+      (by intro d hd; simp only [List.head?_cons, Option.some.injEq] at hd; subst d; decide) hs
+  generalize () = u at h
+  induction h generalizing s with
+  | @stray bs rest hb hn =>
+    have hr := afterBlanks (rest := rest) hb
+      (hs.trans (List.append_assoc bs ['\\'] rest))
+    have hp : (s.skipWhile blank).peek = some '\\' := by rw [Stream.peek_eq_head, hr]; rfl
+    have hpop : (s.skipWhile blank).pop.rest = rest := by rw [Stream.pop_rest, hr]; rfl
+    have hp₂ : (s.skipWhile blank).pop.peek ≠ some '\n' := by
+      rw [Stream.peek_eq_head, hpop]
+      exact fun he => hn '\n' he rfl
+    rw [loop_run, trailingWhitespaceBody_run]
+    simp only [hp, hp₂, ite_true, ite_false]
+    exact ⟨_, _, rfl, hpop⟩
+  | @cont bs w rest hb _ ih =>
+    have hr := afterBlanks hb (show s.rest = bs ++ '\\' :: '\n' :: (w ++ rest) by rw [hs]; simp)
+    have hp : (s.skipWhile blank).peek = some '\\' := by rw [Stream.peek_eq_head, hr]; rfl
+    have hp₂ : (s.skipWhile blank).pop.peek = some '\n' := by
+      rw [Stream.peek_eq_head, Stream.pop_rest, hr]; rfl
+    rw [loop_run, trailingWhitespaceBody_run]
+    simp only [hp, hp₂, ite_true]
+    exact ih _ (by rw [Stream.pop_rest, Stream.pop_rest, hr]; rfl)
 
 end SudoersSpec.Grammar

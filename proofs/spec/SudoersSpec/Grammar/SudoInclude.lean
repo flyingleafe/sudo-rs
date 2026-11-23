@@ -292,4 +292,190 @@ theorem hash_id_failure (O : Oracles) (D : Descriptions) {s t : Stream} {e : Sta
   obtain ⟨c, hc, hg⟩ := hs
   exact AtCursor.of_run h hc hg
 
+/-! ## Completeness, including the failure cursor observed by `#` -/
+
+private theorem same_cursor {s t u : Stream} (ht : s.Reaches t) (hu : s.Reaches u)
+    (hr : t.rest = u.rest) : t = u := by
+  rw [ht.eq_advance, hu.eq_advance, hr]
+
+theorem AtCursor.complete {G : Gram α} {p : Parser α} (hp : Complete p G)
+    {s t : Stream} {a : α} (h : AtCursor G s a t) : p.run s = (.ok a, t) := by
+  have ht := h.reaches
+  obtain ⟨c, hc, hg, _⟩ := h
+  obtain ⟨u, hu, hr⟩ := hp c a t.rest s hg hc
+  rwa [same_cursor (reaches_of_run hu) ht hr] at hu
+
+theorem AtCursor.failure_complete {G : Gram Unit} {p : Parser α} (hp : FailureComplete p G)
+    {s t : Stream} (h : AtCursor G s () t) : ∃ e, p.run s = (.error e, t) := by
+  have ht := h.reaches
+  obtain ⟨c, hc, hg, _⟩ := h
+  obtain ⟨e, u, hu, hr⟩ := hp c t.rest s hg hc
+  exact ⟨e, same_cursor (reaches_of_run hu) ht hr ▸ hu⟩
+
+theorem AtCursor.reject_complete {G : Gram Unit} {p : Parser α} (hp : RejectComplete p G)
+    {s t : Stream} (h : AtCursor G s () t) : p.run s = (.error .reject, t) := by
+  have ht := h.reaches
+  obtain ⟨c, hc, hg, _⟩ := h
+  obtain ⟨u, hu, hr⟩ := hp c t.rest s hg hc
+  rwa [same_cursor (reaches_of_run hu) ht hr] at hu
+
+private theorem tryNontermFailure_complete {p : Parser α} {G : Gram α} {F : Gram Unit}
+    (hG : Complete p G) (hF : FailureComplete p F) :
+    FailureComplete (tryNonterminal p) (NontermFailureG G F) := by
+  intro c r s hg hs
+  rcases hg with hf | ⟨x, y, a, rfl, hx, hy⟩
+  · obtain ⟨e, t, he, ht⟩ := hF _ _ _ hf hs
+    exact ⟨e, t, by simp [tryNonterminal, run_bind, he], ht⟩
+  · obtain ⟨u, hu, hr⟩ := hG _ _ _ _ hx (by rw [hs, List.append_assoc])
+    obtain ⟨e, t, he, ht⟩ := ws_failure_complete _ _ _ hy hr
+    exact ⟨e, t, by simp [tryNonterminal, run_bind, hu, he], ht⟩
+
+private theorem expect_failure_of_try (description : String) {p : Parser α} {s t : Stream} {e : Status}
+    (h : (tryNonterminal p).run s = (.error e, t)) :
+    ∃ e', (expectNonterminal description p).run s = (.error e', t) := by
+  cases e with
+  | reject => exact ⟨.fatal ⟨s.getPos, t.getPos⟩ (.expected description), by
+      simp [expectNonterminal, run_bind, h]⟩
+  | fatal sp k => exact ⟨.fatal sp k, by simp [expectNonterminal, run_bind, h]⟩
+
+private theorem expectNontermFailure_complete {p : Parser α} {G : Gram α} {F : Gram Unit}
+    (hG : Complete p G) (hF : FailureComplete p F) (description : String) :
+    FailureComplete (expectNonterminal description p) (NontermFailureG G F) := by
+  intro c r s hg hs
+  obtain ⟨e, t, he, ht⟩ := tryNontermFailure_complete hG hF _ _ _ hg hs
+  obtain ⟨e', he'⟩ := expect_failure_of_try description he
+  exact ⟨e', t, he', ht⟩
+
+private theorem optionalTokenFailure_complete (T : TokenSpec α) :
+    FailureComplete (parseOption (token T)) (TokenFatalG T) := by
+  intro c r s hg hs
+  obtain ⟨sp, k, t, ht, hr⟩ := token_fatal_complete T _ _ _ hg hs
+  exact ⟨.fatal sp k, t, by simp [parseOption, run_maybe, ht], hr⟩
+
+private theorem requiredMarkFailure_complete (ch : Char) :
+    FailureComplete (expectSyntax ch) (RequiredMarkFailureG ch) := by
+  rintro c r s ⟨x, y, b, rfl, hm, hf⟩ hs
+  cases hm with
+  | present =>
+    have hpeek : s.peek = some ch := by rw [Stream.peek_eq_head, hs]; rfl
+    have hrest : s.pop.rest = y ++ r := by rw [Stream.pop_rest, hs]; rfl
+    obtain ⟨e, t, ht, hr⟩ := ws_failure_complete _ _ _ hf hrest
+    cases e with
+    | reject => exact (skipTrailingWhitespace_ne_reject _ (congrArg Prod.fst ht)).elim
+    | fatal sp k => exact ⟨.fatal ⟨t.getPos, t.getPos⟩ (.expectingSyntax ch t.peek), t, by
+        simp [expectSyntax, run_bind, trySyntax_run, hpeek, ht], hr⟩
+  | absent hn =>
+    obtain ⟨rfl, _⟩ := hf
+    have hn' : s.peek ≠ some ch := fun hd => hn ch (by simpa [Stream.peek_eq_head, hs] using hd) rfl
+    exact ⟨.fatal ⟨s.getPos, s.getPos⟩ (.expectingSyntax ch s.peek), s, by
+      simp [expectSyntax, run_bind, trySyntax_run, hn'], by simpa using hs⟩
+
+private theorem path_complete (O : Oracles) (D : Descriptions) (keyPos : Nat × Nat)
+    {s t : Stream} {path : String} (h : AtCursor (IncludePathG O) s path t) :
+    (getPath O D keyPos).run s = (.ok (path, ⟨keyPos, t.getPos⟩), t) := by
+  have ht := h.reaches
+  obtain ⟨_, hs, ⟨pfx, body, quoted, rfl, hmark, hb⟩, _⟩ := h
+  obtain ⟨u, hu, hr⟩ := mark_complete '"' _ _ _ _ hmark (by rw [hs, List.append_assoc])
+  have finish (w : Stream)
+      (hw : (getPath O D keyPos).run s = (.ok (path, ⟨keyPos, w.getPos⟩), w))
+      (hrest : w.rest = t.rest) : (getPath O D keyPos).run s = (.ok (path, ⟨keyPos, t.getPos⟩), t) := by
+    rwa [same_cursor (reaches_of_run hw) ht hrest] at hw
+  cases quoted with
+  | false =>
+    obtain ⟨hg, hn⟩ := hb
+    obtain ⟨v, hv, vr⟩ := expectNonterminal_complete (token_complete _) D.includePath _ _ _ _ hg hr
+    have hnl : v.peek = some '\n' := by rw [Stream.peek_eq_head, vr]; exact hn
+    exact finish v (by simp only [getPath, run_bind_of_ok hu]; simp [run_bind, hv, hnl]) vr
+  | true =>
+    obtain ⟨x, y, a, rfl, hx, ⟨z, hz, rfl⟩⟩ := hb
+    cases z
+    obtain ⟨v, hv, vr⟩ := expectNonterminal_complete (token_complete _) D.quotedIncludePath _ _ _ _ hx
+      (by rw [hr, List.append_assoc])
+    obtain ⟨w, hw, wr⟩ := expectSyntax_complete '"' _ _ _ _ hz vr
+    exact finish w (by simp only [getPath, run_bind_of_ok hu]; simp [run_bind, hv, hw]) wr
+
+private theorem pathFailure_complete (O : Oracles) (D : Descriptions) (keyPos : Nat × Nat) :
+    FailureComplete (getPath O D keyPos) (IncludePathFailureG O) := by
+  rintro c r s ⟨x, y, q, rfl, hm, hf⟩ hs
+  obtain ⟨u, hu, ur⟩ := mark_complete '"' _ _ _ _ hm (by rw [hs, List.append_assoc])
+  cases q with
+  | false =>
+    rcases hf with hf | ⟨x, y, p, rfl, hx, rfl, hn⟩
+    · obtain ⟨e, t, ht, hr⟩ := expectNontermFailure_complete (token_complete _) (token_failure_complete _)
+        D.includePath _ _ _ hf ur
+      exact ⟨e, t, by simp only [getPath, run_bind_of_ok hu]; simp [run_bind, ht], hr⟩
+    · obtain ⟨v, hv, vr⟩ := expectNonterminal_complete (token_complete _) D.includePath _ _ _ _ hx
+        (by simpa using ur)
+      have hnl : (v.peek != some '\n') = true := by simpa [Stream.peek_eq_head, vr] using hn
+      exact ⟨.fatal ⟨u.getPos, v.getPos⟩ .useQuotesAroundFilenames, v, by
+        simp only [getPath, run_bind_of_ok hu]
+        simp [run_bind, hv, show v.peek ≠ some '\n' from by simpa using hnl], by simpa using vr⟩
+  | true =>
+    rcases hf with hf | ⟨x, y, p, rfl, hx, hy⟩
+    · obtain ⟨e, t, ht, hr⟩ := expectNontermFailure_complete (token_complete _) (token_failure_complete _)
+        D.quotedIncludePath _ _ _ hf ur
+      exact ⟨e, t, by simp only [getPath, run_bind_of_ok hu]; simp [run_bind, ht], hr⟩
+    · obtain ⟨v, hv, vr⟩ := expectNonterminal_complete (token_complete _) D.quotedIncludePath _ _ _ _ hx
+        (by rw [ur, List.append_assoc])
+      obtain ⟨e, w, hw, wr⟩ := requiredMarkFailure_complete '"' _ _ _ hy vr
+      exact ⟨e, w, by simp only [getPath, run_bind_of_ok hu]; simp [run_bind, hv, hw], wr⟩
+
+private theorem includeKey_complete (O : Oracles) :
+    Complete (tryNonterminal (parseOption (token (usernameToken O)))) (IncludeKeyG O) :=
+  tryNonterminal_complete (option_complete (token_complete _) (token_rejectComplete _))
+
+theorem include_complete (O : Oracles) (D : Descriptions) {s t : Stream} {a : Sudo}
+    (h : IncludeG O s a t) : (parseInclude O D).run s = (.ok a, t) := by
+  cases h with
+  | file hk hp =>
+    simp [parseInclude, run_bind, hk.complete (includeKey_complete O), path_complete O D s.getPos hp]
+  | dir hk hp =>
+    simp [parseInclude, run_bind, hk.complete (includeKey_complete O), path_complete O D s.getPos hp]
+
+theorem include_failure_complete (O : Oracles) (D : Descriptions) {s t : Stream}
+    (h : IncludeFailure O s t) : ∃ e, (parseInclude O D).run s = (.error e, t) := by
+  cases h with
+  | key hk =>
+    obtain ⟨e, he⟩ := hk.failure_complete (tryNontermFailure_complete
+      (option_complete (token_complete _) (token_rejectComplete _)) (optionalTokenFailure_complete _))
+    exact ⟨e, by simp [parseInclude, run_bind, he]⟩
+  | other hk h₁ h₂ =>
+    have hr := hk.complete (includeKey_complete O)
+    simp only [parseInclude, run_bind_of_ok (run_getPos _), run_bind_of_ok hr]
+    exact ⟨.fatal ⟨s.getPos, t.getPos⟩ .unknownDirective, rfl⟩
+  | path hk hd hp =>
+    obtain ⟨e, he⟩ := hp.failure_complete (pathFailure_complete O D s.getPos)
+    rcases hd with rfl | rfl
+    · exact ⟨e, by simp [parseInclude, run_bind, hk.complete (includeKey_complete O), he]⟩
+    · exact ⟨e, by simp [parseInclude, run_bind, hk.complete (includeKey_complete O), he]⟩
+
+theorem hash_id_failure_complete (O : Oracles) (D : Descriptions) {s t : Stream}
+    (h : AtCursor HashIdFailureG s () t) :
+    ∃ e, (tryNonterminal (identifier O D)).run s = (.error e, t) := by
+  apply h.failure_complete
+  intro c r s hc hs
+  rcases hc with ⟨x, y, b, rfl, hm, hy⟩ | ⟨x, y, a, rfl, ⟨m, n, b, rfl, hm, hn⟩, hy⟩
+  · cases b with
+    | false => exact hy.elim
+    | true =>
+      obtain ⟨u, hu, hr⟩ := mark_complete '#' _ _ _ _ hm (by rw [hs, List.append_assoc])
+      obtain ⟨e, v, hv, vr⟩ := expectNontermFailure_complete (token_complete _) (token_failure_complete _)
+        D.digitsU32 _ _ _ hy hr
+      have hi : (identifier O D).run s = (.error e, v) := by
+        simp only [identifier, run_bind_of_ok hu]
+        simp [run_bind, hv]
+      exact ⟨e, v, by simp [tryNonterminal_run, hi], vr⟩
+  · cases b with
+    | false => exact hn.elim
+    | true =>
+      obtain ⟨i, hi, rfl⟩ := hn
+      obtain ⟨u, hu, hr⟩ := mark_complete '#' m true (n ++ (y ++ r)) s hm
+        (by simpa only [List.append_assoc] using hs)
+      obtain ⟨v, hv, vr⟩ := expectNonterminal_complete (token_complete _) D.digitsU32 _ _ _ _ hi hr
+      obtain ⟨e, w, hw, wr⟩ := ws_failure_complete _ _ _ hy vr
+      have hi' : (identifier O D).run s = (.ok (.id i), v) := by
+        simp only [identifier, run_bind_of_ok hu]
+        simp [run_bind, hv]
+      exact ⟨e, w, by simp [tryNonterminal_run, hi', hw], wr⟩
+
 end SudoersSpec.Grammar

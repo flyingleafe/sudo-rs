@@ -16,6 +16,9 @@ import SudoersSpec.Syntax.PanicFree
 import SudoersSpec.Settings.FromParser
 import SudoersSpec.Grammar.SudoFile
 import SudoersSpec.Analysis.Clean
+import SudoersSpec.Grammar.SudoRunasExact
+import SudoersSpec.Grammar.SudoAmbiguity
+import SudoersSpec.Grammar.SudoUnique
 
 /-! Axiom audit: every main result depends on at most `propext`, `Classical.choice` and
 `Quot.sound`. `lake build` prints the lists. -/
@@ -304,3 +307,20 @@ open SudoersSpec
 #print axioms SudoersSpec.Grammar.checkPermissionValue_iff
 #print axioms SudoersSpec.Grammar.sudo_permission_checked_roundTrip
 #print axioms SudoersSpec.Grammar.PermissionExamples.simpleRuleValue
+#print axioms SudoersSpec.Grammar.include_failure_complete
+#print axioms SudoersSpec.Grammar.hash_id_failure_complete
+#print axioms SudoersSpec.Grammar.directive_complete
+#print axioms SudoersSpec.Grammar.sudo_nonpermission_complete
+#print axioms SudoersSpec.Grammar.metaOrTag_at_iff
+#print axioms SudoersSpec.Grammar.metaTagAtG_unique
+#print axioms SudoersSpec.Grammar.runasWithFailure_sound
+#print axioms SudoersSpec.Grammar.runasWithFailure_complete
+#print axioms SudoersSpec.Grammar.runasUserReject_complete
+#print axioms SudoersSpec.Grammar.runas_miss_ambiguity
+#print axioms SudoersSpec.Grammar.sudoItem_ignored_span_ambiguity
+#print axioms SudoersSpec.Grammar.broadSudoItem_not_functional
+#print axioms SudoersSpec.Grammar.exactSudo_item_complete
+#print axioms SudoersSpec.Grammar.exactSudo_item_unique
+#print axioms SudoersSpec.Grammar.exactSudo_cleanFile_complete
+#print axioms SudoersSpec.Grammar.exactSudo_cleanFile_unique
+#print axioms SudoersSpec.Grammar.parseSudoersWith_nonpermission_exact

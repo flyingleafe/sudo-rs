@@ -15,6 +15,14 @@ private theorem reject_after_sound {p : Parser α} {q : α → Parser β}
     obtain ⟨y, hy, hr⟩ := hq a _ _ ht
     exact ⟨x ++ y, by rw [hx, hy, List.append_assoc], x, y, a, rfl, hy ▸ hg, hr⟩
 
+private theorem reject_after_complete {p : Parser α} {q : α → Parser β}
+    {G : Gram α} {R : α → Gram Unit} (hp : Complete p G)
+    (hq : ∀ a, RejectComplete (q a) (R a)) : RejectComplete (p >>= q) (SeqG G R) := by
+  rintro c r s ⟨x, y, a, rfl, hx, hy⟩ hs
+  obtain ⟨u, hu, hrest⟩ := hp x a (y ++ r) s hx (by rw [hs, List.append_assoc])
+  obtain ⟨t, ht, hr⟩ := hq a y r u hy hrest
+  exact ⟨t, by rw [run_bind_of_ok hu, ht], hr⟩
+
 private theorem mark_reject_sound (ch : Char) {q : Bool → Parser α} {R : Bool → Gram Unit}
     (hq : ∀ b, RejectSound (q b) (R b)) :
     RejectSound (eatChar ch >>= q) (SeqG (MarkG ch) R) :=
@@ -25,6 +33,18 @@ private theorem mapP_reject {p : Parser α} {f : α → β} {s t : Stream}
   rcases run_bind_eq_error.mp h with h | ⟨_, _, _, h⟩
   · exact h
   · simp at h
+
+private theorem mapP_reject_complete {p : Parser α} {R : Gram Unit}
+    (hp : RejectComplete p R) (f : α → β) : RejectComplete (MapP p f) R := by
+  intro c r s hd hs
+  obtain ⟨t, ht, hr⟩ := hp c r s hd hs
+  exact ⟨t, run_bind_of_error ht _, hr⟩
+
+private theorem tryNonterminal_reject_complete {p : Parser α} {R : Gram Unit}
+    (hp : RejectComplete p R) : RejectComplete (tryNonterminal p) R := by
+  intro c r s hd hs
+  obtain ⟨t, ht, hr⟩ := hp c r s hd hs
+  exact ⟨t, tryNonterminal_reject.mpr ht, hr⟩
 
 private def IdentifierRejectG (O : Oracles) : Gram Unit :=
   SeqG (MarkG '#') fun numeric => if numeric then EmptyG else TokenRejectG (usernameToken O)
@@ -43,6 +63,18 @@ private theorem identifier_reject_sound (O : Oracles) (D : Descriptions) :
     intro s t h
     exact (expectNonterminal_ne_reject D.digitsU32 (token digitsU32Token) s
       (congrArg Prod.fst (mapP_reject (f := Identifier.id) h))).elim
+
+private theorem identifier_reject_complete (O : Oracles) (D : Descriptions) :
+    RejectComplete (identifier O D) (IdentifierRejectG O) := by
+  unfold identifier IdentifierRejectG
+  apply reject_after_complete (mark_complete '#')
+  intro b
+  cases b with
+  | false =>
+    exact mapP_reject_complete (tryNonterminal_reject_complete (token_rejectComplete _)) _
+  | true =>
+    intro _ _ _ h _
+    exact False.elim h
 
 private def ParseUserRejectG (O : Oracles) : Gram Unit :=
   SeqG (MarkG '%') fun group => if group then EmptyG else
@@ -74,6 +106,25 @@ private theorem parseUser_reject_sound (O : Oracles) (D : Descriptions) :
         (congrArg Prod.fst (mapP_reject
           (f := fun i => if nonunix then UserSpecifier.nonunixGroup i else .group i) h))).elim
 
+private theorem parseUser_reject_complete (O : Oracles) (D : Descriptions) :
+    RejectComplete (parseUser O D) (ParseUserRejectG O) := by
+  unfold parseUser ParseUserRejectG
+  apply reject_after_complete (mark_complete '%')
+  intro b
+  cases b with
+  | false =>
+    apply reject_after_complete (mark_complete '+')
+    intro plus
+    cases plus with
+    | false =>
+      exact mapP_reject_complete (tryNonterminal_reject_complete (identifier_reject_complete O D)) _
+    | true =>
+      intro _ _ _ h _
+      exact False.elim h
+  | true =>
+    intro _ _ _ h _
+    exact False.elim h
+
 /-- A nested rejection accounts for the inner token text, not any more of the outer input. -/
 private def InnerUserRejectG (O : Oracles) (text : String) : Gram Unit :=
   fun c _ _ => c = [] ∧ ∃ x r, text.toList = x ++ r ∧ ParseUserRejectG O x () r
@@ -101,6 +152,18 @@ private theorem quotedTail_reject_sound (O : Oracles) (D : Descriptions) (start 
     exact ⟨[], rfl, rfl, x, _, hx, hd⟩
   · exact (expectSyntax_ne_reject '"' u (congrArg Prod.fst (mapP_reject (f := fun _ => a) h))).elim
 
+private theorem quotedTail_reject_complete (O : Oracles) (D : Descriptions) (start : Nat × Nat)
+    (text : String) : RejectComplete (do
+      let result ← nested (parseUser O D) (Stream.newWithPos text.toList start)
+      let a ← lift result
+      expectSyntax '"'
+      pure a) (InnerUserRejectG O text) := by
+  rintro c r s ⟨rfl, x, innerRest, htext, hd⟩ hs
+  obtain ⟨u, hu, _⟩ := parseUser_reject_complete O D x innerRest
+    (Stream.newWithPos text.toList start) hd htext
+  -- `nested` returns the inner rejection without moving the outer stream.
+  exact ⟨s, by simp [run_bind, hu], hs⟩
+
 private def UserSpecifierRejectG (O : Oracles) : Gram Unit :=
   SeqG (MarkG '"') fun quoted => if quoted then QuotedUserRejectG O else ParseUserRejectG O
 
@@ -117,6 +180,19 @@ private theorem userSpecifier_reject_sound (O : Oracles) (D : Descriptions) :
     exact (reject_after_sound (expectNonterminal_sound (token_sound _) D.username)
       (fun u _ h => expectNonterminal_ne_reject D.username _ u (congrArg Prod.fst h))
       (quotedTail_reject_sound O D s.getPos)) s t h
+
+private theorem userSpecifier_reject_complete (O : Oracles) (D : Descriptions) :
+    RejectComplete (userSpecifier O D) (UserSpecifierRejectG O) := by
+  unfold userSpecifier UserSpecifierRejectG
+  apply reject_after_complete (mark_complete '"')
+  intro b
+  cases b with
+  | false => exact parseUser_reject_complete O D
+  | true =>
+    intro c r s hd hs
+    simp only [ite_true, run_bind_of_ok (run_getPos s)]
+    exact (reject_after_complete (expectNonterminal_complete (token_complete _) D.username)
+      (quotedTail_reject_complete O D s.getPos)) c r s hd hs
 
 private def MetaUserRejectG (O : Oracles) : Gram Unit :=
   SeqG (NontermG (OptG (TokenG (MetaUsernameToken O)) (TokenRejectG (MetaUsernameToken O)))) fun
@@ -145,6 +221,18 @@ private theorem metaUser_reject_sound (O : Oracles) (D : Descriptions) :
       intro s t h
       cases m <;> simp at h
 
+private theorem metaUser_reject_complete (O : Oracles) (D : Descriptions) :
+    RejectComplete (metaUserSpecifier O D) (MetaUserRejectG O) := by
+  unfold metaUserSpecifier parseMeta MetaUserRejectG
+  apply reject_after_complete
+    (tryNonterminal_complete (option_complete (token_complete _) (token_rejectComplete _)))
+  intro a
+  cases a with
+  | none => exact mapP_reject_complete (userSpecifier_reject_complete O D) _
+  | some _ =>
+    intro _ _ _ h _
+    exact False.elim h
+
 /-- The first user-list entry rejects before any qualification marker. Its consumed prefix
 includes the failed meta-token probe and its trailing whitespace, and may include a quote and
 its text if the user parser rejects on the separate quoted stream. -/
@@ -159,5 +247,13 @@ theorem userList_reject_sound (O : Oracles) (D : Descriptions) :
   obtain ⟨hn, hr⟩ := qualified_reject_iff.mp (parseList_reject h')
   obtain ⟨c, hc, hd⟩ := metaUser_reject_sound O D s t hr
   exact ⟨c, hc, hc ▸ hn, hd⟩
+
+theorem userList_reject_complete (O : Oracles) (D : Descriptions) :
+    RejectComplete (tryNonterminal (specListUserSpecifier O D)) (UserListRejectG O) := by
+  rintro c r s ⟨hn, hmeta⟩ hs
+  obtain ⟨t, ht, hr⟩ := metaUser_reject_complete O D c r s hmeta hs
+  refine ⟨t, tryNonterminal_reject.mpr ?_, hr⟩
+  unfold specListUserSpecifier
+  exact specList_reject_iff.mpr ⟨hs.symm ▸ hn, ht⟩
 
 end SudoersSpec.Grammar

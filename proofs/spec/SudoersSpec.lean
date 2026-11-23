@@ -68,3 +68,7 @@ import SudoersSpec.Grammar.PermissionNames
 import SudoersSpec.Grammar.PermissionCommands
 import SudoersSpec.Grammar.PermissionValues
 import SudoersSpec.Grammar.PermissionValueCheck
+import SudoersSpec.Grammar.SudoTagPosition
+import SudoersSpec.Grammar.SudoRunasExact
+import SudoersSpec.Grammar.SudoAmbiguity
+import SudoersSpec.Grammar.SudoUnique
