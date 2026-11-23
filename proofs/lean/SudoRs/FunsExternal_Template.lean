@@ -317,6 +317,19 @@ axiom std.collections.hash.set.HashSet.remove
   std.collections.hash.set.HashSet T S A → Q → Result (Bool ×
     (std.collections.hash.set.HashSet T S A))
 
+/-- [std::collections::hash::set::{impl core::clone::Clone for std::collections::hash::set::HashSet<T, S, A>}::clone]:
+    Source: '/rustc/library/std/src/collections/hash/set.rs', lines 1131:4-1131:27
+    Name pattern: [std::collections::hash::set::{core::clone::Clone<std::collections::hash::set::HashSet<@T, @S, @A>>}::clone]
+    Visibility: public -/
+@[rust_fun
+  "std::collections::hash::set::{core::clone::Clone<std::collections::hash::set::HashSet<@T, @S, @A>>}::clone"]
+axiom std.collections.hash.set.HashSet.Insts.CoreCloneClone.clone
+  {T : Type _} {S : Type _} {A : Type _} (corecloneCloneInst : core.clone.Clone
+  T) (corecloneCloneInst1 : core.clone.Clone S) (corecloneCloneInst2 :
+  core.clone.Clone A) :
+  std.collections.hash.set.HashSet T S A → Result
+    (std.collections.hash.set.HashSet T S A)
+
 /-- [std::ffi::os_str::{impl core::ops::deref::Deref<std::ffi::os_str::OsStr> for std::ffi::os_str::OsString}::deref]:
     Source: '/rustc/library/std/src/ffi/os_str.rs', lines 672:4-672:29
     Name pattern: [std::ffi::os_str::{core::ops::deref::Deref<std::ffi::os_str::OsString, std::ffi::os_str::OsStr>}::deref]
@@ -351,6 +364,15 @@ axiom std.ffi.os_str.OsStr.as_encoded_bytes
   "std::ffi::os_str::{core::convert::AsRef<str, std::ffi::os_str::OsStr>}::as_ref"]
 axiom Str.Insts.CoreConvertAsRefOsStr.as_ref
   : Str → Result std.ffi.os_str.OsStr
+
+/-- [std::hash::random::{impl core::clone::Clone for std::hash::random::RandomState}::clone]:
+    Source: '/rustc/library/std/src/hash/random.rs', lines 34:9-34:14
+    Name pattern: [std::hash::random::{core::clone::Clone<std::hash::random::RandomState>}::clone]
+    Visibility: public -/
+@[rust_fun
+  "std::hash::random::{core::clone::Clone<std::hash::random::RandomState>}::clone"]
+axiom std.hash.random.RandomState.Insts.CoreCloneClone.clone
+  : std.hash.random.RandomState → Result std.hash.random.RandomState
 
 /-- [std::hash::random::{impl core::hash::Hasher for std::hash::random::DefaultHasher}::finish]:
     Source: '/rustc/library/std/src/hash/random.rs', lines 140:4-140:27
@@ -391,6 +413,13 @@ axiom
 axiom std.ffi.os_str.OsString.Insts.StdOsUnixFfiOs_strOsStringExt.from_vec
   : alloc.vec.Vec Std.U8 → Result std.ffi.os_str.OsString
 
+/-- [std::path::{std::path::PathBuf}::as_path]:
+    Source: '/rustc/library/std/src/path.rs', lines 1275:4-1275:34
+    Name pattern: [std::path::{std::path::PathBuf}::as_path]
+    Visibility: public -/
+@[rust_fun "std::path::{std::path::PathBuf}::as_path"]
+axiom std.path.PathBuf.as_path : std.path.PathBuf → Result std.path.Path
+
 /-- [std::path::{std::path::Path}::new]:
     Source: '/rustc/library/std/src/path.rs', lines 2412:4-2412:70
     Name pattern: [std::path::{std::path::Path}::new]
@@ -401,6 +430,13 @@ axiom std.path.Path.new
   std.ffi.os_str.OsStr) :
   S → Result std.path.Path
 
+/-- [std::path::{std::path::Path}::to_path_buf]:
+    Source: '/rustc/library/std/src/path.rs', lines 2528:4-2528:40
+    Name pattern: [std::path::{std::path::Path}::to_path_buf]
+    Visibility: public -/
+@[rust_fun "std::path::{std::path::Path}::to_path_buf"]
+axiom std.path.Path.to_path_buf : std.path.Path → Result std.path.PathBuf
+
 /-- [alloc::boxed::convert::{impl core::convert::From<&'_0 str> for alloc::boxed::Box<str>}::from]:
     Source: '/rustc/library/alloc/src/boxed/convert.rs', lines 137:4-137:32
     Name pattern: [alloc::boxed::convert::{core::convert::From<Box<str>, &'0 str>}::from]
@@ -408,6 +444,21 @@ axiom std.path.Path.new
 @[rust_fun
   "alloc::boxed::convert::{core::convert::From<Box<str>, &'0 str>}::from"]
 axiom BoxStr.Insts.CoreConvertFromShared0Str.from : Str → Result Str
+
+/-- [alloc::boxed::{impl core::default::Default for alloc::boxed::Box<[T]>}::default]:
+    Source: '/rustc/library/alloc/src/boxed.rs', lines 2047:4-2047:24
+    Name pattern: [alloc::boxed::{core::default::Default<Box<[@T]>>}::default]
+    Visibility: public -/
+@[rust_fun "alloc::boxed::{core::default::Default<Box<[@T]>>}::default"]
+axiom BoxSlice.Insts.CoreDefaultDefault.default (T : Type _) : Result (Slice T)
+
+/-- [alloc::boxed::{impl core::clone::Clone for alloc::boxed::Box<str>}::clone]:
+    Source: '/rustc/library/alloc/src/boxed.rs', lines 2171:4-2171:27
+    Name pattern: [alloc::boxed::{core::clone::Clone<Box<str>>}::clone]
+    Visibility: public -/
+@[rust_fun "alloc::boxed::{core::clone::Clone<Box<str>>}::clone"]
+axiom BoxStr.Insts.CoreCloneClone.clone
+  {A : Type _} (corecloneCloneInst : core.clone.Clone A) : Str → Result Str
 
 /-- [alloc::boxed::{impl core::convert::AsRef<T> for alloc::boxed::Box<T>}::as_ref]:
     Source: '/rustc/library/alloc/src/boxed.rs', lines 2429:4-2429:26
@@ -496,6 +547,16 @@ axiom alloc.string.String.Insts.CoreConvertFromShared0Str.from
 axiom alloc.vec.Vec.into_boxed_slice
   {T : Type _} (A : Type _) : alloc.vec.Vec T → Result (Slice T)
 
+/-- [alloc::vec::{alloc::vec::Vec<T>}::append]:
+    Source: '/rustc/library/alloc/src/vec/mod.rs', lines 2979:4-2979:46
+    Name pattern: [alloc::vec::{alloc::vec::Vec<@T>}::append]
+    Visibility: public -/
+@[rust_fun "alloc::vec::{alloc::vec::Vec<@T>}::append"]
+axiom alloc.vec.Vec.append
+  {T : Type _} (A : Type _) :
+  alloc.vec.Vec T → alloc.vec.Vec T → Result ((alloc.vec.Vec T) ×
+    (alloc.vec.Vec T))
+
 /-- [alloc::vec::{impl core::default::Default for alloc::vec::Vec<T>}::default]:
     Source: '/rustc/library/alloc/src/vec/mod.rs', lines 4417:4-4417:26
     Name pattern: [alloc::vec::{core::default::Default<alloc::vec::Vec<@T>>}::default]
@@ -537,6 +598,12 @@ axiom common.string.SudoString.Insts.CoreOpsDerefDerefStr.deref
     Visibility: public -/
 axiom common.string.SudoString.Insts.CoreCmpPartialEqStr.eq
   : common.string.SudoString → Str → Result Bool
+
+/-- [sudo_rs::defaults::{impl core::default::Default for sudo_rs::defaults::Settings}::default]:
+    Source: 'src/defaults/settings_dsl.rs', lines 269:12-273:13; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 39:0-93:1
+    Visibility: public -/
+axiom defaults.Settings.Insts.CoreDefaultDefault.default
+  : Result defaults.Settings
 
 /-- [sudo_rs::sudoers::char_stream::chars_of]:
     Source: 'src/sudoers/char_stream.rs', lines 95:0-97:1
@@ -583,13 +650,32 @@ axiom sudoers.tokens.classify_chdir
   : String → Result sudoers.tokens.ChDirForm
 
 /-- [sudo_rs::sudoers::warn_ignored]:
-    Source: 'src/sudoers/mod.rs', lines 917:0-927:1 -/
+    Source: 'src/sudoers/mod.rs', lines 940:0-950:1 -/
 axiom sudoers.warn_ignored : sudoers.Ignored → Result Unit
 
 /-- [sudo_rs::sudoers::alias_diagnostic]:
-    Source: 'src/sudoers/mod.rs', lines 1303:0-1314:1 -/
+    Source: 'src/sudoers/mod.rs', lines 1451:0-1462:1 -/
 axiom sudoers.alias_diagnostic
   :
   alloc.vec.Vec sudoers.Error → sudoers.AliasDiagnostic → Str → Result
     (alloc.vec.Vec sudoers.Error)
+
+/-- [sudo_rs::sudoers::include_dir_files]:
+    Source: 'src/sudoers/mod.rs', lines 1385:0-1410:1 -/
+axiom sudoers.include_dir_files
+  :
+  std.path.Path → String → Result (core.result.Result (alloc.vec.Vec
+    std.path.PathBuf) String)
+
+/-- [sudo_rs::sudoers::include_file]:
+    Source: 'src/sudoers/mod.rs', lines 1329:0-1379:1 -/
+axiom sudoers.include_file
+  :
+  std.path.Path → sudoers.IncludeFile → Option sudoers.IncludeState →
+    Result (core.result.Result (std.path.PathBuf × (alloc.vec.Vec
+    (core.result.Result sudoers.ast.Sudo sudoers.basic_parser.Status))) String)
+
+/-- [sudo_rs::sudoers::fatal_message]:
+    Source: 'src/sudoers/mod.rs', lines 1165:0-1167:1 -/
+axiom sudoers.fatal_message : sudoers.basic_parser.ErrorKind → Result String
 

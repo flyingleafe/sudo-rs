@@ -106,6 +106,16 @@ def Str.Insts.CoreConvertAsRefOsStr : core.convert.AsRef Str
   as_ref := Str.Insts.CoreConvertAsRefOsStr.as_ref
 }
 
+/-- Trait implementation: [std::hash::random::{impl core::clone::Clone for std::hash::random::RandomState}]
+    Source: '/rustc/library/std/src/hash/random.rs', lines 34:9-34:14
+    Name pattern: [core::clone::Clone<std::hash::random::RandomState>] -/
+@[reducible, rust_trait_impl
+  "core::clone::Clone<std::hash::random::RandomState>"]
+def std.hash.random.RandomState.Insts.CoreCloneClone : core.clone.Clone
+  std.hash.random.RandomState := {
+  clone := std.hash.random.RandomState.Insts.CoreCloneClone.clone
+}
+
 /-- Trait implementation: [std::hash::random::{impl core::hash::Hasher for std::hash::random::DefaultHasher}]
     Source: '/rustc/library/std/src/hash/random.rs', lines 125:0-125:29
     Name pattern: [core::hash::Hasher<std::hash::random::DefaultHasher>] -/
@@ -136,6 +146,15 @@ def std.hash.random.RandomState.Insts.CoreHashBuildHasherDefaultHasher :
 @[reducible, rust_trait_impl "core::convert::From<Box<str>, &'0 str>"]
 def BoxStr.Insts.CoreConvertFromShared0Str : core.convert.From Str Str := {
   «from» := BoxStr.Insts.CoreConvertFromShared0Str.from
+}
+
+/-- Trait implementation: [alloc::boxed::{impl core::clone::Clone for alloc::boxed::Box<str>}]
+    Source: '/rustc/library/alloc/src/boxed.rs', lines 2170:0-2170:48
+    Name pattern: [core::clone::Clone<Box<str>>] -/
+@[reducible, rust_trait_impl "core::clone::Clone<Box<str>>"]
+def BoxStr.Insts.CoreCloneClone {A : Type _} (corecloneCloneInst :
+  core.clone.Clone A) : core.clone.Clone Str := {
+  clone := BoxStr.Insts.CoreCloneClone.clone corecloneCloneInst
 }
 
 /-- Trait implementation: [alloc::string::{impl core::cmp::PartialEq<alloc::string::String> for alloc::string::String}]
@@ -1078,6 +1097,132 @@ def defaults.Settings.impl.umask_override
 def defaults.Settings.impl.log_allowed
   (self : defaults.Settings) : Result Bool := do
   ok self.log_allowed
+
+/-- [sudo_rs::defaults::enums::{impl core::clone::Clone for sudo_rs::defaults::enums::timestamp_type}::clone]:
+    Source: 'src/defaults/settings_dsl.rs', lines 227:25-227:30; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 39:0-93:1
+    Visibility: public -/
+def defaults.enums.timestamp_type.Insts.CoreCloneClone.clone
+  (self : defaults.enums.timestamp_type) :
+  Result defaults.enums.timestamp_type
+  := do
+  ok self
+
+/-- [sudo_rs::defaults::enums::{impl core::clone::Clone for sudo_rs::defaults::enums::verifypw}::clone]:
+    Source: 'src/defaults/settings_dsl.rs', lines 227:25-227:30; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 39:0-93:1
+    Visibility: public -/
+def defaults.enums.verifypw.Insts.CoreCloneClone.clone
+  (self : defaults.enums.verifypw) : Result defaults.enums.verifypw := do
+  ok self
+
+/-- [sudo_rs::defaults::enums::{impl core::clone::Clone for sudo_rs::defaults::enums::lecture}::clone]:
+    Source: 'src/defaults/settings_dsl.rs', lines 227:25-227:30; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 39:0-93:1
+    Visibility: public -/
+def defaults.enums.lecture.Insts.CoreCloneClone.clone
+  (self : defaults.enums.lecture) : Result defaults.enums.lecture := do
+  ok self
+
+/-- [sudo_rs::defaults::{impl core::clone::Clone for sudo_rs::defaults::Settings}::clone]:
+    Source: 'src/defaults/settings_dsl.rs', lines 233:17-233:22; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 39:0-93:1
+    Visibility: public -/
+def defaults.Settings.Insts.CoreCloneClone.clone
+  (self : defaults.Settings) : Result defaults.Settings := do
+  let b ←
+    lift (core.clone.impls.CloneBool.clone self.always_query_group_plugin)
+  let b1 ← lift (core.clone.impls.CloneBool.clone self.always_set_home)
+  let b2 ← lift (core.clone.impls.CloneBool.clone self.env_reset)
+  let b3 ← lift (core.clone.impls.CloneBool.clone self.fqdn)
+  let b4 ← lift (core.clone.impls.CloneBool.clone self.ignore_dot)
+  let l ← defaults.enums.lecture.Insts.CoreCloneClone.clone self.lecture
+  let o ←
+    core.option.Option.Insts.CoreCloneClone.clone (BoxStr.Insts.CoreCloneClone
+      core.clone.CloneGlobal) self.mailerpath
+  let b5 ← lift (core.clone.impls.CloneBool.clone self.mail_badpass)
+  let b6 ← lift (core.clone.impls.CloneBool.clone self.match_group_by_gid)
+  let b7 ← lift (core.clone.impls.CloneBool.clone self.use_pty)
+  let b8 ← lift (core.clone.impls.CloneBool.clone self.visiblepw)
+  let b9 ← lift (core.clone.impls.CloneBool.clone self.pwfeedback)
+  let b10 ← lift (core.clone.impls.CloneBool.clone self.rootpw)
+  let b11 ← lift (core.clone.impls.CloneBool.clone self.targetpw)
+  let b12 ← lift (core.clone.impls.CloneBool.clone self.noexec)
+  let b13 ← lift (core.clone.impls.CloneBool.clone self.noninteractive_auth)
+  let b14 ← lift (core.clone.impls.CloneBool.clone self.log_allowed)
+  let b15 ← lift (core.clone.impls.CloneBool.clone self.log_denied)
+  let b16 ← lift (core.clone.impls.CloneBool.clone self.insults)
+  let b17 ← lift (core.clone.impls.CloneBool.clone self.setenv)
+  let o1 ←
+    core.option.Option.Insts.CoreCloneClone.clone (BoxStr.Insts.CoreCloneClone
+      core.clone.CloneGlobal) self.runcwd
+  let o2 ←
+    core.option.Option.Insts.CoreCloneClone.clone (BoxStr.Insts.CoreCloneClone
+      core.clone.CloneGlobal) self.apparmor_profile
+  let i ← lift (core.clone.impls.CloneU64.clone self.umask)
+  let b18 ← lift (core.clone.impls.CloneBool.clone self.umask_override)
+  let i1 ← lift (core.clone.impls.CloneU64.clone self.passwd_tries)
+  let o3 ←
+    core.option.Option.Insts.CoreCloneClone.clone (BoxStr.Insts.CoreCloneClone
+      core.clone.CloneGlobal) self.secure_path
+  let v ← defaults.enums.verifypw.Insts.CoreCloneClone.clone self.verifypw
+  let i2 ← lift (core.clone.impls.CloneU64.clone self.passwd_timeout)
+  let i3 ← lift (core.clone.impls.CloneU64.clone self.timestamp_timeout)
+  let tt ←
+    defaults.enums.timestamp_type.Insts.CoreCloneClone.clone
+      self.timestamp_type
+  let s ←
+    BoxStr.Insts.CoreCloneClone.clone core.clone.CloneGlobal self.editor
+  let b19 ← lift (core.clone.impls.CloneBool.clone self.env_editor)
+  let hs ←
+    std.collections.hash.set.HashSet.Insts.CoreCloneClone.clone
+      alloc.string.String.Insts.CoreCloneClone
+      std.hash.random.RandomState.Insts.CoreCloneClone core.clone.CloneGlobal
+      self.env_keep
+  let hs1 ←
+    std.collections.hash.set.HashSet.Insts.CoreCloneClone.clone
+      alloc.string.String.Insts.CoreCloneClone
+      std.hash.random.RandomState.Insts.CoreCloneClone core.clone.CloneGlobal
+      self.env_check
+  let hs2 ←
+    std.collections.hash.set.HashSet.Insts.CoreCloneClone.clone
+      alloc.string.String.Insts.CoreCloneClone
+      std.hash.random.RandomState.Insts.CoreCloneClone core.clone.CloneGlobal
+      self.env_delete
+  ok
+    {
+      always_query_group_plugin := b,
+      always_set_home := b1,
+      env_reset := b2,
+      fqdn := b3,
+      ignore_dot := b4,
+      lecture := l,
+      mailerpath := o,
+      mail_badpass := b5,
+      match_group_by_gid := b6,
+      use_pty := b7,
+      visiblepw := b8,
+      pwfeedback := b9,
+      rootpw := b10,
+      targetpw := b11,
+      noexec := b12,
+      noninteractive_auth := b13,
+      log_allowed := b14,
+      log_denied := b15,
+      insults := b16,
+      setenv := b17,
+      runcwd := o1,
+      apparmor_profile := o2,
+      umask := i,
+      umask_override := b18,
+      passwd_tries := i1,
+      secure_path := o3,
+      verifypw := v,
+      passwd_timeout := i2,
+      timestamp_timeout := i3,
+      timestamp_type := tt,
+      editor := s,
+      env_editor := b19,
+      env_keep := hs,
+      env_check := hs1,
+      env_delete := hs2
+    }
 
 /-- [sudo_rs::defaults::{sudo_rs::defaults::Settings}::passwd_tries]:
     Source: 'src/defaults/settings_dsl.rs', lines 243:16-245:17; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 39:0-93:1 -/
@@ -2215,7 +2360,7 @@ def sudoers.tokens.Meta.Insts.Sudo_rsSudoersAst_namesUserFriendly {T : Type _}
 }
 
 /-- [sudo_rs::sudoers::ast::{impl sudo_rs::sudoers::basic_parser::Many for sudo_rs::sudoers::ast::Qualified<T>}::LIMIT]
-    Source: 'src/sudoers/ast.rs', lines 269:4-269:34
+    Source: 'src/sudoers/ast.rs', lines 270:4-270:34
     Visibility: public -/
 @[global_simps, irreducible]
 def sudoers.ast.Qualified.Insts.Sudo_rsSudoersBasic_parserMany.LIMIT {T :
@@ -2224,7 +2369,7 @@ def sudoers.ast.Qualified.Insts.Sudo_rsSudoersBasic_parserMany.LIMIT {T :
   basic_parserManyInst.LIMIT
 
 /-- [sudo_rs::sudoers::ast::{impl sudo_rs::sudoers::basic_parser::Many for sudo_rs::sudoers::ast::Qualified<T>}::SEP]
-    Source: 'src/sudoers/ast.rs', lines 268:4-268:29
+    Source: 'src/sudoers/ast.rs', lines 269:4-269:29
     Visibility: public -/
 @[global_simps, irreducible]
 def sudoers.ast.Qualified.Insts.Sudo_rsSudoersBasic_parserMany.SEP {T : Type _}
@@ -2232,7 +2377,7 @@ def sudoers.ast.Qualified.Insts.Sudo_rsSudoersBasic_parserMany.SEP {T : Type _}
   basic_parserManyInst.SEP
 
 /-- Trait implementation: [sudo_rs::sudoers::ast::{impl sudo_rs::sudoers::basic_parser::Many for sudo_rs::sudoers::ast::Qualified<T>}]
-    Source: 'src/sudoers/ast.rs', lines 267:0-270:1 -/
+    Source: 'src/sudoers/ast.rs', lines 268:0-271:1 -/
 @[reducible]
 def sudoers.ast.Qualified.Insts.Sudo_rsSudoersBasic_parserMany {T : Type _}
   (basic_parserManyInst : sudoers.basic_parser.Many T) :
@@ -2282,7 +2427,7 @@ def sudoers.basic_parser.is_syntax
     ok (r2, stream1)
 
 /-- [sudo_rs::sudoers::ast::{impl sudo_rs::sudoers::basic_parser::Parse for sudo_rs::sudoers::ast::Qualified<T>}::parse]: loop 0:
-    Source: 'src/sudoers/ast.rs', lines 241:12-250:13
+    Source: 'src/sudoers/ast.rs', lines 242:12-251:13
     Visibility: public -/
 @[rust_loop]
 def sudoers.ast.Qualified.Insts.Sudo_rsSudoersBasic_parserParse.parse_loop
@@ -2310,7 +2455,7 @@ def sudoers.ast.Qualified.Insts.Sudo_rsSudoersBasic_parserParse.parse_loop
 partial_fixpoint
 
 /-- [sudo_rs::sudoers::ast::{impl sudo_rs::sudoers::basic_parser::Parse for sudo_rs::sudoers::ast::Qualified<T>}::parse]:
-    Source: 'src/sudoers/ast.rs', lines 236:4-264:5
+    Source: 'src/sudoers/ast.rs', lines 237:4-265:5
     Visibility: public -/
 def sudoers.ast.Qualified.Insts.Sudo_rsSudoersBasic_parserParse.parse
   {T : Type _} (basic_parserParseInst : sudoers.basic_parser.Parse T)
@@ -2377,7 +2522,7 @@ def sudoers.ast.Qualified.Insts.Sudo_rsSudoersBasic_parserParse.parse
     ok (r1, stream1)
 
 /-- Trait implementation: [sudo_rs::sudoers::ast::{impl sudo_rs::sudoers::basic_parser::Parse for sudo_rs::sudoers::ast::Qualified<T>}]
-    Source: 'src/sudoers/ast.rs', lines 235:0-265:1 -/
+    Source: 'src/sudoers/ast.rs', lines 236:0-266:1 -/
 @[reducible]
 def sudoers.ast.Qualified.Insts.Sudo_rsSudoersBasic_parserParse {T : Type _}
   (basic_parserParseInst : sudoers.basic_parser.Parse T)
@@ -2867,7 +3012,7 @@ def sudoers.tokens.DigitsU32.Insts.Sudo_rsSudoersAst_namesUserFriendly :
 }
 
 /-- [sudo_rs::sudoers::ast::{impl sudo_rs::sudoers::basic_parser::Parse for sudo_rs::sudoers::ast::Identifier}::parse]:
-    Source: 'src/sudoers/ast.rs', lines 215:4-223:5
+    Source: 'src/sudoers/ast.rs', lines 216:4-224:5
     Visibility: public -/
 def sudoers.ast.Identifier.Insts.Sudo_rsSudoersBasic_parserParse.parse
   (stream : sudoers.char_stream.CharStream) :
@@ -2911,7 +3056,7 @@ def sudoers.ast.Identifier.Insts.Sudo_rsSudoersBasic_parserParse.parse
       ok (r1, stream2)
 
 /-- Trait implementation: [sudo_rs::sudoers::ast::{impl sudo_rs::sudoers::basic_parser::Parse for sudo_rs::sudoers::ast::Identifier}]
-    Source: 'src/sudoers/ast.rs', lines 214:0-224:1 -/
+    Source: 'src/sudoers/ast.rs', lines 215:0-225:1 -/
 @[reducible]
 def sudoers.ast.Identifier.Insts.Sudo_rsSudoersBasic_parserParse :
   sudoers.basic_parser.Parse sudoers.ast.Identifier := {
@@ -2919,7 +3064,7 @@ def sudoers.ast.Identifier.Insts.Sudo_rsSudoersBasic_parserParse :
 }
 
 /-- [sudo_rs::sudoers::ast::{impl sudo_rs::sudoers::basic_parser::Parse for sudo_rs::sudoers::ast::UserSpecifier}::parse::parse_user]:
-    Source: 'src/sudoers/ast.rs', lines 315:8-332:9 -/
+    Source: 'src/sudoers/ast.rs', lines 316:8-333:9 -/
 def sudoers.ast.ParseUserSpecifier.parse.parse_user
   (stream : sudoers.char_stream.CharStream) :
   Result ((core.result.Result sudoers.ast.UserSpecifier
@@ -2980,7 +3125,7 @@ def sudoers.ast.ParseUserSpecifier.parse.parse_user
         ok (r1, stream3)
 
 /-- [sudo_rs::sudoers::ast::{impl sudo_rs::sudoers::basic_parser::Parse for sudo_rs::sudoers::ast::UserSpecifier}::parse]:
-    Source: 'src/sudoers/ast.rs', lines 314:4-347:5
+    Source: 'src/sudoers/ast.rs', lines 315:4-348:5
     Visibility: public -/
 def sudoers.ast.UserSpecifier.Insts.Sudo_rsSudoersBasic_parserParse.parse
   (stream : sudoers.char_stream.CharStream) :
@@ -3036,7 +3181,7 @@ def sudoers.ast.UserSpecifier.Insts.Sudo_rsSudoersBasic_parserParse.parse
   else sudoers.ast.ParseUserSpecifier.parse.parse_user stream1
 
 /-- Trait implementation: [sudo_rs::sudoers::ast::{impl sudo_rs::sudoers::basic_parser::Parse for sudo_rs::sudoers::ast::UserSpecifier}]
-    Source: 'src/sudoers/ast.rs', lines 313:0-348:1 -/
+    Source: 'src/sudoers/ast.rs', lines 314:0-349:1 -/
 @[reducible]
 def sudoers.ast.UserSpecifier.Insts.Sudo_rsSudoersBasic_parserParse :
   sudoers.basic_parser.Parse sudoers.ast.UserSpecifier := {
@@ -3068,7 +3213,7 @@ def core.option.Option.Insts.Sudo_rsSudoersBasic_parserParse {T : Type _}
 }
 
 /-- [sudo_rs::sudoers::ast::parse_meta]:
-    Source: 'src/sudoers/ast.rs', lines 290:0-297:1 -/
+    Source: 'src/sudoers/ast.rs', lines 291:0-298:1 -/
 def sudoers.ast.parse_meta
   {T : Type _} (basic_parserParseInst : sudoers.basic_parser.Parse T)
   (FromUsernameInst : sudoers.ast.FromUsername T)
@@ -3120,7 +3265,7 @@ def sudoers.ast.parse_meta
     ok (r1, stream1)
 
 /-- [sudo_rs::sudoers::ast::{impl sudo_rs::sudoers::ast::FromUsername for sudo_rs::sudoers::ast::UserSpecifier}::from_username]:
-    Source: 'src/sudoers/ast.rs', lines 284:4-286:5 -/
+    Source: 'src/sudoers/ast.rs', lines 285:4-287:5 -/
 def sudoers.ast.UserSpecifier.Insts.Sudo_rsSudoersAstFromUsername.from_username
   («name» : common.string.SudoString) :
   Result sudoers.ast.UserSpecifier
@@ -3128,7 +3273,7 @@ def sudoers.ast.UserSpecifier.Insts.Sudo_rsSudoersAstFromUsername.from_username
   ok (sudoers.ast.UserSpecifier.User (sudoers.ast.Identifier.Name «name»))
 
 /-- Trait implementation: [sudo_rs::sudoers::ast::{impl sudo_rs::sudoers::ast::FromUsername for sudo_rs::sudoers::ast::UserSpecifier}]
-    Source: 'src/sudoers/ast.rs', lines 283:0-287:1 -/
+    Source: 'src/sudoers/ast.rs', lines 284:0-288:1 -/
 @[reducible]
 def sudoers.ast.UserSpecifier.Insts.Sudo_rsSudoersAstFromUsername :
   sudoers.ast.FromUsername sudoers.ast.UserSpecifier := {
@@ -3137,7 +3282,7 @@ def sudoers.ast.UserSpecifier.Insts.Sudo_rsSudoersAstFromUsername :
 }
 
 /-- [sudo_rs::sudoers::ast::{impl sudo_rs::sudoers::basic_parser::Parse for sudo_rs::sudoers::tokens::Meta<sudo_rs::sudoers::ast::UserSpecifier>}::parse]:
-    Source: 'src/sudoers/ast.rs', lines 354:4-356:5
+    Source: 'src/sudoers/ast.rs', lines 355:4-357:5
     Visibility: public -/
 def
   sudoers.tokens.MetaUserSpecifier.Insts.Sudo_rsSudoersBasic_parserParse.parse
@@ -3150,7 +3295,7 @@ def
     sudoers.ast.UserSpecifier.Insts.Sudo_rsSudoersAstFromUsername stream
 
 /-- Trait implementation: [sudo_rs::sudoers::ast::{impl sudo_rs::sudoers::basic_parser::Parse for sudo_rs::sudoers::tokens::Meta<sudo_rs::sudoers::ast::UserSpecifier>}]
-    Source: 'src/sudoers/ast.rs', lines 353:0-357:1 -/
+    Source: 'src/sudoers/ast.rs', lines 354:0-358:1 -/
 @[reducible]
 def sudoers.tokens.MetaUserSpecifier.Insts.Sudo_rsSudoersBasic_parserParse :
   sudoers.basic_parser.Parse (sudoers.tokens.Meta sudoers.ast.UserSpecifier)
@@ -3160,7 +3305,7 @@ def sudoers.tokens.MetaUserSpecifier.Insts.Sudo_rsSudoersBasic_parserParse :
 }
 
 /-- Trait implementation: [sudo_rs::sudoers::ast::{impl sudo_rs::sudoers::basic_parser::Many for sudo_rs::sudoers::ast::UserSpecifier}]
-    Source: 'src/sudoers/ast.rs', lines 350:0-350:30 -/
+    Source: 'src/sudoers/ast.rs', lines 351:0-351:30 -/
 @[reducible]
 def sudoers.ast.UserSpecifier.Insts.Sudo_rsSudoersBasic_parserMany :
   sudoers.basic_parser.Many sudoers.ast.UserSpecifier := {
@@ -3258,7 +3403,7 @@ def
 }
 
 /-- [sudo_rs::sudoers::ast::{impl sudo_rs::sudoers::basic_parser::Many for (alloc::vec::Vec<sudo_rs::sudoers::ast::Qualified<sudo_rs::sudoers::tokens::Meta<sudo_rs::sudoers::tokens::Hostname>>>, alloc::vec::Vec<(core::option::Option<sudo_rs::sudoers::ast::RunAs>, sudo_rs::sudoers::ast::CommandSpec)>)}::SEP]
-    Source: 'src/sudoers/ast.rs', lines 579:4-579:26
+    Source: 'src/sudoers/ast.rs', lines 580:4-580:26
     Visibility: public -/
 @[global_simps, irreducible]
 def
@@ -3267,7 +3412,7 @@ def
   ':'
 
 /-- Trait implementation: [sudo_rs::sudoers::ast::{impl sudo_rs::sudoers::basic_parser::Many for (alloc::vec::Vec<sudo_rs::sudoers::ast::Qualified<sudo_rs::sudoers::tokens::Meta<sudo_rs::sudoers::tokens::Hostname>>>, alloc::vec::Vec<(core::option::Option<sudo_rs::sudoers::ast::RunAs>, sudo_rs::sudoers::ast::CommandSpec)>)}]
-    Source: 'src/sudoers/ast.rs', lines 578:0-580:1 -/
+    Source: 'src/sudoers/ast.rs', lines 579:0-581:1 -/
 @[reducible]
 def
   PairVecQualifiedMetaHostnameVecPairOptionRunAsCommandSpec.Insts.Sudo_rsSudoersBasic_parserMany
@@ -3301,7 +3446,7 @@ def PairOptionRunAsCommandSpec.Insts.Sudo_rsSudoersAst_namesUserFriendly :
 }
 
 /-- Trait implementation: [sudo_rs::sudoers::ast::{impl sudo_rs::sudoers::basic_parser::Many for (core::option::Option<sudo_rs::sudoers::ast::RunAs>, sudo_rs::sudoers::ast::CommandSpec)}]
-    Source: 'src/sudoers/ast.rs', lines 603:0-603:45 -/
+    Source: 'src/sudoers/ast.rs', lines 604:0-604:45 -/
 @[reducible]
 def PairOptionRunAsCommandSpec.Insts.Sudo_rsSudoersBasic_parserMany :
   sudoers.basic_parser.Many ((Option sudoers.ast.RunAs) ×
@@ -4304,7 +4449,7 @@ def sudoers.tokens.StringParameter.Insts.Sudo_rsSudoersAst_namesUserFriendly :
 }
 
 /-- [sudo_rs::sudoers::ast::switch]:
-    Source: 'src/sudoers/ast.rs', lines 435:0-438:1 -/
+    Source: 'src/sudoers/ast.rs', lines 436:0-439:1 -/
 def sudoers.ast.switch
   (modifier : sudoers.ast.Modifier) (stream : sudoers.char_stream.CharStream) :
   Result ((core.result.Result sudoers.ast.Modifier sudoers.basic_parser.Status)
@@ -4324,7 +4469,7 @@ def sudoers.ast.switch
     ok (r1, stream1)
 
 /-- [sudo_rs::sudoers::ast::{impl sudo_rs::sudoers::basic_parser::Parse for sudo_rs::sudoers::ast::MetaOrTag}::parse]:
-    Source: 'src/sudoers/ast.rs', lines 441:4-499:5
+    Source: 'src/sudoers/ast.rs', lines 442:4-500:5
     Visibility: public -/
 def sudoers.ast.MetaOrTag.Insts.Sudo_rsSudoersBasic_parserParse.parse
   (stream : sudoers.char_stream.CharStream) :
@@ -4980,7 +5125,7 @@ def sudoers.ast.MetaOrTag.Insts.Sudo_rsSudoersBasic_parserParse.parse
     ok (r1, stream1)
 
 /-- Trait implementation: [sudo_rs::sudoers::ast::{impl sudo_rs::sudoers::basic_parser::Parse for sudo_rs::sudoers::ast::MetaOrTag}]
-    Source: 'src/sudoers/ast.rs', lines 440:0-500:1 -/
+    Source: 'src/sudoers/ast.rs', lines 441:0-501:1 -/
 @[reducible]
 def sudoers.ast.MetaOrTag.Insts.Sudo_rsSudoersBasic_parserParse :
   sudoers.basic_parser.Parse sudoers.ast.MetaOrTag := {
@@ -4988,7 +5133,7 @@ def sudoers.ast.MetaOrTag.Insts.Sudo_rsSudoersBasic_parserParse :
 }
 
 /-- [sudo_rs::sudoers::ast::command_tag_step]:
-    Source: 'src/sudoers/ast.rs', lines 504:0-521:1 -/
+    Source: 'src/sudoers/ast.rs', lines 505:0-522:1 -/
 def sudoers.ast.command_tag_step
   (stream : sudoers.char_stream.CharStream)
   (tags : alloc.vec.Vec sudoers.ast.Modifier) :
@@ -5039,7 +5184,7 @@ def sudoers.ast.command_tag_step
     ok (r1, stream1, tags)
 
 /-- [sudo_rs::sudoers::ast::{impl sudo_rs::sudoers::basic_parser::Parse for sudo_rs::sudoers::ast::CommandSpec}::parse]: loop 0:
-    Source: 'src/sudoers/ast.rs', lines 534:8-546:9
+    Source: 'src/sudoers/ast.rs', lines 535:8-547:9
     Visibility: public -/
 @[rust_loop]
 def sudoers.ast.CommandSpec.Insts.Sudo_rsSudoersBasic_parserParse.parse_loop
@@ -5072,7 +5217,7 @@ def sudoers.ast.CommandSpec.Insts.Sudo_rsSudoersBasic_parserParse.parse_loop
 partial_fixpoint
 
 /-- [sudo_rs::sudoers::ast::{impl sudo_rs::sudoers::basic_parser::Parse for sudo_rs::sudoers::ast::CommandSpec}::parse]:
-    Source: 'src/sudoers/ast.rs', lines 528:4-558:5
+    Source: 'src/sudoers/ast.rs', lines 529:4-559:5
     Visibility: public -/
 def sudoers.ast.CommandSpec.Insts.Sudo_rsSudoersBasic_parserParse.parse
   (stream : sudoers.char_stream.CharStream) :
@@ -5118,7 +5263,7 @@ def sudoers.ast.CommandSpec.Insts.Sudo_rsSudoersBasic_parserParse.parse
       { src := s, pos := i, line := i1, col := i2 })
 
 /-- Trait implementation: [sudo_rs::sudoers::ast::{impl sudo_rs::sudoers::basic_parser::Parse for sudo_rs::sudoers::ast::CommandSpec}]
-    Source: 'src/sudoers/ast.rs', lines 527:0-559:1 -/
+    Source: 'src/sudoers/ast.rs', lines 528:0-560:1 -/
 @[reducible]
 def sudoers.ast.CommandSpec.Insts.Sudo_rsSudoersBasic_parserParse :
   sudoers.basic_parser.Parse sudoers.ast.CommandSpec := {
@@ -5126,13 +5271,13 @@ def sudoers.ast.CommandSpec.Insts.Sudo_rsSudoersBasic_parserParse :
 }
 
 /-- [sudo_rs::sudoers::ast::{impl sudo_rs::sudoers::ast::FromUsername for sudo_rs::sudoers::ast::Identifier}::from_username]:
-    Source: 'src/sudoers/ast.rs', lines 278:4-280:5 -/
+    Source: 'src/sudoers/ast.rs', lines 279:4-281:5 -/
 def sudoers.ast.Identifier.Insts.Sudo_rsSudoersAstFromUsername.from_username
   («name» : common.string.SudoString) : Result sudoers.ast.Identifier := do
   ok (sudoers.ast.Identifier.Name «name»)
 
 /-- Trait implementation: [sudo_rs::sudoers::ast::{impl sudo_rs::sudoers::ast::FromUsername for sudo_rs::sudoers::ast::Identifier}]
-    Source: 'src/sudoers/ast.rs', lines 277:0-281:1 -/
+    Source: 'src/sudoers/ast.rs', lines 278:0-282:1 -/
 @[reducible]
 def sudoers.ast.Identifier.Insts.Sudo_rsSudoersAstFromUsername :
   sudoers.ast.FromUsername sudoers.ast.Identifier := {
@@ -5141,7 +5286,7 @@ def sudoers.ast.Identifier.Insts.Sudo_rsSudoersAstFromUsername :
 }
 
 /-- [sudo_rs::sudoers::ast::{impl sudo_rs::sudoers::basic_parser::Parse for sudo_rs::sudoers::tokens::Meta<sudo_rs::sudoers::ast::Identifier>}::parse]:
-    Source: 'src/sudoers/ast.rs', lines 301:4-303:5
+    Source: 'src/sudoers/ast.rs', lines 302:4-304:5
     Visibility: public -/
 def sudoers.tokens.MetaIdentifier.Insts.Sudo_rsSudoersBasic_parserParse.parse
   (stream : sudoers.char_stream.CharStream) :
@@ -5153,7 +5298,7 @@ def sudoers.tokens.MetaIdentifier.Insts.Sudo_rsSudoersBasic_parserParse.parse
     sudoers.ast.Identifier.Insts.Sudo_rsSudoersAstFromUsername stream
 
 /-- Trait implementation: [sudo_rs::sudoers::ast::{impl sudo_rs::sudoers::basic_parser::Parse for sudo_rs::sudoers::tokens::Meta<sudo_rs::sudoers::ast::Identifier>}]
-    Source: 'src/sudoers/ast.rs', lines 300:0-304:1 -/
+    Source: 'src/sudoers/ast.rs', lines 301:0-305:1 -/
 @[reducible]
 def sudoers.tokens.MetaIdentifier.Insts.Sudo_rsSudoersBasic_parserParse :
   sudoers.basic_parser.Parse (sudoers.tokens.Meta sudoers.ast.Identifier) := {
@@ -5162,7 +5307,7 @@ def sudoers.tokens.MetaIdentifier.Insts.Sudo_rsSudoersBasic_parserParse :
 }
 
 /-- Trait implementation: [sudo_rs::sudoers::ast::{impl sudo_rs::sudoers::basic_parser::Many for sudo_rs::sudoers::ast::Identifier}]
-    Source: 'src/sudoers/ast.rs', lines 226:0-226:27 -/
+    Source: 'src/sudoers/ast.rs', lines 227:0-227:27 -/
 @[reducible]
 def sudoers.ast.Identifier.Insts.Sudo_rsSudoersBasic_parserMany :
   sudoers.basic_parser.Many sudoers.ast.Identifier := {
@@ -5171,7 +5316,7 @@ def sudoers.ast.Identifier.Insts.Sudo_rsSudoersBasic_parserMany :
 }
 
 /-- [sudo_rs::sudoers::ast::{impl sudo_rs::sudoers::basic_parser::Parse for sudo_rs::sudoers::ast::RunAs}::parse]:
-    Source: 'src/sudoers/ast.rs', lines 364:4-388:5
+    Source: 'src/sudoers/ast.rs', lines 365:4-389:5
     Visibility: public -/
 def sudoers.ast.RunAs.Insts.Sudo_rsSudoersBasic_parserParse.parse
   (stream : sudoers.char_stream.CharStream) :
@@ -5281,7 +5426,7 @@ def sudoers.ast.RunAs.Insts.Sudo_rsSudoersBasic_parserParse.parse
     ok (r1, stream1)
 
 /-- Trait implementation: [sudo_rs::sudoers::ast::{impl sudo_rs::sudoers::basic_parser::Parse for sudo_rs::sudoers::ast::RunAs}]
-    Source: 'src/sudoers/ast.rs', lines 363:0-389:1 -/
+    Source: 'src/sudoers/ast.rs', lines 364:0-390:1 -/
 @[reducible]
 def sudoers.ast.RunAs.Insts.Sudo_rsSudoersBasic_parserParse :
   sudoers.basic_parser.Parse sudoers.ast.RunAs := {
@@ -5289,7 +5434,7 @@ def sudoers.ast.RunAs.Insts.Sudo_rsSudoersBasic_parserParse :
 }
 
 /-- [sudo_rs::sudoers::ast::{impl sudo_rs::sudoers::basic_parser::Parse for (core::option::Option<sudo_rs::sudoers::ast::RunAs>, sudo_rs::sudoers::ast::CommandSpec)}::parse]:
-    Source: 'src/sudoers/ast.rs', lines 588:4-596:5
+    Source: 'src/sudoers/ast.rs', lines 589:4-597:5
     Visibility: public -/
 def PairOptionRunAsCommandSpec.Insts.Sudo_rsSudoersBasic_parserParse.parse
   (stream : sudoers.char_stream.CharStream) :
@@ -5345,7 +5490,7 @@ def PairOptionRunAsCommandSpec.Insts.Sudo_rsSudoersBasic_parserParse.parse
     ok (r1, stream1)
 
 /-- Trait implementation: [sudo_rs::sudoers::ast::{impl sudo_rs::sudoers::basic_parser::Parse for (core::option::Option<sudo_rs::sudoers::ast::RunAs>, sudo_rs::sudoers::ast::CommandSpec)}]
-    Source: 'src/sudoers/ast.rs', lines 587:0-597:1 -/
+    Source: 'src/sudoers/ast.rs', lines 588:0-598:1 -/
 @[reducible]
 def PairOptionRunAsCommandSpec.Insts.Sudo_rsSudoersBasic_parserParse :
   sudoers.basic_parser.Parse ((Option sudoers.ast.RunAs) ×
@@ -5355,7 +5500,7 @@ def PairOptionRunAsCommandSpec.Insts.Sudo_rsSudoersBasic_parserParse :
 }
 
 /-- [sudo_rs::sudoers::ast::{impl sudo_rs::sudoers::basic_parser::Parse for (alloc::vec::Vec<sudo_rs::sudoers::ast::Qualified<sudo_rs::sudoers::tokens::Meta<sudo_rs::sudoers::tokens::Hostname>>>, alloc::vec::Vec<(core::option::Option<sudo_rs::sudoers::ast::RunAs>, sudo_rs::sudoers::ast::CommandSpec)>)}::parse]:
-    Source: 'src/sudoers/ast.rs', lines 567:4-573:5
+    Source: 'src/sudoers/ast.rs', lines 568:4-574:5
     Visibility: public -/
 def
   PairVecQualifiedMetaHostnameVecPairOptionRunAsCommandSpec.Insts.Sudo_rsSudoersBasic_parserParse.parse
@@ -5413,7 +5558,7 @@ def
     ok (r1, stream1)
 
 /-- Trait implementation: [sudo_rs::sudoers::ast::{impl sudo_rs::sudoers::basic_parser::Parse for (alloc::vec::Vec<sudo_rs::sudoers::ast::Qualified<sudo_rs::sudoers::tokens::Meta<sudo_rs::sudoers::tokens::Hostname>>>, alloc::vec::Vec<(core::option::Option<sudo_rs::sudoers::ast::RunAs>, sudo_rs::sudoers::ast::CommandSpec)>)}]
-    Source: 'src/sudoers/ast.rs', lines 566:0-574:1 -/
+    Source: 'src/sudoers/ast.rs', lines 567:0-575:1 -/
 @[reducible]
 def
   PairVecQualifiedMetaHostnameVecPairOptionRunAsCommandSpec.Insts.Sudo_rsSudoersBasic_parserParse
@@ -5443,21 +5588,21 @@ def sudoers.ast.permissions
     stream
 
 /-- [sudo_rs::sudoers::ast::{impl core::clone::Clone for sudo_rs::sudoers::ast::Authenticate}::clone]:
-    Source: 'src/sudoers/ast.rs', lines 107:15-107:20
+    Source: 'src/sudoers/ast.rs', lines 108:15-108:20
     Visibility: public -/
 def sudoers.ast.Authenticate.Insts.CoreCloneClone.clone
   (self : sudoers.ast.Authenticate) : Result sudoers.ast.Authenticate := do
   ok self
 
 /-- [sudo_rs::sudoers::ast::{impl core::default::Default for sudo_rs::sudoers::ast::Authenticate}::default]:
-    Source: 'src/sudoers/ast.rs', lines 107:22-107:29
+    Source: 'src/sudoers/ast.rs', lines 108:22-108:29
     Visibility: public -/
 def sudoers.ast.Authenticate.Insts.CoreDefaultDefault.default
   : Result sudoers.ast.Authenticate := do
   ok sudoers.ast.Authenticate.None
 
 /-- [sudo_rs::sudoers::ast::{impl core::clone::Clone for sudo_rs::sudoers::ast::EnvironmentControl}::clone]:
-    Source: 'src/sudoers/ast.rs', lines 119:15-119:20
+    Source: 'src/sudoers/ast.rs', lines 120:15-120:20
     Visibility: public -/
 def sudoers.ast.EnvironmentControl.Insts.CoreCloneClone.clone
   (self : sudoers.ast.EnvironmentControl) :
@@ -5466,14 +5611,14 @@ def sudoers.ast.EnvironmentControl.Insts.CoreCloneClone.clone
   ok self
 
 /-- [sudo_rs::sudoers::ast::{impl core::default::Default for sudo_rs::sudoers::ast::EnvironmentControl}::default]:
-    Source: 'src/sudoers/ast.rs', lines 119:22-119:29
+    Source: 'src/sudoers/ast.rs', lines 120:22-120:29
     Visibility: public -/
 def sudoers.ast.EnvironmentControl.Insts.CoreDefaultDefault.default
   : Result sudoers.ast.EnvironmentControl := do
   ok sudoers.ast.EnvironmentControl.Implicit
 
 /-- [sudo_rs::sudoers::ast::{impl core::cmp::PartialEq<sudo_rs::sudoers::ast::EnvironmentControl> for sudo_rs::sudoers::ast::EnvironmentControl}::eq]:
-    Source: 'src/sudoers/ast.rs', lines 119:31-119:40
+    Source: 'src/sudoers/ast.rs', lines 120:31-120:40
     Visibility: public -/
 def sudoers.ast.EnvironmentControl.Insts.CoreCmpPartialEqEnvironmentControl.eq
   (self : sudoers.ast.EnvironmentControl)
@@ -5485,7 +5630,7 @@ def sudoers.ast.EnvironmentControl.Insts.CoreCmpPartialEqEnvironmentControl.eq
   ok (self1 = other1)
 
 /-- Trait implementation: [sudo_rs::sudoers::ast::{impl core::cmp::PartialEq<sudo_rs::sudoers::ast::EnvironmentControl> for sudo_rs::sudoers::ast::EnvironmentControl}]
-    Source: 'src/sudoers/ast.rs', lines 119:31-119:40 -/
+    Source: 'src/sudoers/ast.rs', lines 120:31-120:40 -/
 @[reducible]
 impl_def
   sudoers.ast.EnvironmentControl.Insts.CoreCmpPartialEqEnvironmentControl :
@@ -5498,21 +5643,21 @@ impl_def
 }
 
 /-- [sudo_rs::sudoers::ast::{impl core::clone::Clone for sudo_rs::sudoers::ast::ExecControl}::clone]:
-    Source: 'src/sudoers/ast.rs', lines 131:15-131:20
+    Source: 'src/sudoers/ast.rs', lines 132:15-132:20
     Visibility: public -/
 def sudoers.ast.ExecControl.Insts.CoreCloneClone.clone
   (self : sudoers.ast.ExecControl) : Result sudoers.ast.ExecControl := do
   ok self
 
 /-- [sudo_rs::sudoers::ast::{impl core::default::Default for sudo_rs::sudoers::ast::ExecControl}::default]:
-    Source: 'src/sudoers/ast.rs', lines 131:22-131:29
+    Source: 'src/sudoers/ast.rs', lines 132:22-132:29
     Visibility: public -/
 def sudoers.ast.ExecControl.Insts.CoreDefaultDefault.default
   : Result sudoers.ast.ExecControl := do
   ok sudoers.ast.ExecControl.Implicit
 
 /-- [sudo_rs::sudoers::ast::{impl core::default::Default for sudo_rs::sudoers::ast::Tag}::default]:
-    Source: 'src/sudoers/ast.rs', lines 144:9-144:16
+    Source: 'src/sudoers/ast.rs', lines 145:9-145:16
     Visibility: public -/
 def sudoers.ast.Tag.Insts.CoreDefaultDefault.default
   : Result sudoers.ast.Tag := do
@@ -5569,7 +5714,7 @@ def sudoers.basic_parser.Span.Insts.CoreCloneClone : core.clone.Clone
 }
 
 /-- [sudo_rs::sudoers::ast::{impl core::clone::Clone for sudo_rs::sudoers::ast::Tag}::clone]:
-    Source: 'src/sudoers/ast.rs', lines 144:18-144:23
+    Source: 'src/sudoers/ast.rs', lines 145:18-145:23
     Visibility: public -/
 def sudoers.ast.Tag.Insts.CoreCloneClone.clone
   (self : sudoers.ast.Tag) : Result sudoers.ast.Tag := do
@@ -5597,7 +5742,7 @@ def sudoers.ast.Tag.Insts.CoreCloneClone.clone
     }
 
 /-- [sudo_rs::sudoers::ast::{sudo_rs::sudoers::ast::Tag}::needs_passwd]:
-    Source: 'src/sudoers/ast.rs', lines 156:4-158:5
+    Source: 'src/sudoers/ast.rs', lines 157:4-159:5
     Visibility: public -/
 def sudoers.ast.Tag.needs_passwd (self : sudoers.ast.Tag) : Result Bool := do
   match self.authenticate with
@@ -5606,7 +5751,7 @@ def sudoers.ast.Tag.needs_passwd (self : sudoers.ast.Tag) : Result Bool := do
   | sudoers.ast.Authenticate.Nopasswd => ok false
 
 /-- [sudo_rs::sudoers::ast::{sudo_rs::sudoers::ast::Modifier}::apply]:
-    Source: 'src/sudoers/ast.rs', lines 414:4-427:5
+    Source: 'src/sudoers/ast.rs', lines 415:4-428:5
     Visibility: public -/
 def sudoers.ast.Modifier.apply
   (self : sudoers.ast.Modifier) (tag : sudoers.ast.Tag) :
@@ -5779,17 +5924,60 @@ def sudoers.basic_parser.parse_lines
       sudoers.basic_parser.Status)) more
   ok (result, { src := s, pos := i, line := i1, col := i2 })
 
-/-- [sudo_rs::sudoers::in_group]:
-    Source: 'src/sudoers/mod.rs', lines 886:0-888:1 -/
-def sudoers.in_group
-  {T0 : Type _} {T1 : Type _} {Clause0_Group : Type _}
-  (systeminterfaceUnixUserInst : system.interface.UnixUser T0 Clause0_Group)
-  (systeminterfaceUnixGroupInst : system.interface.UnixGroup T1) (user : T0)
-  (group : T1) :
-  Result Bool
-  := do
-  let gi ← systeminterfaceUnixGroupInst.as_gid group
-  systeminterfaceUnixUserInst.in_group_by_gid user gi
+/-- [sudo_rs::sudoers::INCLUDE_LIMIT]
+    Source: 'src/sudoers/mod.rs', lines 35:0-35:30 -/
+@[global_simps, irreducible] def sudoers.INCLUDE_LIMIT : Std.U8 := 128#u8
+
+/-- [sudo_rs::sudoers::{impl core::default::Default for sudo_rs::sudoers::CustomiserTable}::default]:
+    Source: 'src/sudoers/mod.rs', lines 444:9-444:16
+    Visibility: public -/
+def sudoers.CustomiserTable.Insts.CoreDefaultDefault.default
+  : Result sudoers.CustomiserTable := do
+  let v ←
+    alloc.vec.Vec.Insts.CoreDefaultDefault.default (sudoers.ast.ConfigScope ×
+      (alloc.vec.Vec defaults.SettingsModifier))
+  let v1 ←
+    alloc.vec.Vec.Insts.CoreDefaultDefault.default ((alloc.vec.Vec
+      (sudoers.ast.Qualified (sudoers.tokens.Meta (glob.Pattern ×
+      sudoers.tokens.Args)))) × (alloc.vec.Vec defaults.SettingsModifier))
+  ok { non_cmnd := v, cmnd := v1 }
+
+/-- [sudo_rs::sudoers::{impl core::default::Default for sudo_rs::sudoers::VecOrd<T>}::default]:
+    Source: 'src/sudoers/mod.rs', lines 454:4-456:5
+    Visibility: public -/
+def sudoers.VecOrd.Insts.CoreDefaultDefault.default
+  (T : Type _) : Result (sudoers.VecOrd T) := do
+  let v ← alloc.vec.Vec.Insts.CoreDefaultDefault.default Std.Usize
+  let v1 ← alloc.vec.Vec.Insts.CoreDefaultDefault.default T
+  ok (v, v1)
+
+/-- [sudo_rs::sudoers::{impl core::default::Default for sudo_rs::sudoers::AliasTable}::default]:
+    Source: 'src/sudoers/mod.rs', lines 436:9-436:16
+    Visibility: public -/
+def sudoers.AliasTable.Insts.CoreDefaultDefault.default
+  : Result sudoers.AliasTable := do
+  let vo ←
+    sudoers.VecOrd.Insts.CoreDefaultDefault.default (sudoers.ast.Def
+      sudoers.ast.UserSpecifier)
+  let vo1 ←
+    sudoers.VecOrd.Insts.CoreDefaultDefault.default (sudoers.ast.Def
+      sudoers.tokens.Hostname)
+  let vo2 ←
+    sudoers.VecOrd.Insts.CoreDefaultDefault.default (sudoers.ast.Def
+      (glob.Pattern × sudoers.tokens.Args))
+  ok { user := vo, host := vo1, cmnd := vo2, runas := vo }
+
+/-- [sudo_rs::sudoers::{impl core::default::Default for sudo_rs::sudoers::Sudoers}::default]:
+    Source: 'src/sudoers/mod.rs', lines 52:9-52:16
+    Visibility: public -/
+def sudoers.Sudoers.Insts.CoreDefaultDefault.default
+  : Result sudoers.Sudoers := do
+  let v ←
+    alloc.vec.Vec.Insts.CoreDefaultDefault.default sudoers.ast.PermissionSpec
+  let «at» ← sudoers.AliasTable.Insts.CoreDefaultDefault.default
+  let s ← defaults.Settings.Insts.CoreDefaultDefault.default
+  let ct ← sudoers.CustomiserTable.Insts.CoreDefaultDefault.default
+  ok { rules := v, aliases := «at», settings := s, customisers := ct }
 
 /-- [sudo_rs::system::{impl core::ops::deref::Deref<str> for sudo_rs::system::Hostname}::deref]:
     Source: 'src/system/mod.rs', lines 200:4-202:5
@@ -5813,8 +6001,38 @@ def sudoers.tokens.Hostname.Insts.CoreOpsDerefDerefString :
   deref := sudoers.tokens.Hostname.Insts.CoreOpsDerefDerefString.deref
 }
 
+/-- [sudo_rs::sudoers::apply_settings]: loop 0:
+    Source: 'src/sudoers/mod.rs', lines 1428:4-1433:5 -/
+@[rust_loop]
+def sudoers.apply_settings_loop
+  (settings : defaults.Settings)
+  (modifiers : alloc.vec.into_iter.IntoIter defaults.SettingsModifier)
+  (more : Bool) :
+  Result defaults.Settings
+  := do
+  if more
+  then
+    let (o, modifiers1) ← alloc.vec.into_iter.IteratorIntoIter.next modifiers
+    match o with
+    | none => sudoers.apply_settings_loop settings modifiers1 false
+    | some modifier =>
+      let settings1 ← defaults.SettingsModifier.apply modifier settings
+      sudoers.apply_settings_loop settings1 modifiers1 more
+  else ok settings
+partial_fixpoint
+
+/-- [sudo_rs::sudoers::apply_settings]:
+    Source: 'src/sudoers/mod.rs', lines 1425:0-1434:1 -/
+def sudoers.apply_settings
+  (modifiers : alloc.vec.Vec defaults.SettingsModifier)
+  (settings : defaults.Settings) :
+  Result defaults.Settings
+  := do
+  let modifiers1 ← alloc.vec.IntoIteratorVec.into_iter modifiers
+  sudoers.apply_settings_loop settings modifiers1 true
+
 /-- [sudo_rs::sudoers::{sudo_rs::sudoers::FoundAliases}::get]: loop 0:
-    Source: 'src/sudoers/mod.rs', lines 802:8-808:9 -/
+    Source: 'src/sudoers/mod.rs', lines 825:8-831:9 -/
 @[rust_loop]
 def sudoers.FoundAliases.get_loop
   (self : sudoers.FoundAliases) («alias» : Str) (result : Option Bool)
@@ -5838,14 +6056,14 @@ def sudoers.FoundAliases.get_loop
 partial_fixpoint
 
 /-- [sudo_rs::sudoers::{sudo_rs::sudoers::FoundAliases}::get]:
-    Source: 'src/sudoers/mod.rs', lines 799:4-811:5 -/
+    Source: 'src/sudoers/mod.rs', lines 822:4-834:5 -/
 @[reducible]
 def sudoers.FoundAliases.get
   (self : sudoers.FoundAliases) («alias» : Str) : Result (Option Bool) := do
   sudoers.FoundAliases.get_loop self «alias» none 0#usize
 
 /-- [sudo_rs::sudoers::item_verdict]:
-    Source: 'src/sudoers/mod.rs', lines 847:0-870:1 -/
+    Source: 'src/sudoers/mod.rs', lines 870:0-893:1 -/
 def sudoers.item_verdict
   {Predicate : Type _} {T : Type _}
   (coreopsfunctionFnPredicateTupleShared0TBoolInst : core.ops.function.Fn
@@ -5875,7 +6093,7 @@ def sudoers.item_verdict
                 else ok (some (¬ judgement))
 
 /-- [sudo_rs::sudoers::find_item_after]: loop 0:
-    Source: 'src/sudoers/mod.rs', lines 835:4-840:5 -/
+    Source: 'src/sudoers/mod.rs', lines 858:4-863:5 -/
 @[rust_loop]
 def sudoers.find_item_after_loop
   {Predicate : Type _} {T : Type _}
@@ -5903,7 +6121,7 @@ def sudoers.find_item_after_loop
 partial_fixpoint
 
 /-- [sudo_rs::sudoers::find_item_after]:
-    Source: 'src/sudoers/mod.rs', lines 825:0-843:1 -/
+    Source: 'src/sudoers/mod.rs', lines 848:0-866:1 -/
 @[reducible]
 def sudoers.find_item_after
   {Predicate : Type _} {T : Type _}
@@ -5917,7 +6135,7 @@ def sudoers.find_item_after
     result items «matches» aliases 0#usize
 
 /-- [sudo_rs::sudoers::find_item]:
-    Source: 'src/sudoers/mod.rs', lines 817:0-822:1 -/
+    Source: 'src/sudoers/mod.rs', lines 840:0-845:1 -/
 def sudoers.find_item
   {Predicate : Type _} {T : Type _}
   (coreopsfunctionFnPredicateTupleShared0TBoolInst : core.ops.function.Fn
@@ -5930,7 +6148,7 @@ def sudoers.find_item
     items «matches» aliases
 
 /-- [sudo_rs::sudoers::{sudo_rs::sudoers::FoundAliases}::insert]:
-    Source: 'src/sudoers/mod.rs', lines 795:4-797:5 -/
+    Source: 'src/sudoers/mod.rs', lines 818:4-820:5 -/
 def sudoers.FoundAliases.insert
   (self : sudoers.FoundAliases) («alias» : String) (found : Bool) :
   Result sudoers.FoundAliases
@@ -5939,7 +6157,7 @@ def sudoers.FoundAliases.insert
   ok v
 
 /-- [sudo_rs::sudoers::{impl core::default::Default for sudo_rs::sudoers::FoundAliases}::default]:
-    Source: 'src/sudoers/mod.rs', lines 791:9-791:16
+    Source: 'src/sudoers/mod.rs', lines 814:9-814:16
     Visibility: public -/
 def sudoers.FoundAliases.Insts.CoreDefaultDefault.default
   : Result sudoers.FoundAliases := do
@@ -5947,7 +6165,7 @@ def sudoers.FoundAliases.Insts.CoreDefaultDefault.default
   ok v
 
 /-- [sudo_rs::sudoers::get_aliases]: loop 0:
-    Source: 'src/sudoers/mod.rs', lines 957:4-967:5 -/
+    Source: 'src/sudoers/mod.rs', lines 980:4-990:5 -/
 @[rust_loop]
 def sudoers.get_aliases_loop
   {Predicate : Type _} {T : Type _}
@@ -5995,7 +6213,7 @@ def sudoers.get_aliases_loop
 partial_fixpoint
 
 /-- [sudo_rs::sudoers::get_aliases]:
-    Source: 'src/sudoers/mod.rs', lines 949:0-970:1 -/
+    Source: 'src/sudoers/mod.rs', lines 972:0-993:1 -/
 def sudoers.get_aliases
   {Predicate : Type _} {T : Type _}
   (coreopsfunctionFnPredicateTupleShared0TBoolInst : core.ops.function.Fn
@@ -6008,104 +6226,8 @@ def sudoers.get_aliases
   sudoers.get_aliases_loop coreopsfunctionFnPredicateTupleShared0TBoolInst pred
     order defs set 0#usize
 
-/-- [sudo_rs::sudoers::match_command::{impl core::ops::function::Fn<(&'_2 (glob::Pattern, sudo_rs::sudoers::tokens::Args),), bool> for sudo_rs::sudoers::match_command::{closure}<'_0, '_1>}::call]:
-    Source: 'src/sudoers/mod.rs', lines 938:4-944:5 -/
-def
-  sudoers.match_command.closure.Insts.CoreOpsFunctionFnTupleShared2PairPatternArgsBool.call
-  (c : sudoers.match_command.closure)
-  (tupled_args : (glob.Pattern × sudoers.tokens.Args)) :
-  Result Bool
-  := do
-  let (p, mo, s) := c
-  let (cmdpat, argpat) := tupled_args
-  let b ← glob.Pattern.matches_path_with cmdpat p mo
-  if b
-  then
-    match argpat with
-    | sudoers.tokens.Args.Prefix vec =>
-      core.slice.Slice.starts_with
-        std.ffi.os_str.OsString.Insts.CoreCmpPartialEqOsString s vec
-    | sudoers.tokens.Args.Exact vec =>
-      let s1 ← Box.Insts.CoreConvertAsRef.as_ref alloc.alloc.Global vec
-      core.slice.cmp.PartialEqSlice.eq
-        std.ffi.os_str.OsString.Insts.CoreCmpPartialEqOsString s s1
-  else ok false
-
-/-- [sudo_rs::sudoers::match_command::{impl core::ops::function::FnMut<(&'_2 (glob::Pattern, sudo_rs::sudoers::tokens::Args),), bool> for sudo_rs::sudoers::match_command::{closure}<'_0, '_1>}::call_mut]:
-    Source: 'src/sudoers/mod.rs', lines 938:4-944:5 -/
-def
-  sudoers.match_command.closure.Insts.CoreOpsFunctionFnMutTupleShared2PairPatternArgsBool.call_mut
-  (state : sudoers.match_command.closure)
-  (args : (glob.Pattern × sudoers.tokens.Args)) :
-  Result (Bool × sudoers.match_command.closure)
-  := do
-  let b ←
-    sudoers.match_command.closure.Insts.CoreOpsFunctionFnTupleShared2PairPatternArgsBool.call
-      state args
-  ok (b, state)
-
-/-- [sudo_rs::sudoers::match_command::{impl core::ops::function::FnOnce<(&'_2 (glob::Pattern, sudo_rs::sudoers::tokens::Args),), bool> for sudo_rs::sudoers::match_command::{closure}<'_0, '_1>}::call_once]:
-    Source: 'src/sudoers/mod.rs', lines 938:4-944:5 -/
-def
-  sudoers.match_command.closure.Insts.CoreOpsFunctionFnOnceTupleShared2PairPatternArgsBool.call_once
-  (c : sudoers.match_command.closure)
-  (p : (glob.Pattern × sudoers.tokens.Args)) :
-  Result Bool
-  := do
-  let (b, _) ←
-    sudoers.match_command.closure.Insts.CoreOpsFunctionFnMutTupleShared2PairPatternArgsBool.call_mut
-      c p
-  ok b
-
-/-- Trait implementation: [sudo_rs::sudoers::match_command::{impl core::ops::function::FnOnce<(&'_2 (glob::Pattern, sudo_rs::sudoers::tokens::Args),), bool> for sudo_rs::sudoers::match_command::{closure}<'_0, '_1>}]
-    Source: 'src/sudoers/mod.rs', lines 938:4-944:5 -/
-@[reducible]
-def
-  sudoers.match_command.closure.Insts.CoreOpsFunctionFnOnceTupleShared2PairPatternArgsBool
-  : core.ops.function.FnOnce sudoers.match_command.closure (glob.Pattern ×
-  sudoers.tokens.Args) Bool := {
-  call_once :=
-    sudoers.match_command.closure.Insts.CoreOpsFunctionFnOnceTupleShared2PairPatternArgsBool.call_once
-}
-
-/-- Trait implementation: [sudo_rs::sudoers::match_command::{impl core::ops::function::FnMut<(&'_2 (glob::Pattern, sudo_rs::sudoers::tokens::Args),), bool> for sudo_rs::sudoers::match_command::{closure}<'_0, '_1>}]
-    Source: 'src/sudoers/mod.rs', lines 938:4-944:5 -/
-@[reducible]
-def
-  sudoers.match_command.closure.Insts.CoreOpsFunctionFnMutTupleShared2PairPatternArgsBool
-  : core.ops.function.FnMut sudoers.match_command.closure (glob.Pattern ×
-  sudoers.tokens.Args) Bool := {
-  FnOnceInst :=
-    sudoers.match_command.closure.Insts.CoreOpsFunctionFnOnceTupleShared2PairPatternArgsBool
-  call_mut :=
-    sudoers.match_command.closure.Insts.CoreOpsFunctionFnMutTupleShared2PairPatternArgsBool.call_mut
-}
-
-/-- Trait implementation: [sudo_rs::sudoers::match_command::{impl core::ops::function::Fn<(&'_2 (glob::Pattern, sudo_rs::sudoers::tokens::Args),), bool> for sudo_rs::sudoers::match_command::{closure}<'_0, '_1>}]
-    Source: 'src/sudoers/mod.rs', lines 938:4-944:5 -/
-@[reducible]
-def
-  sudoers.match_command.closure.Insts.CoreOpsFunctionFnTupleShared2PairPatternArgsBool
-  : core.ops.function.Fn sudoers.match_command.closure (glob.Pattern ×
-  sudoers.tokens.Args) Bool := {
-  FnMutInst :=
-    sudoers.match_command.closure.Insts.CoreOpsFunctionFnMutTupleShared2PairPatternArgsBool
-  call :=
-    sudoers.match_command.closure.Insts.CoreOpsFunctionFnTupleShared2PairPatternArgsBool.call
-}
-
-/-- [sudo_rs::sudoers::match_command]:
-    Source: 'src/sudoers/mod.rs', lines 933:0-945:1 -/
-def sudoers.match_command
-  (p : (std.path.Path × (Slice std.ffi.os_str.OsString))) :
-  Result sudoers.match_command.closure
-  := do
-  let (cmd, args) := p
-  let mo ← glob.MatchOptions.new
-  ok (cmd, { mo with require_literal_separator := true }, args)
-
 /-- [sudo_rs::sudoers::match_token::{impl core::ops::function::Fn<(&'_1 T,), bool> for sudo_rs::sudoers::match_token::{closure}<'_0, T>}::call]:
-    Source: 'src/sudoers/mod.rs', lines 930:4-930:39 -/
+    Source: 'src/sudoers/mod.rs', lines 953:4-953:39 -/
 def sudoers.match_token.closure.Insts.CoreOpsFunctionFnTupleShared1TBool.call
   {T : Type _} (coreopsderefDerefTStringInst : core.ops.deref.Deref T String)
   (c : sudoers.match_token.closure T) (tupled_args : T) :
@@ -6116,7 +6238,7 @@ def sudoers.match_token.closure.Insts.CoreOpsFunctionFnTupleShared1TBool.call
   Str.Insts.CoreCmpPartialEqStr.eq s1 c
 
 /-- [sudo_rs::sudoers::match_token::{impl core::ops::function::FnMut<(&'_1 T,), bool> for sudo_rs::sudoers::match_token::{closure}<'_0, T>}::call_mut]:
-    Source: 'src/sudoers/mod.rs', lines 930:4-930:39 -/
+    Source: 'src/sudoers/mod.rs', lines 953:4-953:39 -/
 def
   sudoers.match_token.closure.Insts.CoreOpsFunctionFnMutTupleShared1TBool.call_mut
   {T : Type _} (coreopsderefDerefTStringInst : core.ops.deref.Deref T String)
@@ -6129,7 +6251,7 @@ def
   ok (b, state)
 
 /-- [sudo_rs::sudoers::match_token::{impl core::ops::function::FnOnce<(&'_1 T,), bool> for sudo_rs::sudoers::match_token::{closure}<'_0, T>}::call_once]:
-    Source: 'src/sudoers/mod.rs', lines 930:4-930:39 -/
+    Source: 'src/sudoers/mod.rs', lines 953:4-953:39 -/
 def
   sudoers.match_token.closure.Insts.CoreOpsFunctionFnOnceTupleShared1TBool.call_once
   {T : Type _} (coreopsderefDerefTStringInst : core.ops.deref.Deref T String)
@@ -6142,7 +6264,7 @@ def
   ok b
 
 /-- Trait implementation: [sudo_rs::sudoers::match_token::{impl core::ops::function::FnOnce<(&'_1 T,), bool> for sudo_rs::sudoers::match_token::{closure}<'_0, T>}]
-    Source: 'src/sudoers/mod.rs', lines 930:4-930:39 -/
+    Source: 'src/sudoers/mod.rs', lines 953:4-953:39 -/
 @[reducible]
 def sudoers.match_token.closure.Insts.CoreOpsFunctionFnOnceTupleShared1TBool {T
   : Type _} (coreopsderefDerefTStringInst : core.ops.deref.Deref T String) :
@@ -6153,7 +6275,7 @@ def sudoers.match_token.closure.Insts.CoreOpsFunctionFnOnceTupleShared1TBool {T
 }
 
 /-- Trait implementation: [sudo_rs::sudoers::match_token::{impl core::ops::function::FnMut<(&'_1 T,), bool> for sudo_rs::sudoers::match_token::{closure}<'_0, T>}]
-    Source: 'src/sudoers/mod.rs', lines 930:4-930:39 -/
+    Source: 'src/sudoers/mod.rs', lines 953:4-953:39 -/
 @[reducible]
 def sudoers.match_token.closure.Insts.CoreOpsFunctionFnMutTupleShared1TBool {T
   : Type _} (coreopsderefDerefTStringInst : core.ops.deref.Deref T String) :
@@ -6167,7 +6289,7 @@ def sudoers.match_token.closure.Insts.CoreOpsFunctionFnMutTupleShared1TBool {T
 }
 
 /-- Trait implementation: [sudo_rs::sudoers::match_token::{impl core::ops::function::Fn<(&'_1 T,), bool> for sudo_rs::sudoers::match_token::{closure}<'_0, T>}]
-    Source: 'src/sudoers/mod.rs', lines 930:4-930:39 -/
+    Source: 'src/sudoers/mod.rs', lines 953:4-953:39 -/
 @[reducible]
 def sudoers.match_token.closure.Insts.CoreOpsFunctionFnTupleShared1TBool {T :
   Type _} (coreopsderefDerefTStringInst : core.ops.deref.Deref T String) :
@@ -6181,7 +6303,7 @@ def sudoers.match_token.closure.Insts.CoreOpsFunctionFnTupleShared1TBool {T :
 }
 
 /-- [sudo_rs::sudoers::match_token]:
-    Source: 'src/sudoers/mod.rs', lines 929:0-931:1 -/
+    Source: 'src/sudoers/mod.rs', lines 952:0-954:1 -/
 def sudoers.match_token
   {T : Type _} (coreopsderefDerefTStringInst : core.ops.deref.Deref T String)
   (text : Str) :
@@ -6196,168 +6318,6 @@ def system.interface.GroupId.new
   (id : Std.U32) : Result system.interface.GroupId := do
   ok id
 
-/-- [sudo_rs::system::interface::{impl core::cmp::PartialEq<sudo_rs::system::interface::GroupId> for sudo_rs::system::interface::GroupId}::eq]:
-    Source: 'src/system/interface.rs', lines 9:29-9:38
-    Visibility: public -/
-def system.interface.GroupId.Insts.CoreCmpPartialEqGroupId.eq
-  (self : system.interface.GroupId) (other : system.interface.GroupId) :
-  Result Bool
-  := do
-  ok (self = other)
-
-/-- [sudo_rs::sudoers::match_group::{closure}::{impl core::ops::function::FnOnce<(&'_1 str,), bool> for sudo_rs::sudoers::match_group::{closure}::{closure}<'_0, '_1, '_2, '_3, T0>}::call_once]:
-    Source: 'src/sudoers/mod.rs', lines 893:66-893:79 -/
-def
-  sudoers.match_group.closure.closure.Insts.CoreOpsFunctionFnOnceTupleShared1StrBool.call_once
-  {T0 : Type _} (systeminterfaceUnixGroupInst : system.interface.UnixGroup T0)
-  (c : sudoers.match_group.closure.closure T0) (tupled_args : Str) :
-  Result Bool
-  := do
-  common.string.SudoString.Insts.CoreCmpPartialEqStr.eq c tupled_args
-
-/-- Trait implementation: [sudo_rs::sudoers::match_group::{closure}::{impl core::ops::function::FnOnce<(&'_1 str,), bool> for sudo_rs::sudoers::match_group::{closure}::{closure}<'_0, '_1, '_2, '_3, T0>}]
-    Source: 'src/sudoers/mod.rs', lines 893:66-893:79 -/
-@[reducible]
-def
-  sudoers.match_group.closure.closure.Insts.CoreOpsFunctionFnOnceTupleShared1StrBool
-  {T0 : Type _} (systeminterfaceUnixGroupInst : system.interface.UnixGroup T0)
-  : core.ops.function.FnOnce (sudoers.match_group.closure.closure T0) Str Bool
-  := {
-  call_once :=
-    sudoers.match_group.closure.closure.Insts.CoreOpsFunctionFnOnceTupleShared1StrBool.call_once
-    systeminterfaceUnixGroupInst
-}
-
-/-- [sudo_rs::sudoers::match_group::{impl core::ops::function::Fn<(&'_1 sudo_rs::sudoers::ast::Identifier,), bool> for sudo_rs::sudoers::match_group::{closure}<'_0, T0>}::call]:
-    Source: 'src/sudoers/mod.rs', lines 891:4-894:5 -/
-def
-  sudoers.match_group.closure.Insts.CoreOpsFunctionFnTupleShared1IdentifierBool.call
-  {T0 : Type _} (systeminterfaceUnixGroupInst : system.interface.UnixGroup T0)
-  (c : sudoers.match_group.closure T0) (tupled_args : sudoers.ast.Identifier) :
-  Result Bool
-  := do
-  match tupled_args with
-  | sudoers.ast.Identifier.Name «name» =>
-    let o ← systeminterfaceUnixGroupInst.try_as_name c
-    core.option.Option.is_some_and
-      (sudoers.match_group.closure.closure.Insts.CoreOpsFunctionFnOnceTupleShared1StrBool
-      systeminterfaceUnixGroupInst) o «name»
-  | sudoers.ast.Identifier.ID num =>
-    let gi ← systeminterfaceUnixGroupInst.as_gid c
-    let gi1 ← system.interface.GroupId.new num
-    system.interface.GroupId.Insts.CoreCmpPartialEqGroupId.eq gi gi1
-
-/-- [sudo_rs::sudoers::match_group]:
-    Source: 'src/sudoers/mod.rs', lines 890:0-895:1 -/
-def sudoers.match_group
-  {T0 : Type _} (systeminterfaceUnixGroupInst : system.interface.UnixGroup T0)
-  (group : T0) :
-  Result (sudoers.match_group.closure T0)
-  := do
-  ok group
-
-/-- [sudo_rs::sudoers::match_group_alias::{impl core::ops::function::Fn<(&'_1 sudo_rs::sudoers::ast::UserSpecifier,), bool> for sudo_rs::sudoers::match_group_alias::{closure}<'_0, T0>}::call]:
-    Source: 'src/sudoers/mod.rs', lines 898:4-906:5 -/
-def
-  sudoers.match_group_alias.closure.Insts.CoreOpsFunctionFnTupleShared1UserSpecifierBool.call
-  {T0 : Type _} (systeminterfaceUnixGroupInst : system.interface.UnixGroup T0)
-  (c : sudoers.match_group_alias.closure T0)
-  (tupled_args : sudoers.ast.UserSpecifier) :
-  Result Bool
-  := do
-  match tupled_args with
-  | sudoers.ast.UserSpecifier.User ident =>
-    let c1 ← sudoers.match_group systeminterfaceUnixGroupInst c
-    sudoers.match_group.closure.Insts.CoreOpsFunctionFnTupleShared1IdentifierBool.call
-      systeminterfaceUnixGroupInst c1 ident
-  | sudoers.ast.UserSpecifier.Group _ =>
-    sudoers.warn_ignored sudoers.Ignored.GroupInRunasAlias
-    ok false
-  | sudoers.ast.UserSpecifier.NonunixGroup _ =>
-    sudoers.warn_ignored sudoers.Ignored.GroupInRunasAlias
-    ok false
-
-/-- [sudo_rs::sudoers::match_group_alias::{impl core::ops::function::FnMut<(&'_1 sudo_rs::sudoers::ast::UserSpecifier,), bool> for sudo_rs::sudoers::match_group_alias::{closure}<'_0, T0>}::call_mut]:
-    Source: 'src/sudoers/mod.rs', lines 898:4-906:5 -/
-def
-  sudoers.match_group_alias.closure.Insts.CoreOpsFunctionFnMutTupleShared1UserSpecifierBool.call_mut
-  {T0 : Type _} (systeminterfaceUnixGroupInst : system.interface.UnixGroup T0)
-  (state : sudoers.match_group_alias.closure T0)
-  (args : sudoers.ast.UserSpecifier) :
-  Result (Bool × (sudoers.match_group_alias.closure T0))
-  := do
-  let b ←
-    sudoers.match_group_alias.closure.Insts.CoreOpsFunctionFnTupleShared1UserSpecifierBool.call
-      systeminterfaceUnixGroupInst state args
-  ok (b, state)
-
-/-- [sudo_rs::sudoers::match_group_alias::{impl core::ops::function::FnOnce<(&'_1 sudo_rs::sudoers::ast::UserSpecifier,), bool> for sudo_rs::sudoers::match_group_alias::{closure}<'_0, T0>}::call_once]:
-    Source: 'src/sudoers/mod.rs', lines 898:4-906:5 -/
-def
-  sudoers.match_group_alias.closure.Insts.CoreOpsFunctionFnOnceTupleShared1UserSpecifierBool.call_once
-  {T0 : Type _} (systeminterfaceUnixGroupInst : system.interface.UnixGroup T0)
-  (c : sudoers.match_group_alias.closure T0) (us : sudoers.ast.UserSpecifier) :
-  Result Bool
-  := do
-  let (b, _) ←
-    sudoers.match_group_alias.closure.Insts.CoreOpsFunctionFnMutTupleShared1UserSpecifierBool.call_mut
-      systeminterfaceUnixGroupInst c us
-  ok b
-
-/-- Trait implementation: [sudo_rs::sudoers::match_group_alias::{impl core::ops::function::FnOnce<(&'_1 sudo_rs::sudoers::ast::UserSpecifier,), bool> for sudo_rs::sudoers::match_group_alias::{closure}<'_0, T0>}]
-    Source: 'src/sudoers/mod.rs', lines 898:4-906:5 -/
-@[reducible]
-def
-  sudoers.match_group_alias.closure.Insts.CoreOpsFunctionFnOnceTupleShared1UserSpecifierBool
-  {T0 : Type _} (systeminterfaceUnixGroupInst : system.interface.UnixGroup T0)
-  : core.ops.function.FnOnce (sudoers.match_group_alias.closure T0)
-  sudoers.ast.UserSpecifier Bool := {
-  call_once :=
-    sudoers.match_group_alias.closure.Insts.CoreOpsFunctionFnOnceTupleShared1UserSpecifierBool.call_once
-    systeminterfaceUnixGroupInst
-}
-
-/-- Trait implementation: [sudo_rs::sudoers::match_group_alias::{impl core::ops::function::FnMut<(&'_1 sudo_rs::sudoers::ast::UserSpecifier,), bool> for sudo_rs::sudoers::match_group_alias::{closure}<'_0, T0>}]
-    Source: 'src/sudoers/mod.rs', lines 898:4-906:5 -/
-@[reducible]
-def
-  sudoers.match_group_alias.closure.Insts.CoreOpsFunctionFnMutTupleShared1UserSpecifierBool
-  {T0 : Type _} (systeminterfaceUnixGroupInst : system.interface.UnixGroup T0)
-  : core.ops.function.FnMut (sudoers.match_group_alias.closure T0)
-  sudoers.ast.UserSpecifier Bool := {
-  FnOnceInst :=
-    sudoers.match_group_alias.closure.Insts.CoreOpsFunctionFnOnceTupleShared1UserSpecifierBool
-    systeminterfaceUnixGroupInst
-  call_mut :=
-    sudoers.match_group_alias.closure.Insts.CoreOpsFunctionFnMutTupleShared1UserSpecifierBool.call_mut
-    systeminterfaceUnixGroupInst
-}
-
-/-- Trait implementation: [sudo_rs::sudoers::match_group_alias::{impl core::ops::function::Fn<(&'_1 sudo_rs::sudoers::ast::UserSpecifier,), bool> for sudo_rs::sudoers::match_group_alias::{closure}<'_0, T0>}]
-    Source: 'src/sudoers/mod.rs', lines 898:4-906:5 -/
-@[reducible]
-def
-  sudoers.match_group_alias.closure.Insts.CoreOpsFunctionFnTupleShared1UserSpecifierBool
-  {T0 : Type _} (systeminterfaceUnixGroupInst : system.interface.UnixGroup T0)
-  : core.ops.function.Fn (sudoers.match_group_alias.closure T0)
-  sudoers.ast.UserSpecifier Bool := {
-  FnMutInst :=
-    sudoers.match_group_alias.closure.Insts.CoreOpsFunctionFnMutTupleShared1UserSpecifierBool
-    systeminterfaceUnixGroupInst
-  call :=
-    sudoers.match_group_alias.closure.Insts.CoreOpsFunctionFnTupleShared1UserSpecifierBool.call
-    systeminterfaceUnixGroupInst
-}
-
-/-- [sudo_rs::sudoers::match_group_alias]:
-    Source: 'src/sudoers/mod.rs', lines 897:0-907:1 -/
-def sudoers.match_group_alias
-  {T0 : Type _} (systeminterfaceUnixGroupInst : system.interface.UnixGroup T0)
-  (group : T0) :
-  Result (sudoers.match_group_alias.closure T0)
-  := do
-  ok group
-
 /-- [sudo_rs::system::interface::{sudo_rs::system::interface::UserId}::new]:
     Source: 'src/system/interface.rs', lines 35:4-37:5
     Visibility: public -/
@@ -6366,7 +6326,7 @@ def system.interface.UserId.new
   ok id
 
 /-- [sudo_rs::sudoers::match_identifier]:
-    Source: 'src/sudoers/mod.rs', lines 973:0-978:1 -/
+    Source: 'src/sudoers/mod.rs', lines 996:0-1001:1 -/
 def sudoers.match_identifier
   {T0 : Type _} {Clause0_Group : Type _} (systeminterfaceUnixUserInst :
   system.interface.UnixUser T0 Clause0_Group) (user : T0)
@@ -6383,7 +6343,7 @@ def sudoers.match_identifier
     systeminterfaceUnixUserInst.has_uid user ui
 
 /-- [sudo_rs::sudoers::match_user::{impl core::ops::function::Fn<(&'_1 sudo_rs::sudoers::ast::UserSpecifier,), bool> for sudo_rs::sudoers::match_user::{closure}<'_0, T0, Clause0_Group>}::call]:
-    Source: 'src/sudoers/mod.rs', lines 874:4-883:5 -/
+    Source: 'src/sudoers/mod.rs', lines 897:4-906:5 -/
 def
   sudoers.match_user.closure.Insts.CoreOpsFunctionFnTupleShared1UserSpecifierBool.call
   {T0 : Type _} {Clause0_Group : Type _} (systeminterfaceUnixUserInst :
@@ -6408,7 +6368,7 @@ def
     ok false
 
 /-- [sudo_rs::sudoers::match_user::{impl core::ops::function::FnMut<(&'_1 sudo_rs::sudoers::ast::UserSpecifier,), bool> for sudo_rs::sudoers::match_user::{closure}<'_0, T0, Clause0_Group>}::call_mut]:
-    Source: 'src/sudoers/mod.rs', lines 874:4-883:5 -/
+    Source: 'src/sudoers/mod.rs', lines 897:4-906:5 -/
 def
   sudoers.match_user.closure.Insts.CoreOpsFunctionFnMutTupleShared1UserSpecifierBool.call_mut
   {T0 : Type _} {Clause0_Group : Type _} (systeminterfaceUnixUserInst :
@@ -6423,7 +6383,7 @@ def
   ok (b, state)
 
 /-- [sudo_rs::sudoers::match_user::{impl core::ops::function::FnOnce<(&'_1 sudo_rs::sudoers::ast::UserSpecifier,), bool> for sudo_rs::sudoers::match_user::{closure}<'_0, T0, Clause0_Group>}::call_once]:
-    Source: 'src/sudoers/mod.rs', lines 874:4-883:5 -/
+    Source: 'src/sudoers/mod.rs', lines 897:4-906:5 -/
 def
   sudoers.match_user.closure.Insts.CoreOpsFunctionFnOnceTupleShared1UserSpecifierBool.call_once
   {T0 : Type _} {Clause0_Group : Type _} (systeminterfaceUnixUserInst :
@@ -6438,7 +6398,7 @@ def
   ok b
 
 /-- Trait implementation: [sudo_rs::sudoers::match_user::{impl core::ops::function::FnOnce<(&'_1 sudo_rs::sudoers::ast::UserSpecifier,), bool> for sudo_rs::sudoers::match_user::{closure}<'_0, T0, Clause0_Group>}]
-    Source: 'src/sudoers/mod.rs', lines 874:4-883:5 -/
+    Source: 'src/sudoers/mod.rs', lines 897:4-906:5 -/
 @[reducible]
 def
   sudoers.match_user.closure.Insts.CoreOpsFunctionFnOnceTupleShared1UserSpecifierBool
@@ -6452,7 +6412,7 @@ def
 }
 
 /-- Trait implementation: [sudo_rs::sudoers::match_user::{impl core::ops::function::FnMut<(&'_1 sudo_rs::sudoers::ast::UserSpecifier,), bool> for sudo_rs::sudoers::match_user::{closure}<'_0, T0, Clause0_Group>}]
-    Source: 'src/sudoers/mod.rs', lines 874:4-883:5 -/
+    Source: 'src/sudoers/mod.rs', lines 897:4-906:5 -/
 @[reducible]
 def
   sudoers.match_user.closure.Insts.CoreOpsFunctionFnMutTupleShared1UserSpecifierBool
@@ -6469,7 +6429,7 @@ def
 }
 
 /-- Trait implementation: [sudo_rs::sudoers::match_user::{impl core::ops::function::Fn<(&'_1 sudo_rs::sudoers::ast::UserSpecifier,), bool> for sudo_rs::sudoers::match_user::{closure}<'_0, T0, Clause0_Group>}]
-    Source: 'src/sudoers/mod.rs', lines 874:4-883:5 -/
+    Source: 'src/sudoers/mod.rs', lines 897:4-906:5 -/
 @[reducible]
 def
   sudoers.match_user.closure.Insts.CoreOpsFunctionFnTupleShared1UserSpecifierBool
@@ -6486,7 +6446,7 @@ def
 }
 
 /-- [sudo_rs::sudoers::match_user]:
-    Source: 'src/sudoers/mod.rs', lines 873:0-884:1 -/
+    Source: 'src/sudoers/mod.rs', lines 896:0-907:1 -/
 def sudoers.match_user
   {T0 : Type _} {Clause0_Group : Type _} (systeminterfaceUnixUserInst :
   system.interface.UnixUser T0 Clause0_Group) (user : T0) :
@@ -6494,8 +6454,469 @@ def sudoers.match_user
   := do
   ok user
 
+/-- [sudo_rs::sudoers::{sudo_rs::sudoers::Sudoers}::specify_host_user_runas]: loop 0:
+    Source: 'src/sudoers/mod.rs', lines 138:8-161:9 -/
+@[rust_loop]
+def sudoers.Sudoers.specify_host_user_runas_loop
+  {User : Type _} {Clause0_Group : Type _} (systeminterfaceUnixUserInst :
+  system.interface.UnixUser User Clause0_Group) (s : defaults.Settings)
+  (s1 : Str) (host_aliases : sudoers.FoundAliases) (t : User)
+  (user_aliases : sudoers.FoundAliases)
+  (runas_matcher_aliases : Option ((sudoers.match_user.closure User
+  Clause0_Group) × sudoers.FoundAliases))
+  (customisers : alloc.vec.into_iter.IntoIter (sudoers.ast.ConfigScope ×
+  (alloc.vec.Vec defaults.SettingsModifier))) (more : Bool) :
+  Result defaults.Settings
+  := do
+  if more
+  then
+    let (o, customisers1) ←
+      alloc.vec.into_iter.IteratorIntoIter.next customisers
+    match o with
+    | none =>
+      sudoers.Sudoers.specify_host_user_runas_loop systeminterfaceUnixUserInst
+        s s1 host_aliases t user_aliases runas_matcher_aliases customisers1
+        false
+    | some p =>
+      let (scope, modifiers) := p
+      let (runas_matcher_aliases1, customisers2, matched) ←
+        match scope with
+        | sudoers.ast.ConfigScope.Generic =>
+          ok (runas_matcher_aliases, customisers1, true)
+        | sudoers.ast.ConfigScope.Host list =>
+          do
+          let s2 := alloc.vec.Vec.deref list
+          let matched1 ←
+            sudoers.find_item
+              (sudoers.match_token.closure.Insts.CoreOpsFunctionFnTupleShared1TBool
+              sudoers.tokens.Hostname.Insts.CoreOpsDerefDerefString) s2 s1
+              host_aliases
+          ok (runas_matcher_aliases, customisers1, matched1)
+        | sudoers.ast.ConfigScope.User list =>
+          do
+          let s2 := alloc.vec.Vec.deref list
+          let matched1 ←
+            sudoers.find_item
+              (sudoers.match_user.closure.Insts.CoreOpsFunctionFnTupleShared1UserSpecifierBool
+              systeminterfaceUnixUserInst) s2 t user_aliases
+          ok (runas_matcher_aliases, customisers1, matched1)
+        | sudoers.ast.ConfigScope.RunAs list =>
+          do
+          let (o1, b) ←
+            match runas_matcher_aliases with
+            | none => ok (none, false)
+            | some p1 =>
+              do
+              let (c, runas_aliases) := p1
+              let s2 := alloc.vec.Vec.deref list
+              let matched1 ←
+                sudoers.find_item
+                  (sudoers.match_user.closure.Insts.CoreOpsFunctionFnTupleShared1UserSpecifierBool
+                  systeminterfaceUnixUserInst) s2 c runas_aliases
+              ok (some (c, runas_aliases), matched1)
+          ok (o1, customisers1, b)
+        | sudoers.ast.ConfigScope.Command _ => fail panic
+      if matched
+      then
+        let s2 ← sudoers.apply_settings modifiers s
+        sudoers.Sudoers.specify_host_user_runas_loop
+          systeminterfaceUnixUserInst s2 s1 host_aliases t user_aliases
+          runas_matcher_aliases1 customisers2 more
+      else
+        sudoers.Sudoers.specify_host_user_runas_loop
+          systeminterfaceUnixUserInst s s1 host_aliases t user_aliases
+          runas_matcher_aliases1 customisers2 more
+  else ok s
+partial_fixpoint
+
+/-- [sudo_rs::sudoers::{sudo_rs::sudoers::Sudoers}::specify_host_user_runas]:
+    Source: 'src/sudoers/mod.rs', lines 111:4-162:5 -/
+def sudoers.Sudoers.specify_host_user_runas
+  {User : Type _} {Clause0_Group : Type _} (systeminterfaceUnixUserInst :
+  system.interface.UnixUser User Clause0_Group) (corecmpPartialEqInst :
+  core.cmp.PartialEq User User) (self : sudoers.Sudoers)
+  (hostname : system.Hostname) (requesting_user : User)
+  (target_user : Option User) :
+  Result sudoers.Sudoers
+  := do
+  let (customisers, v) :=
+    core.mem.replace self.customisers.non_cmnd (alloc.vec.Vec.new
+      (sudoers.ast.ConfigScope × (alloc.vec.Vec defaults.SettingsModifier)))
+  let s ← system.Hostname.Insts.CoreOpsDerefDerefStr.deref hostname
+  let c ←
+    sudoers.match_token sudoers.tokens.Hostname.Insts.CoreOpsDerefDerefString s
+  let host_aliases ←
+    sudoers.get_aliases
+      (sudoers.match_token.closure.Insts.CoreOpsFunctionFnTupleShared1TBool
+      sudoers.tokens.Hostname.Insts.CoreOpsDerefDerefString) self.aliases.host
+      c
+  let c1 ← sudoers.match_user systeminterfaceUnixUserInst requesting_user
+  let user_aliases ←
+    sudoers.get_aliases
+      (sudoers.match_user.closure.Insts.CoreOpsFunctionFnTupleShared1UserSpecifierBool
+      systeminterfaceUnixUserInst) self.aliases.user c1
+  let runas_matcher_aliases ←
+    match target_user with
+    | none => ok none
+    | some target_user1 =>
+      do
+      let runas_matcher ←
+        sudoers.match_user systeminterfaceUnixUserInst target_user1
+      let runas_aliases ←
+        sudoers.get_aliases
+          (sudoers.match_user.closure.Insts.CoreOpsFunctionFnTupleShared1UserSpecifierBool
+          systeminterfaceUnixUserInst) self.aliases.runas runas_matcher
+      ok (some (runas_matcher, runas_aliases))
+  let customisers1 ← alloc.vec.IntoIteratorVec.into_iter customisers
+  let s1 ←
+    sudoers.Sudoers.specify_host_user_runas_loop systeminterfaceUnixUserInst
+      self.settings c host_aliases c1 user_aliases runas_matcher_aliases
+      customisers1 true
+  ok
+    {
+      self
+        with
+        settings := s1, customisers := { self.customisers with non_cmnd := v }
+    }
+
+/-- [sudo_rs::sudoers::match_command::{impl core::ops::function::Fn<(&'_2 (glob::Pattern, sudo_rs::sudoers::tokens::Args),), bool> for sudo_rs::sudoers::match_command::{closure}<'_0, '_1>}::call]:
+    Source: 'src/sudoers/mod.rs', lines 961:4-967:5 -/
+def
+  sudoers.match_command.closure.Insts.CoreOpsFunctionFnTupleShared2PairPatternArgsBool.call
+  (c : sudoers.match_command.closure)
+  (tupled_args : (glob.Pattern × sudoers.tokens.Args)) :
+  Result Bool
+  := do
+  let (p, mo, s) := c
+  let (cmdpat, argpat) := tupled_args
+  let b ← glob.Pattern.matches_path_with cmdpat p mo
+  if b
+  then
+    match argpat with
+    | sudoers.tokens.Args.Prefix vec =>
+      core.slice.Slice.starts_with
+        std.ffi.os_str.OsString.Insts.CoreCmpPartialEqOsString s vec
+    | sudoers.tokens.Args.Exact vec =>
+      let s1 ← Box.Insts.CoreConvertAsRef.as_ref alloc.alloc.Global vec
+      core.slice.cmp.PartialEqSlice.eq
+        std.ffi.os_str.OsString.Insts.CoreCmpPartialEqOsString s s1
+  else ok false
+
+/-- [sudo_rs::sudoers::match_command::{impl core::ops::function::FnMut<(&'_2 (glob::Pattern, sudo_rs::sudoers::tokens::Args),), bool> for sudo_rs::sudoers::match_command::{closure}<'_0, '_1>}::call_mut]:
+    Source: 'src/sudoers/mod.rs', lines 961:4-967:5 -/
+def
+  sudoers.match_command.closure.Insts.CoreOpsFunctionFnMutTupleShared2PairPatternArgsBool.call_mut
+  (state : sudoers.match_command.closure)
+  (args : (glob.Pattern × sudoers.tokens.Args)) :
+  Result (Bool × sudoers.match_command.closure)
+  := do
+  let b ←
+    sudoers.match_command.closure.Insts.CoreOpsFunctionFnTupleShared2PairPatternArgsBool.call
+      state args
+  ok (b, state)
+
+/-- [sudo_rs::sudoers::match_command::{impl core::ops::function::FnOnce<(&'_2 (glob::Pattern, sudo_rs::sudoers::tokens::Args),), bool> for sudo_rs::sudoers::match_command::{closure}<'_0, '_1>}::call_once]:
+    Source: 'src/sudoers/mod.rs', lines 961:4-967:5 -/
+def
+  sudoers.match_command.closure.Insts.CoreOpsFunctionFnOnceTupleShared2PairPatternArgsBool.call_once
+  (c : sudoers.match_command.closure)
+  (p : (glob.Pattern × sudoers.tokens.Args)) :
+  Result Bool
+  := do
+  let (b, _) ←
+    sudoers.match_command.closure.Insts.CoreOpsFunctionFnMutTupleShared2PairPatternArgsBool.call_mut
+      c p
+  ok b
+
+/-- Trait implementation: [sudo_rs::sudoers::match_command::{impl core::ops::function::FnOnce<(&'_2 (glob::Pattern, sudo_rs::sudoers::tokens::Args),), bool> for sudo_rs::sudoers::match_command::{closure}<'_0, '_1>}]
+    Source: 'src/sudoers/mod.rs', lines 961:4-967:5 -/
+@[reducible]
+def
+  sudoers.match_command.closure.Insts.CoreOpsFunctionFnOnceTupleShared2PairPatternArgsBool
+  : core.ops.function.FnOnce sudoers.match_command.closure (glob.Pattern ×
+  sudoers.tokens.Args) Bool := {
+  call_once :=
+    sudoers.match_command.closure.Insts.CoreOpsFunctionFnOnceTupleShared2PairPatternArgsBool.call_once
+}
+
+/-- Trait implementation: [sudo_rs::sudoers::match_command::{impl core::ops::function::FnMut<(&'_2 (glob::Pattern, sudo_rs::sudoers::tokens::Args),), bool> for sudo_rs::sudoers::match_command::{closure}<'_0, '_1>}]
+    Source: 'src/sudoers/mod.rs', lines 961:4-967:5 -/
+@[reducible]
+def
+  sudoers.match_command.closure.Insts.CoreOpsFunctionFnMutTupleShared2PairPatternArgsBool
+  : core.ops.function.FnMut sudoers.match_command.closure (glob.Pattern ×
+  sudoers.tokens.Args) Bool := {
+  FnOnceInst :=
+    sudoers.match_command.closure.Insts.CoreOpsFunctionFnOnceTupleShared2PairPatternArgsBool
+  call_mut :=
+    sudoers.match_command.closure.Insts.CoreOpsFunctionFnMutTupleShared2PairPatternArgsBool.call_mut
+}
+
+/-- Trait implementation: [sudo_rs::sudoers::match_command::{impl core::ops::function::Fn<(&'_2 (glob::Pattern, sudo_rs::sudoers::tokens::Args),), bool> for sudo_rs::sudoers::match_command::{closure}<'_0, '_1>}]
+    Source: 'src/sudoers/mod.rs', lines 961:4-967:5 -/
+@[reducible]
+def
+  sudoers.match_command.closure.Insts.CoreOpsFunctionFnTupleShared2PairPatternArgsBool
+  : core.ops.function.Fn sudoers.match_command.closure (glob.Pattern ×
+  sudoers.tokens.Args) Bool := {
+  FnMutInst :=
+    sudoers.match_command.closure.Insts.CoreOpsFunctionFnMutTupleShared2PairPatternArgsBool
+  call :=
+    sudoers.match_command.closure.Insts.CoreOpsFunctionFnTupleShared2PairPatternArgsBool.call
+}
+
+/-- [sudo_rs::sudoers::match_command]:
+    Source: 'src/sudoers/mod.rs', lines 956:0-968:1 -/
+def sudoers.match_command
+  (p : (std.path.Path × (Slice std.ffi.os_str.OsString))) :
+  Result sudoers.match_command.closure
+  := do
+  let (cmd, args) := p
+  let mo ← glob.MatchOptions.new
+  ok (cmd, { mo with require_literal_separator := true }, args)
+
+/-- [sudo_rs::sudoers::{sudo_rs::sudoers::Sudoers}::specify_command]: loop 0:
+    Source: 'src/sudoers/mod.rs', lines 175:8-184:9 -/
+@[rust_loop]
+def sudoers.Sudoers.specify_command_loop
+  (s : defaults.Settings) (p : std.path.Path) (mo : glob.MatchOptions)
+  (s1 : Slice std.ffi.os_str.OsString) (cmnd_aliases : sudoers.FoundAliases)
+  (customisers : alloc.vec.into_iter.IntoIter ((alloc.vec.Vec
+  (sudoers.ast.Qualified (sudoers.tokens.Meta (glob.Pattern ×
+  sudoers.tokens.Args)))) × (alloc.vec.Vec defaults.SettingsModifier)))
+  (more : Bool) :
+  Result defaults.Settings
+  := do
+  if more
+  then
+    let (o, customisers1) ←
+      alloc.vec.into_iter.IteratorIntoIter.next customisers
+    match o with
+    | none =>
+      sudoers.Sudoers.specify_command_loop s p mo s1 cmnd_aliases customisers1
+        false
+    | some p1 =>
+      let (scope, modifiers) := p1
+      let s2 := alloc.vec.Vec.deref scope
+      let b ←
+        sudoers.find_item
+          sudoers.match_command.closure.Insts.CoreOpsFunctionFnTupleShared2PairPatternArgsBool
+          s2 (p, mo, s1) cmnd_aliases
+      if b
+      then
+        let s3 ← sudoers.apply_settings modifiers s
+        sudoers.Sudoers.specify_command_loop s3 p mo s1 cmnd_aliases
+          customisers1 more
+      else
+        sudoers.Sudoers.specify_command_loop s p mo s1 cmnd_aliases
+          customisers1 more
+  else ok s
+partial_fixpoint
+
+/-- [sudo_rs::sudoers::{sudo_rs::sudoers::Sudoers}::specify_command]:
+    Source: 'src/sudoers/mod.rs', lines 166:4-185:5 -/
+def sudoers.Sudoers.specify_command
+  (self : sudoers.Sudoers) (command : std.path.Path)
+  (arguments : Slice std.ffi.os_str.OsString) :
+  Result sudoers.Sudoers
+  := do
+  let (customisers, v) :=
+    core.mem.replace self.customisers.cmnd (alloc.vec.Vec.new ((alloc.vec.Vec
+      (sudoers.ast.Qualified (sudoers.tokens.Meta (glob.Pattern ×
+      sudoers.tokens.Args)))) × (alloc.vec.Vec defaults.SettingsModifier)))
+  let c ← sudoers.match_command (command, arguments)
+  let (p, mo, s) := c
+  let cmnd_aliases ←
+    sudoers.get_aliases
+      sudoers.match_command.closure.Insts.CoreOpsFunctionFnTupleShared2PairPatternArgsBool
+      self.aliases.cmnd c
+  let customisers1 ← alloc.vec.IntoIteratorVec.into_iter customisers
+  let s1 ←
+    sudoers.Sudoers.specify_command_loop self.settings p mo s cmnd_aliases
+      customisers1 true
+  ok
+    {
+      self
+        with
+        settings := s1, customisers := { self.customisers with cmnd := v }
+    }
+
+/-- [sudo_rs::sudoers::in_group]:
+    Source: 'src/sudoers/mod.rs', lines 909:0-911:1 -/
+def sudoers.in_group
+  {T0 : Type _} {T1 : Type _} {Clause0_Group : Type _}
+  (systeminterfaceUnixUserInst : system.interface.UnixUser T0 Clause0_Group)
+  (systeminterfaceUnixGroupInst : system.interface.UnixGroup T1) (user : T0)
+  (group : T1) :
+  Result Bool
+  := do
+  let gi ← systeminterfaceUnixGroupInst.as_gid group
+  systeminterfaceUnixUserInst.in_group_by_gid user gi
+
+/-- [sudo_rs::system::interface::{impl core::cmp::PartialEq<sudo_rs::system::interface::GroupId> for sudo_rs::system::interface::GroupId}::eq]:
+    Source: 'src/system/interface.rs', lines 9:29-9:38
+    Visibility: public -/
+def system.interface.GroupId.Insts.CoreCmpPartialEqGroupId.eq
+  (self : system.interface.GroupId) (other : system.interface.GroupId) :
+  Result Bool
+  := do
+  ok (self = other)
+
+/-- [sudo_rs::sudoers::match_group::{closure}::{impl core::ops::function::FnOnce<(&'_1 str,), bool> for sudo_rs::sudoers::match_group::{closure}::{closure}<'_0, '_1, '_2, '_3, T0>}::call_once]:
+    Source: 'src/sudoers/mod.rs', lines 916:66-916:79 -/
+def
+  sudoers.match_group.closure.closure.Insts.CoreOpsFunctionFnOnceTupleShared1StrBool.call_once
+  {T0 : Type _} (systeminterfaceUnixGroupInst : system.interface.UnixGroup T0)
+  (c : sudoers.match_group.closure.closure T0) (tupled_args : Str) :
+  Result Bool
+  := do
+  common.string.SudoString.Insts.CoreCmpPartialEqStr.eq c tupled_args
+
+/-- Trait implementation: [sudo_rs::sudoers::match_group::{closure}::{impl core::ops::function::FnOnce<(&'_1 str,), bool> for sudo_rs::sudoers::match_group::{closure}::{closure}<'_0, '_1, '_2, '_3, T0>}]
+    Source: 'src/sudoers/mod.rs', lines 916:66-916:79 -/
+@[reducible]
+def
+  sudoers.match_group.closure.closure.Insts.CoreOpsFunctionFnOnceTupleShared1StrBool
+  {T0 : Type _} (systeminterfaceUnixGroupInst : system.interface.UnixGroup T0)
+  : core.ops.function.FnOnce (sudoers.match_group.closure.closure T0) Str Bool
+  := {
+  call_once :=
+    sudoers.match_group.closure.closure.Insts.CoreOpsFunctionFnOnceTupleShared1StrBool.call_once
+    systeminterfaceUnixGroupInst
+}
+
+/-- [sudo_rs::sudoers::match_group::{impl core::ops::function::Fn<(&'_1 sudo_rs::sudoers::ast::Identifier,), bool> for sudo_rs::sudoers::match_group::{closure}<'_0, T0>}::call]:
+    Source: 'src/sudoers/mod.rs', lines 914:4-917:5 -/
+def
+  sudoers.match_group.closure.Insts.CoreOpsFunctionFnTupleShared1IdentifierBool.call
+  {T0 : Type _} (systeminterfaceUnixGroupInst : system.interface.UnixGroup T0)
+  (c : sudoers.match_group.closure T0) (tupled_args : sudoers.ast.Identifier) :
+  Result Bool
+  := do
+  match tupled_args with
+  | sudoers.ast.Identifier.Name «name» =>
+    let o ← systeminterfaceUnixGroupInst.try_as_name c
+    core.option.Option.is_some_and
+      (sudoers.match_group.closure.closure.Insts.CoreOpsFunctionFnOnceTupleShared1StrBool
+      systeminterfaceUnixGroupInst) o «name»
+  | sudoers.ast.Identifier.ID num =>
+    let gi ← systeminterfaceUnixGroupInst.as_gid c
+    let gi1 ← system.interface.GroupId.new num
+    system.interface.GroupId.Insts.CoreCmpPartialEqGroupId.eq gi gi1
+
+/-- [sudo_rs::sudoers::match_group]:
+    Source: 'src/sudoers/mod.rs', lines 913:0-918:1 -/
+def sudoers.match_group
+  {T0 : Type _} (systeminterfaceUnixGroupInst : system.interface.UnixGroup T0)
+  (group : T0) :
+  Result (sudoers.match_group.closure T0)
+  := do
+  ok group
+
+/-- [sudo_rs::sudoers::match_group_alias::{impl core::ops::function::Fn<(&'_1 sudo_rs::sudoers::ast::UserSpecifier,), bool> for sudo_rs::sudoers::match_group_alias::{closure}<'_0, T0>}::call]:
+    Source: 'src/sudoers/mod.rs', lines 921:4-929:5 -/
+def
+  sudoers.match_group_alias.closure.Insts.CoreOpsFunctionFnTupleShared1UserSpecifierBool.call
+  {T0 : Type _} (systeminterfaceUnixGroupInst : system.interface.UnixGroup T0)
+  (c : sudoers.match_group_alias.closure T0)
+  (tupled_args : sudoers.ast.UserSpecifier) :
+  Result Bool
+  := do
+  match tupled_args with
+  | sudoers.ast.UserSpecifier.User ident =>
+    let c1 ← sudoers.match_group systeminterfaceUnixGroupInst c
+    sudoers.match_group.closure.Insts.CoreOpsFunctionFnTupleShared1IdentifierBool.call
+      systeminterfaceUnixGroupInst c1 ident
+  | sudoers.ast.UserSpecifier.Group _ =>
+    sudoers.warn_ignored sudoers.Ignored.GroupInRunasAlias
+    ok false
+  | sudoers.ast.UserSpecifier.NonunixGroup _ =>
+    sudoers.warn_ignored sudoers.Ignored.GroupInRunasAlias
+    ok false
+
+/-- [sudo_rs::sudoers::match_group_alias::{impl core::ops::function::FnMut<(&'_1 sudo_rs::sudoers::ast::UserSpecifier,), bool> for sudo_rs::sudoers::match_group_alias::{closure}<'_0, T0>}::call_mut]:
+    Source: 'src/sudoers/mod.rs', lines 921:4-929:5 -/
+def
+  sudoers.match_group_alias.closure.Insts.CoreOpsFunctionFnMutTupleShared1UserSpecifierBool.call_mut
+  {T0 : Type _} (systeminterfaceUnixGroupInst : system.interface.UnixGroup T0)
+  (state : sudoers.match_group_alias.closure T0)
+  (args : sudoers.ast.UserSpecifier) :
+  Result (Bool × (sudoers.match_group_alias.closure T0))
+  := do
+  let b ←
+    sudoers.match_group_alias.closure.Insts.CoreOpsFunctionFnTupleShared1UserSpecifierBool.call
+      systeminterfaceUnixGroupInst state args
+  ok (b, state)
+
+/-- [sudo_rs::sudoers::match_group_alias::{impl core::ops::function::FnOnce<(&'_1 sudo_rs::sudoers::ast::UserSpecifier,), bool> for sudo_rs::sudoers::match_group_alias::{closure}<'_0, T0>}::call_once]:
+    Source: 'src/sudoers/mod.rs', lines 921:4-929:5 -/
+def
+  sudoers.match_group_alias.closure.Insts.CoreOpsFunctionFnOnceTupleShared1UserSpecifierBool.call_once
+  {T0 : Type _} (systeminterfaceUnixGroupInst : system.interface.UnixGroup T0)
+  (c : sudoers.match_group_alias.closure T0) (us : sudoers.ast.UserSpecifier) :
+  Result Bool
+  := do
+  let (b, _) ←
+    sudoers.match_group_alias.closure.Insts.CoreOpsFunctionFnMutTupleShared1UserSpecifierBool.call_mut
+      systeminterfaceUnixGroupInst c us
+  ok b
+
+/-- Trait implementation: [sudo_rs::sudoers::match_group_alias::{impl core::ops::function::FnOnce<(&'_1 sudo_rs::sudoers::ast::UserSpecifier,), bool> for sudo_rs::sudoers::match_group_alias::{closure}<'_0, T0>}]
+    Source: 'src/sudoers/mod.rs', lines 921:4-929:5 -/
+@[reducible]
+def
+  sudoers.match_group_alias.closure.Insts.CoreOpsFunctionFnOnceTupleShared1UserSpecifierBool
+  {T0 : Type _} (systeminterfaceUnixGroupInst : system.interface.UnixGroup T0)
+  : core.ops.function.FnOnce (sudoers.match_group_alias.closure T0)
+  sudoers.ast.UserSpecifier Bool := {
+  call_once :=
+    sudoers.match_group_alias.closure.Insts.CoreOpsFunctionFnOnceTupleShared1UserSpecifierBool.call_once
+    systeminterfaceUnixGroupInst
+}
+
+/-- Trait implementation: [sudo_rs::sudoers::match_group_alias::{impl core::ops::function::FnMut<(&'_1 sudo_rs::sudoers::ast::UserSpecifier,), bool> for sudo_rs::sudoers::match_group_alias::{closure}<'_0, T0>}]
+    Source: 'src/sudoers/mod.rs', lines 921:4-929:5 -/
+@[reducible]
+def
+  sudoers.match_group_alias.closure.Insts.CoreOpsFunctionFnMutTupleShared1UserSpecifierBool
+  {T0 : Type _} (systeminterfaceUnixGroupInst : system.interface.UnixGroup T0)
+  : core.ops.function.FnMut (sudoers.match_group_alias.closure T0)
+  sudoers.ast.UserSpecifier Bool := {
+  FnOnceInst :=
+    sudoers.match_group_alias.closure.Insts.CoreOpsFunctionFnOnceTupleShared1UserSpecifierBool
+    systeminterfaceUnixGroupInst
+  call_mut :=
+    sudoers.match_group_alias.closure.Insts.CoreOpsFunctionFnMutTupleShared1UserSpecifierBool.call_mut
+    systeminterfaceUnixGroupInst
+}
+
+/-- Trait implementation: [sudo_rs::sudoers::match_group_alias::{impl core::ops::function::Fn<(&'_1 sudo_rs::sudoers::ast::UserSpecifier,), bool> for sudo_rs::sudoers::match_group_alias::{closure}<'_0, T0>}]
+    Source: 'src/sudoers/mod.rs', lines 921:4-929:5 -/
+@[reducible]
+def
+  sudoers.match_group_alias.closure.Insts.CoreOpsFunctionFnTupleShared1UserSpecifierBool
+  {T0 : Type _} (systeminterfaceUnixGroupInst : system.interface.UnixGroup T0)
+  : core.ops.function.Fn (sudoers.match_group_alias.closure T0)
+  sudoers.ast.UserSpecifier Bool := {
+  FnMutInst :=
+    sudoers.match_group_alias.closure.Insts.CoreOpsFunctionFnMutTupleShared1UserSpecifierBool
+    systeminterfaceUnixGroupInst
+  call :=
+    sudoers.match_group_alias.closure.Insts.CoreOpsFunctionFnTupleShared1UserSpecifierBool.call
+    systeminterfaceUnixGroupInst
+}
+
+/-- [sudo_rs::sudoers::match_group_alias]:
+    Source: 'src/sudoers/mod.rs', lines 920:0-930:1 -/
+def sudoers.match_group_alias
+  {T0 : Type _} (systeminterfaceUnixGroupInst : system.interface.UnixGroup T0)
+  (group : T0) :
+  Result (sudoers.match_group_alias.closure T0)
+  := do
+  ok group
+
 /-- [sudo_rs::sudoers::command_tag]:
-    Source: 'src/sudoers/mod.rs', lines 774:0-783:1 -/
+    Source: 'src/sudoers/mod.rs', lines 797:0-806:1 -/
 def sudoers.command_tag
   (tag : sudoers.ast.Tag)
   (cmd : sudoers.ast.Qualified (sudoers.tokens.Meta (glob.Pattern ×
@@ -6523,7 +6944,7 @@ def sudoers.command_tag
     sudoers.ast.Tag.Insts.CoreCloneClone.clone tag
 
 /-- [sudo_rs::sudoers::apply_modifiers]: loop 0:
-    Source: 'src/sudoers/mod.rs', lines 767:4-770:5 -/
+    Source: 'src/sudoers/mod.rs', lines 790:4-793:5 -/
 @[rust_loop]
 def sudoers.apply_modifiers_loop
   (mods : Slice sudoers.ast.Modifier) (tag : sudoers.ast.Tag) (i : Std.Usize) :
@@ -6540,7 +6961,7 @@ def sudoers.apply_modifiers_loop
 partial_fixpoint
 
 /-- [sudo_rs::sudoers::apply_modifiers]:
-    Source: 'src/sudoers/mod.rs', lines 765:0-771:1 -/
+    Source: 'src/sudoers/mod.rs', lines 788:0-794:1 -/
 @[reducible]
 def sudoers.apply_modifiers
   (mods : Slice sudoers.ast.Modifier) (tag : sudoers.ast.Tag) :
@@ -6549,7 +6970,7 @@ def sudoers.apply_modifiers
   sudoers.apply_modifiers_loop mods tag 0#usize
 
 /-- [sudo_rs::sudoers::distribute_tags]: loop 0:
-    Source: 'src/sudoers/mod.rs', lines 752:4-760:5 -/
+    Source: 'src/sudoers/mod.rs', lines 775:4-783:5 -/
 @[rust_loop]
 def sudoers.distribute_tags_loop
   (runas_cmds : Slice ((Option sudoers.ast.RunAs) × sudoers.ast.CommandSpec))
@@ -6577,7 +6998,7 @@ def sudoers.distribute_tags_loop
 partial_fixpoint
 
 /-- [sudo_rs::sudoers::distribute_tags]:
-    Source: 'src/sudoers/mod.rs', lines 746:0-763:1 -/
+    Source: 'src/sudoers/mod.rs', lines 769:0-786:1 -/
 def sudoers.distribute_tags
   (runas_cmds : Slice ((Option sudoers.ast.RunAs) × sudoers.ast.CommandSpec))
   :
@@ -6588,7 +7009,7 @@ def sudoers.distribute_tags
     Std.Usize) × sudoers.ast.Tag)) 0#usize
 
 /-- [sudo_rs::sudoers::command_verdict]:
-    Source: 'src/sudoers/mod.rs', lines 690:0-706:1 -/
+    Source: 'src/sudoers/mod.rs', lines 713:0-729:1 -/
 def sudoers.command_verdict
   {Verdict : Type _}
   (coreopsfunctionFnVerdictPairOptionShared0RunAsShared1QualifiedMetaPairPatternArgsOptionBoolInst
@@ -6612,7 +7033,7 @@ def sudoers.command_verdict
     verdict (runas, cmd)
 
 /-- [sudo_rs::sudoers::check_commands]: loop 0:
-    Source: 'src/sudoers/mod.rs', lines 675:4-683:5 -/
+    Source: 'src/sudoers/mod.rs', lines 698:4-706:5 -/
 @[rust_loop]
 def sudoers.check_commands_loop
   {Verdict : Type _}
@@ -6654,7 +7075,7 @@ def sudoers.check_commands_loop
 partial_fixpoint
 
 /-- [sudo_rs::sudoers::check_commands]:
-    Source: 'src/sudoers/mod.rs', lines 664:0-686:1 -/
+    Source: 'src/sudoers/mod.rs', lines 687:0-709:1 -/
 def sudoers.check_commands
   {Verdict : Type _}
   (coreopsfunctionFnVerdictPairOptionShared0RunAsShared1QualifiedMetaPairPatternArgsOptionBoolInst
@@ -6671,7 +7092,7 @@ def sudoers.check_commands
     result runas_cmds verdict tags 0#usize
 
 /-- [sudo_rs::sudoers::match_group::{impl core::ops::function::FnMut<(&'_1 sudo_rs::sudoers::ast::Identifier,), bool> for sudo_rs::sudoers::match_group::{closure}<'_0, T0>}::call_mut]:
-    Source: 'src/sudoers/mod.rs', lines 891:4-894:5 -/
+    Source: 'src/sudoers/mod.rs', lines 914:4-917:5 -/
 def
   sudoers.match_group.closure.Insts.CoreOpsFunctionFnMutTupleShared1IdentifierBool.call_mut
   {T0 : Type _} (systeminterfaceUnixGroupInst : system.interface.UnixGroup T0)
@@ -6684,7 +7105,7 @@ def
   ok (b, state)
 
 /-- [sudo_rs::sudoers::match_group::{impl core::ops::function::FnOnce<(&'_1 sudo_rs::sudoers::ast::Identifier,), bool> for sudo_rs::sudoers::match_group::{closure}<'_0, T0>}::call_once]:
-    Source: 'src/sudoers/mod.rs', lines 891:4-894:5 -/
+    Source: 'src/sudoers/mod.rs', lines 914:4-917:5 -/
 def
   sudoers.match_group.closure.Insts.CoreOpsFunctionFnOnceTupleShared1IdentifierBool.call_once
   {T0 : Type _} (systeminterfaceUnixGroupInst : system.interface.UnixGroup T0)
@@ -6697,7 +7118,7 @@ def
   ok b
 
 /-- Trait implementation: [sudo_rs::sudoers::match_group::{impl core::ops::function::FnOnce<(&'_1 sudo_rs::sudoers::ast::Identifier,), bool> for sudo_rs::sudoers::match_group::{closure}<'_0, T0>}]
-    Source: 'src/sudoers/mod.rs', lines 891:4-894:5 -/
+    Source: 'src/sudoers/mod.rs', lines 914:4-917:5 -/
 @[reducible]
 def
   sudoers.match_group.closure.Insts.CoreOpsFunctionFnOnceTupleShared1IdentifierBool
@@ -6710,7 +7131,7 @@ def
 }
 
 /-- Trait implementation: [sudo_rs::sudoers::match_group::{impl core::ops::function::FnMut<(&'_1 sudo_rs::sudoers::ast::Identifier,), bool> for sudo_rs::sudoers::match_group::{closure}<'_0, T0>}]
-    Source: 'src/sudoers/mod.rs', lines 891:4-894:5 -/
+    Source: 'src/sudoers/mod.rs', lines 914:4-917:5 -/
 @[reducible]
 def
   sudoers.match_group.closure.Insts.CoreOpsFunctionFnMutTupleShared1IdentifierBool
@@ -6726,7 +7147,7 @@ def
 }
 
 /-- Trait implementation: [sudo_rs::sudoers::match_group::{impl core::ops::function::Fn<(&'_1 sudo_rs::sudoers::ast::Identifier,), bool> for sudo_rs::sudoers::match_group::{closure}<'_0, T0>}]
-    Source: 'src/sudoers/mod.rs', lines 891:4-894:5 -/
+    Source: 'src/sudoers/mod.rs', lines 914:4-917:5 -/
 @[reducible]
 def
   sudoers.match_group.closure.Insts.CoreOpsFunctionFnTupleShared1IdentifierBool
@@ -6742,7 +7163,7 @@ def
 }
 
 /-- [sudo_rs::sudoers::check_permission::{impl core::ops::function::Fn<(core::option::Option<&'_10 sudo_rs::sudoers::ast::RunAs>, &'_11 sudo_rs::sudoers::ast::Qualified<sudo_rs::sudoers::tokens::Meta<(glob::Pattern, sudo_rs::sudoers::tokens::Args)>>), core::option::Option<bool>> for sudo_rs::sudoers::check_permission::{closure}<'_0, '_1, '_2, '_3, '_4, '_5, '_6, '_7, '_8, '_9, User, Group, Clause0_Group>}::call]:
-    Source: 'src/sudoers/mod.rs', lines 614:18-635:5 -/
+    Source: 'src/sudoers/mod.rs', lines 637:18-658:5 -/
 def
   sudoers.check_permission.closure.Insts.CoreOpsFunctionFnPairOptionShared10RunAsShared11QualifiedMetaPairPatternArgsOptionBool.call
   {User : Type _} {Group : Type _} {Clause0_Group : Type _}
@@ -6878,7 +7299,7 @@ def
           else ok none
 
 /-- [sudo_rs::sudoers::check_permission::{impl core::ops::function::FnMut<(core::option::Option<&'_10 sudo_rs::sudoers::ast::RunAs>, &'_11 sudo_rs::sudoers::ast::Qualified<sudo_rs::sudoers::tokens::Meta<(glob::Pattern, sudo_rs::sudoers::tokens::Args)>>), core::option::Option<bool>> for sudo_rs::sudoers::check_permission::{closure}<'_0, '_1, '_2, '_3, '_4, '_5, '_6, '_7, '_8, '_9, User, Group, Clause0_Group>}::call_mut]:
-    Source: 'src/sudoers/mod.rs', lines 614:18-635:5 -/
+    Source: 'src/sudoers/mod.rs', lines 637:18-658:5 -/
 def
   sudoers.check_permission.closure.Insts.CoreOpsFunctionFnMutPairOptionShared10RunAsShared11QualifiedMetaPairPatternArgsOptionBool.call_mut
   {User : Type _} {Group : Type _} {Clause0_Group : Type _}
@@ -6898,7 +7319,7 @@ def
   ok (o, state)
 
 /-- [sudo_rs::sudoers::check_permission::{impl core::ops::function::FnOnce<(core::option::Option<&'_10 sudo_rs::sudoers::ast::RunAs>, &'_11 sudo_rs::sudoers::ast::Qualified<sudo_rs::sudoers::tokens::Meta<(glob::Pattern, sudo_rs::sudoers::tokens::Args)>>), core::option::Option<bool>> for sudo_rs::sudoers::check_permission::{closure}<'_0, '_1, '_2, '_3, '_4, '_5, '_6, '_7, '_8, '_9, User, Group, Clause0_Group>}::call_once]:
-    Source: 'src/sudoers/mod.rs', lines 614:18-635:5 -/
+    Source: 'src/sudoers/mod.rs', lines 637:18-658:5 -/
 def
   sudoers.check_permission.closure.Insts.CoreOpsFunctionFnOncePairOptionShared10RunAsShared11QualifiedMetaPairPatternArgsOptionBool.call_once
   {User : Type _} {Group : Type _} {Clause0_Group : Type _}
@@ -6917,7 +7338,7 @@ def
   ok o
 
 /-- Trait implementation: [sudo_rs::sudoers::check_permission::{impl core::ops::function::FnOnce<(core::option::Option<&'_10 sudo_rs::sudoers::ast::RunAs>, &'_11 sudo_rs::sudoers::ast::Qualified<sudo_rs::sudoers::tokens::Meta<(glob::Pattern, sudo_rs::sudoers::tokens::Args)>>), core::option::Option<bool>> for sudo_rs::sudoers::check_permission::{closure}<'_0, '_1, '_2, '_3, '_4, '_5, '_6, '_7, '_8, '_9, User, Group, Clause0_Group>}]
-    Source: 'src/sudoers/mod.rs', lines 614:18-635:5 -/
+    Source: 'src/sudoers/mod.rs', lines 637:18-658:5 -/
 @[reducible]
 def
   sudoers.check_permission.closure.Insts.CoreOpsFunctionFnOncePairOptionShared10RunAsShared11QualifiedMetaPairPatternArgsOptionBool
@@ -6936,7 +7357,7 @@ def
 }
 
 /-- Trait implementation: [sudo_rs::sudoers::check_permission::{impl core::ops::function::FnMut<(core::option::Option<&'_10 sudo_rs::sudoers::ast::RunAs>, &'_11 sudo_rs::sudoers::ast::Qualified<sudo_rs::sudoers::tokens::Meta<(glob::Pattern, sudo_rs::sudoers::tokens::Args)>>), core::option::Option<bool>> for sudo_rs::sudoers::check_permission::{closure}<'_0, '_1, '_2, '_3, '_4, '_5, '_6, '_7, '_8, '_9, User, Group, Clause0_Group>}]
-    Source: 'src/sudoers/mod.rs', lines 614:18-635:5 -/
+    Source: 'src/sudoers/mod.rs', lines 637:18-658:5 -/
 @[reducible]
 def
   sudoers.check_permission.closure.Insts.CoreOpsFunctionFnMutPairOptionShared10RunAsShared11QualifiedMetaPairPatternArgsOptionBool
@@ -6959,7 +7380,7 @@ def
 }
 
 /-- Trait implementation: [sudo_rs::sudoers::check_permission::{impl core::ops::function::Fn<(core::option::Option<&'_10 sudo_rs::sudoers::ast::RunAs>, &'_11 sudo_rs::sudoers::ast::Qualified<sudo_rs::sudoers::tokens::Meta<(glob::Pattern, sudo_rs::sudoers::tokens::Args)>>), core::option::Option<bool>> for sudo_rs::sudoers::check_permission::{closure}<'_0, '_1, '_2, '_3, '_4, '_5, '_6, '_7, '_8, '_9, User, Group, Clause0_Group>}]
-    Source: 'src/sudoers/mod.rs', lines 614:18-635:5 -/
+    Source: 'src/sudoers/mod.rs', lines 637:18-658:5 -/
 @[reducible]
 def
   sudoers.check_permission.closure.Insts.CoreOpsFunctionFnPairOptionShared10RunAsShared11QualifiedMetaPairPatternArgsOptionBool
@@ -6982,7 +7403,7 @@ def
 }
 
 /-- [sudo_rs::sudoers::check_permission]: loop 1:
-    Source: 'src/sudoers/mod.rs', lines 648:12-653:13 -/
+    Source: 'src/sudoers/mod.rs', lines 671:12-676:13 -/
 @[rust_loop]
 def sudoers.check_permission_loop0_loop0
   {User : Type _} {Group : Type _} {Clause0_Group : Type _}
@@ -7032,7 +7453,7 @@ def sudoers.check_permission_loop0_loop0
 partial_fixpoint
 
 /-- [sudo_rs::sudoers::check_permission]: loop 0:
-    Source: 'src/sudoers/mod.rs', lines 644:4-656:5 -/
+    Source: 'src/sudoers/mod.rs', lines 667:4-679:5 -/
 @[rust_loop]
 def sudoers.check_permission_loop0
   {User : Type _} {Group : Type _} {Clause0_Group : Type _}
@@ -7080,7 +7501,7 @@ def sudoers.check_permission_loop0
 partial_fixpoint
 
 /-- [sudo_rs::sudoers::check_permission]:
-    Source: 'src/sudoers/mod.rs', lines 600:0-659:1 -/
+    Source: 'src/sudoers/mod.rs', lines 623:0-682:1 -/
 def sudoers.check_permission
   {User : Type _} {Group : Type _} {Clause0_Group : Type _}
   (systeminterfaceUnixUserInst : system.interface.UnixUser User Clause0_Group)
@@ -7127,7 +7548,7 @@ def sudoers.check_permission
     request.group c3 c4 user_aliases host_aliases none 0#usize
 
 /-- [sudo_rs::sudoers::permission_flags]:
-    Source: 'src/sudoers/mod.rs', lines 444:0-462:1 -/
+    Source: 'src/sudoers/mod.rs', lines 467:0-485:1 -/
 def sudoers.permission_flags
   {User : Type _} {Group : Type _} {Clause0_Group : Type _}
   (systeminterfaceUnixUserInst : system.interface.UnixUser User Clause0_Group)
@@ -7162,470 +7583,29 @@ def sudoers.permission_flags
     then ok (some { t with authenticate := sudoers.ast.Authenticate.Nopasswd })
     else ok flags
 
-/-- [sudo_rs::sudoers::select_commands]: loop 0:
-    Source: 'src/sudoers/mod.rs', lines 579:4-591:5 -/
-@[rust_loop]
-def sudoers.select_commands_loop
-  (result : Option sudoers.ast.Tag) (prefer_passwd : Bool)
-  (tags : alloc.vec.Vec ((Option Std.Usize) × sudoers.ast.Tag))
-  (i : Std.Usize) :
-  Result (Option sudoers.ast.Tag)
-  := do
-  let i1 := alloc.vec.Vec.len tags
-  if i < i1
-  then
-    let (_, tag) ←
-      alloc.vec.Vec.index (core.slice.index.SliceIndexUsizeSlice ((Option
-        Std.Usize) × sudoers.ast.Tag)) tags i
-    let keep ←
-      match result with
-      | none => ok false
-      | some best =>
-        do
-        let b ← sudoers.ast.Tag.needs_passwd best
-        if b = prefer_passwd
-        then
-          let b1 ← sudoers.ast.Tag.needs_passwd tag
-          ok (b1 != prefer_passwd)
-        else ok false
-    let result1 ←
-      if keep
-      then ok result
-      else
-        do
-        let t ← sudoers.ast.Tag.Insts.CoreCloneClone.clone tag
-        ok (some t)
-    let i2 ← i + 1#usize
-    sudoers.select_commands_loop result1 prefer_passwd tags i2
-  else ok result
-partial_fixpoint
-
-/-- [sudo_rs::sudoers::select_commands]:
-    Source: 'src/sudoers/mod.rs', lines 571:0-594:1 -/
-def sudoers.select_commands
-  (result : Option sudoers.ast.Tag)
-  (runas_cmds : Slice ((Option sudoers.ast.RunAs) × sudoers.ast.CommandSpec))
-  (prefer_passwd : Bool) :
-  Result (Option sudoers.ast.Tag)
-  := do
-  let tags ← sudoers.distribute_tags runas_cmds
-  sudoers.select_commands_loop result prefer_passwd tags 0#usize
-
-/-- [sudo_rs::sudoers::select_tag]: loop 1:
-    Source: 'src/sudoers/mod.rs', lines 556:12-561:13 -/
-@[rust_loop]
-def sudoers.select_tag_loop0_loop0
-  (prefer_passwd : Bool) (s : Str) (host_aliases : sudoers.FoundAliases)
-  (result : Option sudoers.ast.Tag)
-  (permissions : alloc.vec.Vec ((alloc.vec.Vec (sudoers.ast.Qualified
-  (sudoers.tokens.Meta sudoers.tokens.Hostname))) × (alloc.vec.Vec ((Option
-  sudoers.ast.RunAs) × sudoers.ast.CommandSpec)))) (j : Std.Usize) :
-  Result (Option sudoers.ast.Tag)
-  := do
-  let i := alloc.vec.Vec.len permissions
-  if j < i
-  then
-    let (v, v1) ←
-      alloc.vec.Vec.index (core.slice.index.SliceIndexUsizeSlice
-        ((alloc.vec.Vec (sudoers.ast.Qualified (sudoers.tokens.Meta
-        sudoers.tokens.Hostname))) × (alloc.vec.Vec ((Option
-        sudoers.ast.RunAs) × sudoers.ast.CommandSpec)))) permissions j
-    let s1 := alloc.vec.Vec.deref v
-    let b ←
-      sudoers.find_item
-        (sudoers.match_token.closure.Insts.CoreOpsFunctionFnTupleShared1TBool
-        sudoers.tokens.Hostname.Insts.CoreOpsDerefDerefString) s1 s
-        host_aliases
-    let result1 ←
-      if b
-      then
-        let s2 := alloc.vec.Vec.deref v1
-        sudoers.select_commands result s2 prefer_passwd
-      else ok result
-    let j1 ← j + 1#usize
-    sudoers.select_tag_loop0_loop0 prefer_passwd s host_aliases result1
-      permissions j1
-  else ok result
-partial_fixpoint
-
-/-- [sudo_rs::sudoers::select_tag]: loop 0:
-    Source: 'src/sudoers/mod.rs', lines 552:4-564:5 -/
-@[rust_loop]
-def sudoers.select_tag_loop0
-  {User : Type _} {Clause0_Group : Type _} (systeminterfaceUnixUserInst :
-  system.interface.UnixUser User Clause0_Group)
-  (rules : Slice sudoers.ast.PermissionSpec) (prefer_passwd : Bool) (t : User)
-  (s : Str) (user_aliases : sudoers.FoundAliases)
-  (host_aliases : sudoers.FoundAliases) (result : Option sudoers.ast.Tag)
-  (i : Std.Usize) :
-  Result (Option sudoers.ast.Tag)
-  := do
-  let i1 := Slice.len rules
-  if i < i1
-  then
-    let ps ← Slice.index_usize rules i
-    let s1 := alloc.vec.Vec.deref ps.users
-    let b ←
-      sudoers.find_item
-        (sudoers.match_user.closure.Insts.CoreOpsFunctionFnTupleShared1UserSpecifierBool
-        systeminterfaceUnixUserInst) s1 t user_aliases
-    if b
-    then
-      let result1 ←
-        sudoers.select_tag_loop0_loop0 prefer_passwd s host_aliases result
-          ps.permissions 0#usize
-      let i2 ← i + 1#usize
-      sudoers.select_tag_loop0 systeminterfaceUnixUserInst rules prefer_passwd
-        t s user_aliases host_aliases result1 i2
-    else
-      let i2 ← i + 1#usize
-      sudoers.select_tag_loop0 systeminterfaceUnixUserInst rules prefer_passwd
-        t s user_aliases host_aliases result i2
-  else ok result
-partial_fixpoint
-
-/-- [sudo_rs::sudoers::select_tag]:
-    Source: 'src/sudoers/mod.rs', lines 538:0-567:1 -/
-def sudoers.select_tag
-  {User : Type _} {Clause0_Group : Type _} (systeminterfaceUnixUserInst :
-  system.interface.UnixUser User Clause0_Group)
-  (rules : Slice sudoers.ast.PermissionSpec) (aliases : sudoers.AliasTable)
-  (invoking_user : User) (hostname : system.Hostname) (prefer_passwd : Bool) :
-  Result (Option sudoers.ast.Tag)
-  := do
-  let c ← sudoers.match_user systeminterfaceUnixUserInst invoking_user
-  let s ← system.Hostname.Insts.CoreOpsDerefDerefStr.deref hostname
-  let c1 ←
-    sudoers.match_token sudoers.tokens.Hostname.Insts.CoreOpsDerefDerefString s
-  let user_aliases ←
-    sudoers.get_aliases
-      (sudoers.match_user.closure.Insts.CoreOpsFunctionFnTupleShared1UserSpecifierBool
-      systeminterfaceUnixUserInst) aliases.user c
-  let host_aliases ←
-    sudoers.get_aliases
-      (sudoers.match_token.closure.Insts.CoreOpsFunctionFnTupleShared1TBool
-      sudoers.tokens.Hostname.Insts.CoreOpsDerefDerefString) aliases.host c1
-  sudoers.select_tag_loop0 systeminterfaceUnixUserInst rules prefer_passwd c c1
-    user_aliases host_aliases none 0#usize
-
-/-- [sudo_rs::sudoers::list_flags]:
-    Source: 'src/sudoers/mod.rs', lines 468:0-511:1 -/
-def sudoers.list_flags
+/-- [sudo_rs::sudoers::{sudo_rs::sudoers::Sudoers}::check]:
+    Source: 'src/sudoers/mod.rs', lines 187:4-202:5
+    Visibility: public -/
+def sudoers.Sudoers.check
   {User : Type _} {Group : Type _} {Clause0_Group : Type _}
   (systeminterfaceUnixUserInst : system.interface.UnixUser User Clause0_Group)
   (corecmpPartialEqInst : core.cmp.PartialEq User User)
   (systeminterfaceUnixGroupInst : system.interface.UnixGroup Group)
-  (rules : Slice sudoers.ast.PermissionSpec) (aliases : sudoers.AliasTable)
-  (invoking_user : User) (hostname : system.Hostname)
-  (request : sudoers.ListRequest User Group Clause0_Group) :
-  Result (Option sudoers.ast.Tag)
+  (self : sudoers.Sudoers) (am_user : User) (on_host : system.Hostname)
+  (request : sudoers.Request User Group Clause0_Group) :
+  Result (sudoers.Judgement × sudoers.Sudoers)
   := do
-  let b ←
-    core.cmp.impls.PartialEqShared.ne corecmpPartialEqInst
-      request.inspected_user invoking_user
-  let (skip_passwd, flags) ←
-    if b
-    then
-      do
-      let skip_passwd1 ← systeminterfaceUnixUserInst.is_root invoking_user
-      let t ← systeminterfaceUnixUserInst.group request.inspected_user
-      let p ←
-        std.path.Path.new Str.Insts.CoreConvertAsRefOsStr (toStr "list")
-      let s ← lift (Array.to_slice (Std.Array.empty std.ffi.os_str.OsString))
-      let flags1 ←
-        sudoers.permission_flags systeminterfaceUnixUserInst
-          corecmpPartialEqInst systeminterfaceUnixUserInst.UnixGroupInst rules
-          aliases invoking_user hostname
-          {
-            user := request.inspected_user,
-            group := t,
-            command := p,
-            arguments := s
-          }
-      let b1 := core.option.Option.is_none flags1
-      let o ←
-        if b1
-        then
-          if skip_passwd1
-          then
-            do
-            let t1 ← sudoers.ast.Tag.Insts.CoreDefaultDefault.default
-            ok (some t1)
-          else ok flags1
-        else ok flags1
-      ok (skip_passwd1, o)
-    else
-      do
-      let b1 ← systeminterfaceUnixUserInst.is_root invoking_user
-      let skip_passwd1 ←
-        if b1
-        then ok true
-        else
-          do
-          let b2 ←
-            core.cmp.impls.PartialEqShared.eq corecmpPartialEqInst
-              request.target_user invoking_user
-          if b2
-          then
-            sudoers.in_group systeminterfaceUnixUserInst
-              systeminterfaceUnixGroupInst invoking_user request.target_group
-          else ok false
-      let flags1 ←
-        sudoers.select_tag systeminterfaceUnixUserInst rules aliases
-          invoking_user hostname false
-      ok (skip_passwd1, flags1)
-  match flags with
-  | none => ok none
-  | some t =>
-    if skip_passwd
-    then ok (some { t with authenticate := sudoers.ast.Authenticate.Nopasswd })
-    else ok flags
-
-/-- [sudo_rs::sudoers::validate_flags]:
-    Source: 'src/sudoers/mod.rs', lines 516:0-532:1 -/
-def sudoers.validate_flags
-  {User : Type _} {Clause0_Group : Type _} (systeminterfaceUnixUserInst :
-  system.interface.UnixUser User Clause0_Group)
-  (rules : Slice sudoers.ast.PermissionSpec) (aliases : sudoers.AliasTable)
-  (invoking_user : User) (hostname : system.Hostname) :
-  Result (Option sudoers.ast.Tag)
-  := do
-  let skip_passwd ← systeminterfaceUnixUserInst.is_root invoking_user
+  let self1 ←
+    sudoers.Sudoers.specify_host_user_runas systeminterfaceUnixUserInst
+      corecmpPartialEqInst self on_host am_user (some request.user)
+  let self2 ←
+    sudoers.Sudoers.specify_command self1 request.command request.arguments
+  let s := alloc.vec.Vec.deref self2.rules
   let flags ←
-    sudoers.select_tag systeminterfaceUnixUserInst rules aliases invoking_user
-      hostname true
-  match flags with
-  | none => ok none
-  | some t =>
-    if skip_passwd
-    then ok (some { t with authenticate := sudoers.ast.Authenticate.Nopasswd })
-    else ok flags
-
-/-- [sudo_rs::sudoers::sanitize_alias_table::dependency_position]: loop 0:
-    Source: 'src/sudoers/mod.rs', lines 1329:8-1336:5 -/
-@[rust_loop]
-def sudoers.sanitize_alias_table.dependency_position_loop
-  {T : Type _} (table : Slice (sudoers.ast.Def T)) («name» : String)
-  (i : Std.Usize) :
-  Result (Option Std.Usize)
-  := do
-  let i1 := Slice.len table
-  if i < i1
-  then
-    let d ← Slice.index_usize table i
-    let (s, _) := d
-    let b ← alloc.string.String.Insts.CoreCmpPartialEqString.eq s «name»
-    if b
-    then ok (some i)
-    else
-      let i2 ← i + 1#usize
-      sudoers.sanitize_alias_table.dependency_position_loop table «name» i2
-  else ok none
-partial_fixpoint
-
-/-- [sudo_rs::sudoers::sanitize_alias_table::dependency_position]:
-    Source: 'src/sudoers/mod.rs', lines 1327:4-1336:5 -/
-@[reducible]
-def sudoers.sanitize_alias_table.dependency_position
-  {T : Type _} (table : Slice (sudoers.ast.Def T)) («name» : String) :
-  Result (Option Std.Usize)
-  := do
-  sudoers.sanitize_alias_table.dependency_position_loop table «name» 0#usize
-
-/-- [sudo_rs::sudoers::sanitize_alias_table::remqualify]:
-    Source: 'src/sudoers/mod.rs', lines 1320:4-1325:5 -/
-def sudoers.sanitize_alias_table.remqualify
-  {U : Type _} (item : sudoers.ast.Qualified U) : Result U := do
-  match item with
-  | sudoers.ast.Qualified.Allow x => ok x
-  | sudoers.ast.Qualified.Forbid x => ok x
-
-mutual
-
-/-- [sudo_rs::sudoers::sanitize_alias_table::{sudo_rs::sudoers::sanitize_alias_table::Visitor<'_0, T>}::visit]: loop 0:
-    Source: 'src/sudoers/mod.rs', lines 1350:16-1359:17 -/
-@[rust_loop]
-def sudoers.sanitize_alias_table.Visitor.visit_loop
-  {T : Type _}
-  (iter : core.slice.iter.Iter (sudoers.ast.Qualified (sudoers.tokens.Meta T)))
-  (back : alloc.vec.Vec sudoers.Error → alloc.vec.Vec sudoers.Error)
-  (hs : std.collections.hash.set.HashSet Std.Usize std.hash.random.RandomState
-  alloc.alloc.Global) (v : alloc.vec.Vec (sudoers.ast.Def T))
-  (v1 : alloc.vec.Vec Std.Usize) (v2 : alloc.vec.Vec sudoers.Error) :
-  Result ((std.collections.hash.set.HashSet Std.Usize
-    std.hash.random.RandomState alloc.alloc.Global) × (alloc.vec.Vec
-    (sudoers.ast.Def T)) × (alloc.vec.Vec Std.Usize) × (alloc.vec.Vec
-    sudoers.Error) × (alloc.vec.Vec sudoers.Error → alloc.vec.Vec
-    sudoers.Error))
-  := do
-  let (o, iter1) ← core.slice.iter.IteratorSliceIter.next iter
-  match o with
-  | none => ok (hs, v, v1, v2, back)
-  | some elem =>
-    let m ← sudoers.sanitize_alias_table.remqualify elem
-    match m with
-    | sudoers.tokens.Meta.All =>
-      sudoers.sanitize_alias_table.Visitor.visit_loop iter1 back hs v v1 v2
-    | sudoers.tokens.Meta.Only _ =>
-      sudoers.sanitize_alias_table.Visitor.visit_loop iter1 back hs v v1 v2
-    | sudoers.tokens.Meta.Alias «name» =>
-      let s := alloc.vec.Vec.deref v
-      let o1 ← sudoers.sanitize_alias_table.dependency_position s «name»
-      match o1 with
-      | none =>
-        let s1 ←
-          alloc.string.String.Insts.CoreOpsDerefDerefStr.deref «name»
-        let v3 ←
-          sudoers.alias_diagnostic v2 sudoers.AliasDiagnostic.Undefined s1
-        sudoers.sanitize_alias_table.Visitor.visit_loop iter1 back hs v v1 v3
-      | some dependency =>
-        let (self, visit_back) ←
-          sudoers.sanitize_alias_table.Visitor.visit
-            { seen := hs, table := v, order := v1, diagnostics := v2 }
-            dependency
-        sudoers.sanitize_alias_table.Visitor.visit_loop iter1
-          (fun v3 => back
-            (visit_back { self with diagnostics := v3 }).diagnostics) 
-          self.seen self.table self.order self.diagnostics
-partial_fixpoint
-
-/-- [sudo_rs::sudoers::sanitize_alias_table::{sudo_rs::sudoers::sanitize_alias_table::Visitor<'_0, T>}::visit]:
-    Source: 'src/sudoers/mod.rs', lines 1347:8-1365:9 -/
-def sudoers.sanitize_alias_table.Visitor.visit
-  {T : Type _} (self : sudoers.sanitize_alias_table.Visitor T)
-  (pos : Std.Usize) :
-  Result ((sudoers.sanitize_alias_table.Visitor T) ×
-    (sudoers.sanitize_alias_table.Visitor T →
-    sudoers.sanitize_alias_table.Visitor T))
-  := do
-  let (b, hs) ←
-    std.collections.hash.set.HashSet.insert core.cmp.EqUsize
-      Usize.Insts.CoreHashHash
-      std.hash.random.RandomState.Insts.CoreHashBuildHasherDefaultHasher
-      self.seen pos
-  if b
-  then
-    let d ←
-      alloc.vec.Vec.index (core.slice.index.SliceIndexUsizeSlice
-        (sudoers.ast.Def T)) self.table pos
-    let (_, members) := d
-    let s := alloc.vec.Vec.deref members
-    let iter ← core.slice.Slice.iter s
-    let (hs1, v, v1, v2, back) ←
-      sudoers.sanitize_alias_table.Visitor.visit_loop iter (fun v3 => v3) hs
-        self.table self.order self.diagnostics
-    let v3 ← alloc.vec.Vec.push v1 pos
-    let back1 :=
-      fun self1 =>
-        let v4 := back self1.diagnostics
-        { self with diagnostics := v4 }
-    ok ({ seen := hs1, table := v, order := v3, diagnostics := v2 }, back1)
-  else
-    let s := alloc.vec.Vec.deref self.order
-    let b1 ← core.slice.Slice.contains core.cmp.PartialEqUsize s pos
-    if b1
-    then
-      let back := fun self1 => { self with diagnostics := self1.diagnostics }
-      ok ({ self with seen := hs }, back)
-    else
-      let d ←
-        alloc.vec.Vec.index (core.slice.index.SliceIndexUsizeSlice
-          (sudoers.ast.Def T)) self.table pos
-      let (id, _) := d
-      let s1 ← alloc.string.String.Insts.CoreOpsDerefDerefStr.deref id
-      let v ←
-        sudoers.alias_diagnostic self.diagnostics
-          sudoers.AliasDiagnostic.Recursive s1
-      let back := fun self1 => { self with diagnostics := self1.diagnostics }
-      ok ({ self with seen := hs, diagnostics := v }, back)
-partial_fixpoint
-
-end
-
-/-- [sudo_rs::sudoers::sanitize_alias_table]: loop 0:
-    Source: 'src/sudoers/mod.rs', lines 1376:4-1382:5 -/
-@[rust_loop]
-def sudoers.sanitize_alias_table_loop
-  {T : Type _}
-  (iter : core.iter.adapters.enumerate.Enumerate (core.slice.iter.Iter
-  (sudoers.ast.Def T)))
-  (back : alloc.vec.Vec sudoers.Error → alloc.vec.Vec sudoers.Error)
-  (hs : std.collections.hash.set.HashSet Std.Usize std.hash.random.RandomState
-  alloc.alloc.Global) (table : alloc.vec.Vec (sudoers.ast.Def T))
-  (v : alloc.vec.Vec Std.Usize) (diagnostics : alloc.vec.Vec sudoers.Error)
-  (dupe : std.collections.hash.set.HashSet String std.hash.random.RandomState
-  alloc.alloc.Global) :
-  Result ((alloc.vec.Vec Std.Usize) × (alloc.vec.Vec sudoers.Error))
-  := do
-  let (o, iter1) ←
-    core.iter.adapters.enumerate.IteratorEnumerate.next
-      (core.iter.traits.iterator.IteratorSliceIter (sudoers.ast.Def T)) iter
-  match o with
-  | none => ok (v, back diagnostics)
-  | some p =>
-    let (i, d) := p
-    let («name», _) := d
-    let (b, dupe1) ←
-      std.collections.hash.set.HashSet.insert (Shared0A.Insts.CoreCmpEq
-        alloc.string.String.Insts.CoreCmpEq) (Shared0T.Insts.CoreHashHash
-        alloc.string.String.Insts.CoreHashHash)
-        std.hash.random.RandomState.Insts.CoreHashBuildHasherDefaultHasher dupe
-        «name»
-    if b
-    then
-      let (visitor, visit_back) ←
-        sudoers.sanitize_alias_table.Visitor.visit
-          { seen := hs, table, order := v, diagnostics } i
-      sudoers.sanitize_alias_table_loop iter1
-        (fun v1 => back
-          (visit_back { visitor with diagnostics := v1 }).diagnostics)
-        visitor.seen visitor.table visitor.order visitor.diagnostics dupe1
-    else
-      let s ← alloc.string.String.Insts.CoreOpsDerefDerefStr.deref «name»
-      let diagnostics1 ←
-        sudoers.alias_diagnostic diagnostics sudoers.AliasDiagnostic.Duplicate
-          s
-      sudoers.sanitize_alias_table_loop iter1 back hs table v diagnostics1
-        dupe1
-partial_fixpoint
-
-/-- [sudo_rs::sudoers::sanitize_alias_table]:
-    Source: 'src/sudoers/mod.rs', lines 1319:0-1385:1 -/
-def sudoers.sanitize_alias_table
-  {T : Type _} (table : alloc.vec.Vec (sudoers.ast.Def T))
-  (diagnostics : alloc.vec.Vec sudoers.Error) :
-  Result ((alloc.vec.Vec Std.Usize) × (alloc.vec.Vec sudoers.Error))
-  := do
-  let hs ← std.collections.hash.set.HashSetTRandomStateGlobal.new Std.Usize
-  let i := alloc.vec.Vec.len table
-  let v := alloc.vec.Vec.with_capacity Std.Usize i
-  let dupe ← std.collections.hash.set.HashSetTRandomStateGlobal.new String
-  let s := alloc.vec.Vec.deref table
-  let i1 ← core.slice.Slice.iter s
-  let iter ←
-    core.iter.traits.iterator.Iterator.enumerate.trait_default
-      (core.iter.traits.iterator.IteratorSliceIter (sudoers.ast.Def T)) i1
-  sudoers.sanitize_alias_table_loop iter (fun v1 => v1) hs table v diagnostics
-    dupe
-
-/-- [sudo_rs::sudoers::sanitize_alias_tables]:
-    Source: 'src/sudoers/mod.rs', lines 1290:0-1295:1 -/
-def sudoers.sanitize_alias_tables
-  («alias» : sudoers.AliasTable) (diagnostics : alloc.vec.Vec sudoers.Error)
-  :
-  Result (sudoers.AliasTable × (alloc.vec.Vec sudoers.Error))
-  := do
-  let (_, v) := «alias».user
-  let (v1, diagnostics1) ← sudoers.sanitize_alias_table v diagnostics
-  let (_, v2) := «alias».host
-  let (v3, diagnostics2) ← sudoers.sanitize_alias_table v2 diagnostics1
-  let (_, v4) := «alias».cmnd
-  let (v5, diagnostics3) ← sudoers.sanitize_alias_table v4 diagnostics2
-  let (_, v6) := «alias».runas
-  let (v7, diagnostics4) ← sudoers.sanitize_alias_table v6 diagnostics3
-  ok
-    ({ user := (v1, v), host := (v3, v2), cmnd := (v5, v4), runas := (v7, v6) },
-    diagnostics4)
+    sudoers.permission_flags systeminterfaceUnixUserInst corecmpPartialEqInst
+      systeminterfaceUnixGroupInst s self2.aliases am_user on_host request
+  let s1 ← defaults.Settings.Insts.CoreCloneClone.clone self2.settings
+  ok ({ flags, settings := s1 }, self2)
 
 /-- [sudo_rs::sudoers::policy::{sudo_rs::defaults::Settings}::to_auth]:
     Source: 'src/sudoers/policy.rs', lines 41:4-64:5 -/
@@ -7698,6 +7678,961 @@ def sudoers.policy.Settings.to_auth
           noninteractive_auth := b2,
           scope := «as»
         }
+
+/-- [sudo_rs::sudoers::select_commands]: loop 0:
+    Source: 'src/sudoers/mod.rs', lines 602:4-614:5 -/
+@[rust_loop]
+def sudoers.select_commands_loop
+  (result : Option sudoers.ast.Tag) (prefer_passwd : Bool)
+  (tags : alloc.vec.Vec ((Option Std.Usize) × sudoers.ast.Tag))
+  (i : Std.Usize) :
+  Result (Option sudoers.ast.Tag)
+  := do
+  let i1 := alloc.vec.Vec.len tags
+  if i < i1
+  then
+    let (_, tag) ←
+      alloc.vec.Vec.index (core.slice.index.SliceIndexUsizeSlice ((Option
+        Std.Usize) × sudoers.ast.Tag)) tags i
+    let keep ←
+      match result with
+      | none => ok false
+      | some best =>
+        do
+        let b ← sudoers.ast.Tag.needs_passwd best
+        if b = prefer_passwd
+        then
+          let b1 ← sudoers.ast.Tag.needs_passwd tag
+          ok (b1 != prefer_passwd)
+        else ok false
+    let result1 ←
+      if keep
+      then ok result
+      else
+        do
+        let t ← sudoers.ast.Tag.Insts.CoreCloneClone.clone tag
+        ok (some t)
+    let i2 ← i + 1#usize
+    sudoers.select_commands_loop result1 prefer_passwd tags i2
+  else ok result
+partial_fixpoint
+
+/-- [sudo_rs::sudoers::select_commands]:
+    Source: 'src/sudoers/mod.rs', lines 594:0-617:1 -/
+def sudoers.select_commands
+  (result : Option sudoers.ast.Tag)
+  (runas_cmds : Slice ((Option sudoers.ast.RunAs) × sudoers.ast.CommandSpec))
+  (prefer_passwd : Bool) :
+  Result (Option sudoers.ast.Tag)
+  := do
+  let tags ← sudoers.distribute_tags runas_cmds
+  sudoers.select_commands_loop result prefer_passwd tags 0#usize
+
+/-- [sudo_rs::sudoers::select_tag]: loop 1:
+    Source: 'src/sudoers/mod.rs', lines 579:12-584:13 -/
+@[rust_loop]
+def sudoers.select_tag_loop0_loop0
+  (prefer_passwd : Bool) (s : Str) (host_aliases : sudoers.FoundAliases)
+  (result : Option sudoers.ast.Tag)
+  (permissions : alloc.vec.Vec ((alloc.vec.Vec (sudoers.ast.Qualified
+  (sudoers.tokens.Meta sudoers.tokens.Hostname))) × (alloc.vec.Vec ((Option
+  sudoers.ast.RunAs) × sudoers.ast.CommandSpec)))) (j : Std.Usize) :
+  Result (Option sudoers.ast.Tag)
+  := do
+  let i := alloc.vec.Vec.len permissions
+  if j < i
+  then
+    let (v, v1) ←
+      alloc.vec.Vec.index (core.slice.index.SliceIndexUsizeSlice
+        ((alloc.vec.Vec (sudoers.ast.Qualified (sudoers.tokens.Meta
+        sudoers.tokens.Hostname))) × (alloc.vec.Vec ((Option
+        sudoers.ast.RunAs) × sudoers.ast.CommandSpec)))) permissions j
+    let s1 := alloc.vec.Vec.deref v
+    let b ←
+      sudoers.find_item
+        (sudoers.match_token.closure.Insts.CoreOpsFunctionFnTupleShared1TBool
+        sudoers.tokens.Hostname.Insts.CoreOpsDerefDerefString) s1 s
+        host_aliases
+    let result1 ←
+      if b
+      then
+        let s2 := alloc.vec.Vec.deref v1
+        sudoers.select_commands result s2 prefer_passwd
+      else ok result
+    let j1 ← j + 1#usize
+    sudoers.select_tag_loop0_loop0 prefer_passwd s host_aliases result1
+      permissions j1
+  else ok result
+partial_fixpoint
+
+/-- [sudo_rs::sudoers::select_tag]: loop 0:
+    Source: 'src/sudoers/mod.rs', lines 575:4-587:5 -/
+@[rust_loop]
+def sudoers.select_tag_loop0
+  {User : Type _} {Clause0_Group : Type _} (systeminterfaceUnixUserInst :
+  system.interface.UnixUser User Clause0_Group)
+  (rules : Slice sudoers.ast.PermissionSpec) (prefer_passwd : Bool) (t : User)
+  (s : Str) (user_aliases : sudoers.FoundAliases)
+  (host_aliases : sudoers.FoundAliases) (result : Option sudoers.ast.Tag)
+  (i : Std.Usize) :
+  Result (Option sudoers.ast.Tag)
+  := do
+  let i1 := Slice.len rules
+  if i < i1
+  then
+    let ps ← Slice.index_usize rules i
+    let s1 := alloc.vec.Vec.deref ps.users
+    let b ←
+      sudoers.find_item
+        (sudoers.match_user.closure.Insts.CoreOpsFunctionFnTupleShared1UserSpecifierBool
+        systeminterfaceUnixUserInst) s1 t user_aliases
+    if b
+    then
+      let result1 ←
+        sudoers.select_tag_loop0_loop0 prefer_passwd s host_aliases result
+          ps.permissions 0#usize
+      let i2 ← i + 1#usize
+      sudoers.select_tag_loop0 systeminterfaceUnixUserInst rules prefer_passwd
+        t s user_aliases host_aliases result1 i2
+    else
+      let i2 ← i + 1#usize
+      sudoers.select_tag_loop0 systeminterfaceUnixUserInst rules prefer_passwd
+        t s user_aliases host_aliases result i2
+  else ok result
+partial_fixpoint
+
+/-- [sudo_rs::sudoers::select_tag]:
+    Source: 'src/sudoers/mod.rs', lines 561:0-590:1 -/
+def sudoers.select_tag
+  {User : Type _} {Clause0_Group : Type _} (systeminterfaceUnixUserInst :
+  system.interface.UnixUser User Clause0_Group)
+  (rules : Slice sudoers.ast.PermissionSpec) (aliases : sudoers.AliasTable)
+  (invoking_user : User) (hostname : system.Hostname) (prefer_passwd : Bool) :
+  Result (Option sudoers.ast.Tag)
+  := do
+  let c ← sudoers.match_user systeminterfaceUnixUserInst invoking_user
+  let s ← system.Hostname.Insts.CoreOpsDerefDerefStr.deref hostname
+  let c1 ←
+    sudoers.match_token sudoers.tokens.Hostname.Insts.CoreOpsDerefDerefString s
+  let user_aliases ←
+    sudoers.get_aliases
+      (sudoers.match_user.closure.Insts.CoreOpsFunctionFnTupleShared1UserSpecifierBool
+      systeminterfaceUnixUserInst) aliases.user c
+  let host_aliases ←
+    sudoers.get_aliases
+      (sudoers.match_token.closure.Insts.CoreOpsFunctionFnTupleShared1TBool
+      sudoers.tokens.Hostname.Insts.CoreOpsDerefDerefString) aliases.host c1
+  sudoers.select_tag_loop0 systeminterfaceUnixUserInst rules prefer_passwd c c1
+    user_aliases host_aliases none 0#usize
+
+/-- [sudo_rs::sudoers::list_flags]:
+    Source: 'src/sudoers/mod.rs', lines 491:0-534:1 -/
+def sudoers.list_flags
+  {User : Type _} {Group : Type _} {Clause0_Group : Type _}
+  (systeminterfaceUnixUserInst : system.interface.UnixUser User Clause0_Group)
+  (corecmpPartialEqInst : core.cmp.PartialEq User User)
+  (systeminterfaceUnixGroupInst : system.interface.UnixGroup Group)
+  (rules : Slice sudoers.ast.PermissionSpec) (aliases : sudoers.AliasTable)
+  (invoking_user : User) (hostname : system.Hostname)
+  (request : sudoers.ListRequest User Group Clause0_Group) :
+  Result (Option sudoers.ast.Tag)
+  := do
+  let b ←
+    core.cmp.impls.PartialEqShared.ne corecmpPartialEqInst
+      request.inspected_user invoking_user
+  let (skip_passwd, flags) ←
+    if b
+    then
+      do
+      let skip_passwd1 ← systeminterfaceUnixUserInst.is_root invoking_user
+      let t ← systeminterfaceUnixUserInst.group request.inspected_user
+      let p ←
+        std.path.Path.new Str.Insts.CoreConvertAsRefOsStr (toStr "list")
+      let s ← lift (Array.to_slice (Std.Array.empty std.ffi.os_str.OsString))
+      let flags1 ←
+        sudoers.permission_flags systeminterfaceUnixUserInst
+          corecmpPartialEqInst systeminterfaceUnixUserInst.UnixGroupInst rules
+          aliases invoking_user hostname
+          {
+            user := request.inspected_user,
+            group := t,
+            command := p,
+            arguments := s
+          }
+      let b1 := core.option.Option.is_none flags1
+      let o ←
+        if b1
+        then
+          if skip_passwd1
+          then
+            do
+            let t1 ← sudoers.ast.Tag.Insts.CoreDefaultDefault.default
+            ok (some t1)
+          else ok flags1
+        else ok flags1
+      ok (skip_passwd1, o)
+    else
+      do
+      let b1 ← systeminterfaceUnixUserInst.is_root invoking_user
+      let skip_passwd1 ←
+        if b1
+        then ok true
+        else
+          do
+          let b2 ←
+            core.cmp.impls.PartialEqShared.eq corecmpPartialEqInst
+              request.target_user invoking_user
+          if b2
+          then
+            sudoers.in_group systeminterfaceUnixUserInst
+              systeminterfaceUnixGroupInst invoking_user request.target_group
+          else ok false
+      let flags1 ←
+        sudoers.select_tag systeminterfaceUnixUserInst rules aliases
+          invoking_user hostname false
+      ok (skip_passwd1, flags1)
+  match flags with
+  | none => ok none
+  | some t =>
+    if skip_passwd
+    then ok (some { t with authenticate := sudoers.ast.Authenticate.Nopasswd })
+    else ok flags
+
+/-- [sudo_rs::sudoers::{sudo_rs::sudoers::Sudoers}::check_list_permission]:
+    Source: 'src/sudoers/mod.rs', lines 204:4-220:5
+    Visibility: public -/
+def sudoers.Sudoers.check_list_permission
+  {User : Type _} {Group : Type _} {Clause0_Group : Type _}
+  (systeminterfaceUnixUserInst : system.interface.UnixUser User Clause0_Group)
+  (corecmpPartialEqInst : core.cmp.PartialEq User User)
+  (systeminterfaceUnixGroupInst : system.interface.UnixGroup Group)
+  (self : sudoers.Sudoers) (invoking_user : User) (hostname : system.Hostname)
+  (request : sudoers.ListRequest User Group Clause0_Group) :
+  Result ((sudoers.policy.Authorization Unit) × sudoers.Sudoers)
+  := do
+  let b ←
+    core.cmp.impls.PartialEqShared.ne corecmpPartialEqInst
+      request.inspected_user invoking_user
+  let self1 ←
+    if b
+    then
+      do
+      let self2 ←
+        sudoers.Sudoers.specify_host_user_runas systeminterfaceUnixUserInst
+          corecmpPartialEqInst self hostname invoking_user (some
+          request.inspected_user)
+      let p ←
+        std.path.Path.new Str.Insts.CoreConvertAsRefOsStr (toStr "list")
+      let s ← lift (Array.to_slice (Std.Array.empty std.ffi.os_str.OsString))
+      sudoers.Sudoers.specify_command self2 p s
+    else ok self
+  let s := alloc.vec.Vec.deref self1.rules
+  let o ←
+    sudoers.list_flags systeminterfaceUnixUserInst corecmpPartialEqInst
+      systeminterfaceUnixGroupInst s self1.aliases invoking_user hostname
+      request
+  match o with
+  | none => ok (sudoers.policy.Authorization.Forbidden, self1)
+  | some tag =>
+    let a ← sudoers.policy.Settings.to_auth self1.settings tag
+    ok (sudoers.policy.Authorization.Allowed a (), self1)
+
+/-- [sudo_rs::sudoers::validate_flags]:
+    Source: 'src/sudoers/mod.rs', lines 539:0-555:1 -/
+def sudoers.validate_flags
+  {User : Type _} {Clause0_Group : Type _} (systeminterfaceUnixUserInst :
+  system.interface.UnixUser User Clause0_Group)
+  (rules : Slice sudoers.ast.PermissionSpec) (aliases : sudoers.AliasTable)
+  (invoking_user : User) (hostname : system.Hostname) :
+  Result (Option sudoers.ast.Tag)
+  := do
+  let skip_passwd ← systeminterfaceUnixUserInst.is_root invoking_user
+  let flags ←
+    sudoers.select_tag systeminterfaceUnixUserInst rules aliases invoking_user
+      hostname true
+  match flags with
+  | none => ok none
+  | some t =>
+    if skip_passwd
+    then ok (some { t with authenticate := sudoers.ast.Authenticate.Nopasswd })
+    else ok flags
+
+/-- [sudo_rs::sudoers::{sudo_rs::sudoers::Sudoers}::check_validate_permission]:
+    Source: 'src/sudoers/mod.rs', lines 222:4-233:5
+    Visibility: public -/
+def sudoers.Sudoers.check_validate_permission
+  {User : Type _} {Clause0_Group : Type _} (systeminterfaceUnixUserInst :
+  system.interface.UnixUser User Clause0_Group) (corecmpPartialEqInst :
+  core.cmp.PartialEq User User) (self : sudoers.Sudoers) (invoking_user : User)
+  (hostname : system.Hostname) :
+  Result ((sudoers.policy.Authorization Unit) × sudoers.Sudoers)
+  := do
+  let self1 ←
+    sudoers.Sudoers.specify_host_user_runas systeminterfaceUnixUserInst
+      corecmpPartialEqInst self hostname invoking_user none
+  let s := alloc.vec.Vec.deref self1.rules
+  let o ←
+    sudoers.validate_flags systeminterfaceUnixUserInst s self1.aliases
+      invoking_user hostname
+  match o with
+  | none => ok (sudoers.policy.Authorization.Forbidden, self1)
+  | some tag =>
+    let a ← sudoers.policy.Settings.to_auth self1.settings tag
+    ok (sudoers.policy.Authorization.Allowed a (), self1)
+
+/-- [sudo_rs::sudoers::sanitize_alias_table::dependency_position]: loop 0:
+    Source: 'src/sudoers/mod.rs', lines 1477:8-1484:5 -/
+@[rust_loop]
+def sudoers.sanitize_alias_table.dependency_position_loop
+  {T : Type _} (table : Slice (sudoers.ast.Def T)) («name» : String)
+  (i : Std.Usize) :
+  Result (Option Std.Usize)
+  := do
+  let i1 := Slice.len table
+  if i < i1
+  then
+    let d ← Slice.index_usize table i
+    let (s, _) := d
+    let b ← alloc.string.String.Insts.CoreCmpPartialEqString.eq s «name»
+    if b
+    then ok (some i)
+    else
+      let i2 ← i + 1#usize
+      sudoers.sanitize_alias_table.dependency_position_loop table «name» i2
+  else ok none
+partial_fixpoint
+
+/-- [sudo_rs::sudoers::sanitize_alias_table::dependency_position]:
+    Source: 'src/sudoers/mod.rs', lines 1475:4-1484:5 -/
+@[reducible]
+def sudoers.sanitize_alias_table.dependency_position
+  {T : Type _} (table : Slice (sudoers.ast.Def T)) («name» : String) :
+  Result (Option Std.Usize)
+  := do
+  sudoers.sanitize_alias_table.dependency_position_loop table «name» 0#usize
+
+/-- [sudo_rs::sudoers::sanitize_alias_table::remqualify]:
+    Source: 'src/sudoers/mod.rs', lines 1468:4-1473:5 -/
+def sudoers.sanitize_alias_table.remqualify
+  {U : Type _} (item : sudoers.ast.Qualified U) : Result U := do
+  match item with
+  | sudoers.ast.Qualified.Allow x => ok x
+  | sudoers.ast.Qualified.Forbid x => ok x
+
+mutual
+
+/-- [sudo_rs::sudoers::sanitize_alias_table::{sudo_rs::sudoers::sanitize_alias_table::Visitor<'_0, T>}::visit]: loop 0:
+    Source: 'src/sudoers/mod.rs', lines 1498:16-1507:17 -/
+@[rust_loop]
+def sudoers.sanitize_alias_table.Visitor.visit_loop
+  {T : Type _}
+  (iter : core.slice.iter.Iter (sudoers.ast.Qualified (sudoers.tokens.Meta T)))
+  (back : alloc.vec.Vec sudoers.Error → alloc.vec.Vec sudoers.Error)
+  (hs : std.collections.hash.set.HashSet Std.Usize std.hash.random.RandomState
+  alloc.alloc.Global) (v : alloc.vec.Vec (sudoers.ast.Def T))
+  (v1 : alloc.vec.Vec Std.Usize) (v2 : alloc.vec.Vec sudoers.Error) :
+  Result ((std.collections.hash.set.HashSet Std.Usize
+    std.hash.random.RandomState alloc.alloc.Global) × (alloc.vec.Vec
+    (sudoers.ast.Def T)) × (alloc.vec.Vec Std.Usize) × (alloc.vec.Vec
+    sudoers.Error) × (alloc.vec.Vec sudoers.Error → alloc.vec.Vec
+    sudoers.Error))
+  := do
+  let (o, iter1) ← core.slice.iter.IteratorSliceIter.next iter
+  match o with
+  | none => ok (hs, v, v1, v2, back)
+  | some elem =>
+    let m ← sudoers.sanitize_alias_table.remqualify elem
+    match m with
+    | sudoers.tokens.Meta.All =>
+      sudoers.sanitize_alias_table.Visitor.visit_loop iter1 back hs v v1 v2
+    | sudoers.tokens.Meta.Only _ =>
+      sudoers.sanitize_alias_table.Visitor.visit_loop iter1 back hs v v1 v2
+    | sudoers.tokens.Meta.Alias «name» =>
+      let s := alloc.vec.Vec.deref v
+      let o1 ← sudoers.sanitize_alias_table.dependency_position s «name»
+      match o1 with
+      | none =>
+        let s1 ←
+          alloc.string.String.Insts.CoreOpsDerefDerefStr.deref «name»
+        let v3 ←
+          sudoers.alias_diagnostic v2 sudoers.AliasDiagnostic.Undefined s1
+        sudoers.sanitize_alias_table.Visitor.visit_loop iter1 back hs v v1 v3
+      | some dependency =>
+        let (self, visit_back) ←
+          sudoers.sanitize_alias_table.Visitor.visit
+            { seen := hs, table := v, order := v1, diagnostics := v2 }
+            dependency
+        sudoers.sanitize_alias_table.Visitor.visit_loop iter1
+          (fun v3 => back
+            (visit_back { self with diagnostics := v3 }).diagnostics) 
+          self.seen self.table self.order self.diagnostics
+partial_fixpoint
+
+/-- [sudo_rs::sudoers::sanitize_alias_table::{sudo_rs::sudoers::sanitize_alias_table::Visitor<'_0, T>}::visit]:
+    Source: 'src/sudoers/mod.rs', lines 1495:8-1513:9 -/
+def sudoers.sanitize_alias_table.Visitor.visit
+  {T : Type _} (self : sudoers.sanitize_alias_table.Visitor T)
+  (pos : Std.Usize) :
+  Result ((sudoers.sanitize_alias_table.Visitor T) ×
+    (sudoers.sanitize_alias_table.Visitor T →
+    sudoers.sanitize_alias_table.Visitor T))
+  := do
+  let (b, hs) ←
+    std.collections.hash.set.HashSet.insert core.cmp.EqUsize
+      Usize.Insts.CoreHashHash
+      std.hash.random.RandomState.Insts.CoreHashBuildHasherDefaultHasher
+      self.seen pos
+  if b
+  then
+    let d ←
+      alloc.vec.Vec.index (core.slice.index.SliceIndexUsizeSlice
+        (sudoers.ast.Def T)) self.table pos
+    let (_, members) := d
+    let s := alloc.vec.Vec.deref members
+    let iter ← core.slice.Slice.iter s
+    let (hs1, v, v1, v2, back) ←
+      sudoers.sanitize_alias_table.Visitor.visit_loop iter (fun v3 => v3) hs
+        self.table self.order self.diagnostics
+    let v3 ← alloc.vec.Vec.push v1 pos
+    let back1 :=
+      fun self1 =>
+        let v4 := back self1.diagnostics
+        { self with diagnostics := v4 }
+    ok ({ seen := hs1, table := v, order := v3, diagnostics := v2 }, back1)
+  else
+    let s := alloc.vec.Vec.deref self.order
+    let b1 ← core.slice.Slice.contains core.cmp.PartialEqUsize s pos
+    if b1
+    then
+      let back := fun self1 => { self with diagnostics := self1.diagnostics }
+      ok ({ self with seen := hs }, back)
+    else
+      let d ←
+        alloc.vec.Vec.index (core.slice.index.SliceIndexUsizeSlice
+          (sudoers.ast.Def T)) self.table pos
+      let (id, _) := d
+      let s1 ← alloc.string.String.Insts.CoreOpsDerefDerefStr.deref id
+      let v ←
+        sudoers.alias_diagnostic self.diagnostics
+          sudoers.AliasDiagnostic.Recursive s1
+      let back := fun self1 => { self with diagnostics := self1.diagnostics }
+      ok ({ self with seen := hs, diagnostics := v }, back)
+partial_fixpoint
+
+end
+
+/-- [sudo_rs::sudoers::sanitize_alias_table]: loop 0:
+    Source: 'src/sudoers/mod.rs', lines 1524:4-1530:5 -/
+@[rust_loop]
+def sudoers.sanitize_alias_table_loop
+  {T : Type _}
+  (iter : core.iter.adapters.enumerate.Enumerate (core.slice.iter.Iter
+  (sudoers.ast.Def T)))
+  (back : alloc.vec.Vec sudoers.Error → alloc.vec.Vec sudoers.Error)
+  (hs : std.collections.hash.set.HashSet Std.Usize std.hash.random.RandomState
+  alloc.alloc.Global) (table : alloc.vec.Vec (sudoers.ast.Def T))
+  (v : alloc.vec.Vec Std.Usize) (diagnostics : alloc.vec.Vec sudoers.Error)
+  (dupe : std.collections.hash.set.HashSet String std.hash.random.RandomState
+  alloc.alloc.Global) :
+  Result ((alloc.vec.Vec Std.Usize) × (alloc.vec.Vec sudoers.Error))
+  := do
+  let (o, iter1) ←
+    core.iter.adapters.enumerate.IteratorEnumerate.next
+      (core.iter.traits.iterator.IteratorSliceIter (sudoers.ast.Def T)) iter
+  match o with
+  | none => ok (v, back diagnostics)
+  | some p =>
+    let (i, d) := p
+    let («name», _) := d
+    let (b, dupe1) ←
+      std.collections.hash.set.HashSet.insert (Shared0A.Insts.CoreCmpEq
+        alloc.string.String.Insts.CoreCmpEq) (Shared0T.Insts.CoreHashHash
+        alloc.string.String.Insts.CoreHashHash)
+        std.hash.random.RandomState.Insts.CoreHashBuildHasherDefaultHasher dupe
+        «name»
+    if b
+    then
+      let (visitor, visit_back) ←
+        sudoers.sanitize_alias_table.Visitor.visit
+          { seen := hs, table, order := v, diagnostics } i
+      sudoers.sanitize_alias_table_loop iter1
+        (fun v1 => back
+          (visit_back { visitor with diagnostics := v1 }).diagnostics)
+        visitor.seen visitor.table visitor.order visitor.diagnostics dupe1
+    else
+      let s ← alloc.string.String.Insts.CoreOpsDerefDerefStr.deref «name»
+      let diagnostics1 ←
+        sudoers.alias_diagnostic diagnostics sudoers.AliasDiagnostic.Duplicate
+          s
+      sudoers.sanitize_alias_table_loop iter1 back hs table v diagnostics1
+        dupe1
+partial_fixpoint
+
+/-- [sudo_rs::sudoers::sanitize_alias_table]:
+    Source: 'src/sudoers/mod.rs', lines 1467:0-1533:1 -/
+def sudoers.sanitize_alias_table
+  {T : Type _} (table : alloc.vec.Vec (sudoers.ast.Def T))
+  (diagnostics : alloc.vec.Vec sudoers.Error) :
+  Result ((alloc.vec.Vec Std.Usize) × (alloc.vec.Vec sudoers.Error))
+  := do
+  let hs ← std.collections.hash.set.HashSetTRandomStateGlobal.new Std.Usize
+  let i := alloc.vec.Vec.len table
+  let v := alloc.vec.Vec.with_capacity Std.Usize i
+  let dupe ← std.collections.hash.set.HashSetTRandomStateGlobal.new String
+  let s := alloc.vec.Vec.deref table
+  let i1 ← core.slice.Slice.iter s
+  let iter ←
+    core.iter.traits.iterator.Iterator.enumerate.trait_default
+      (core.iter.traits.iterator.IteratorSliceIter (sudoers.ast.Def T)) i1
+  sudoers.sanitize_alias_table_loop iter (fun v1 => v1) hs table v diagnostics
+    dupe
+
+/-- [sudo_rs::sudoers::sanitize_alias_tables]:
+    Source: 'src/sudoers/mod.rs', lines 1438:0-1443:1 -/
+def sudoers.sanitize_alias_tables
+  («alias» : sudoers.AliasTable) (diagnostics : alloc.vec.Vec sudoers.Error)
+  :
+  Result (sudoers.AliasTable × (alloc.vec.Vec sudoers.Error))
+  := do
+  let (_, v) := «alias».user
+  let (v1, diagnostics1) ← sudoers.sanitize_alias_table v diagnostics
+  let (_, v2) := «alias».host
+  let (v3, diagnostics2) ← sudoers.sanitize_alias_table v2 diagnostics1
+  let (_, v4) := «alias».cmnd
+  let (v5, diagnostics3) ← sudoers.sanitize_alias_table v4 diagnostics2
+  let (_, v6) := «alias».runas
+  let (v7, diagnostics4) ← sudoers.sanitize_alias_table v6 diagnostics3
+  ok
+    ({ user := (v1, v), host := (v3, v2), cmnd := (v5, v4), runas := (v7, v6) },
+    diagnostics4)
+
+/-- [sudo_rs::sudoers::any_arguments_meta]:
+    Source: 'src/sudoers/mod.rs', lines 1225:0-1231:1 -/
+def sudoers.any_arguments_meta
+  («meta» : sudoers.tokens.Meta glob.Pattern) :
+  Result (sudoers.tokens.Meta (glob.Pattern × sudoers.tokens.Args))
+  := do
+  match «meta» with
+  | sudoers.tokens.Meta.All => ok sudoers.tokens.Meta.All
+  | sudoers.tokens.Meta.Only simple_command =>
+    let s ← BoxSlice.Insts.CoreDefaultDefault.default std.ffi.os_str.OsString
+    ok (sudoers.tokens.Meta.Only (simple_command, sudoers.tokens.Args.Prefix
+      s))
+  | sudoers.tokens.Meta.Alias «alias» =>
+    ok (sudoers.tokens.Meta.Alias «alias»)
+
+/-- [sudo_rs::sudoers::any_arguments]:
+    Source: 'src/sudoers/mod.rs', lines 1218:0-1223:1 -/
+def sudoers.any_arguments
+  (spec : sudoers.ast.Qualified (sudoers.tokens.Meta glob.Pattern)) :
+  Result (sudoers.ast.Qualified (sudoers.tokens.Meta (glob.Pattern ×
+    sudoers.tokens.Args)))
+  := do
+  match spec with
+  | sudoers.ast.Qualified.Allow «meta» =>
+    let m ← sudoers.any_arguments_meta «meta»
+    ok (sudoers.ast.Qualified.Allow m)
+  | sudoers.ast.Qualified.Forbid «meta» =>
+    let m ← sudoers.any_arguments_meta «meta»
+    ok (sudoers.ast.Qualified.Forbid m)
+
+/-- [sudo_rs::sudoers::command_scope]: loop 0:
+    Source: 'src/sudoers/mod.rs', lines 1208:4-1213:5 -/
+@[rust_loop]
+def sudoers.command_scope_loop
+  (result : alloc.vec.Vec (sudoers.ast.Qualified (sudoers.tokens.Meta
+  (glob.Pattern × sudoers.tokens.Args))))
+  (specs : alloc.vec.into_iter.IntoIter (sudoers.ast.Qualified
+  (sudoers.tokens.Meta glob.Pattern))) (more : Bool) :
+  Result (alloc.vec.Vec (sudoers.ast.Qualified (sudoers.tokens.Meta
+    (glob.Pattern × sudoers.tokens.Args))))
+  := do
+  if more
+  then
+    let (o, specs1) ← alloc.vec.into_iter.IteratorIntoIter.next specs
+    match o with
+    | none => sudoers.command_scope_loop result specs1 false
+    | some spec =>
+      let q ← sudoers.any_arguments spec
+      let result1 ← alloc.vec.Vec.push result q
+      sudoers.command_scope_loop result1 specs1 more
+  else ok result
+partial_fixpoint
+
+/-- [sudo_rs::sudoers::command_scope]:
+    Source: 'src/sudoers/mod.rs', lines 1204:0-1215:1 -/
+def sudoers.command_scope
+  (specs : alloc.vec.Vec (sudoers.ast.Qualified (sudoers.tokens.Meta
+  glob.Pattern))) :
+  Result (alloc.vec.Vec (sudoers.ast.Qualified (sudoers.tokens.Meta
+    (glob.Pattern × sudoers.tokens.Args))))
+  := do
+  let i := alloc.vec.Vec.len specs
+  let result :=
+    alloc.vec.Vec.with_capacity (sudoers.ast.Qualified (sudoers.tokens.Meta
+      (glob.Pattern × sudoers.tokens.Args))) i
+  let specs1 ← alloc.vec.IntoIteratorVec.into_iter specs
+  sudoers.command_scope_loop result specs1 true
+
+/-- [sudo_rs::sudoers::append_defs]:
+    Source: 'src/sudoers/mod.rs', lines 1199:0-1201:1 -/
+def sudoers.append_defs
+  {T : Type _} (table : alloc.vec.Vec (sudoers.ast.Def T))
+  (defs : alloc.vec.Vec (sudoers.ast.Def T)) :
+  Result (alloc.vec.Vec (sudoers.ast.Def T))
+  := do
+  let (table1, _) ← alloc.vec.Vec.append alloc.alloc.Global table defs
+  ok table1
+
+/-- [sudo_rs::sudoers::report]:
+    Source: 'src/sudoers/mod.rs', lines 1155:0-1161:1 -/
+def sudoers.report
+  (diagnostics : alloc.vec.Vec sudoers.Error) (cur_path : std.path.Path)
+  (span : sudoers.basic_parser.Span) (message : String) :
+  Result (alloc.vec.Vec sudoers.Error)
+  := do
+  let pb ← std.path.Path.to_path_buf cur_path
+  alloc.vec.Vec.push diagnostics
+    ({ source := (some pb), location := (some span), message } : sudoers.Error)
+
+/-- [sudo_rs::sudoers::ignored_modifiers]: loop 0:
+    Source: 'src/sudoers/mod.rs', lines 1189:4-1195:5 -/
+@[rust_loop]
+def sudoers.ignored_modifiers_loop
+  (cur_path : std.path.Path) (modifiers : Slice sudoers.ast.Modifier)
+  (diagnostics : alloc.vec.Vec sudoers.Error) (i : Std.Usize) :
+  Result (alloc.vec.Vec sudoers.Error)
+  := do
+  let i1 := Slice.len modifiers
+  if i < i1
+  then
+    let m ← Slice.index_usize modifiers i
+    let diagnostics1 ←
+      match m with
+      | sudoers.ast.Modifier.Passwd => ok diagnostics
+      | sudoers.ast.Modifier.Nopasswd => ok diagnostics
+      | sudoers.ast.Modifier.Setenv => ok diagnostics
+      | sudoers.ast.Modifier.Nosetenv => ok diagnostics
+      | sudoers.ast.Modifier.Exec => ok diagnostics
+      | sudoers.ast.Modifier.Noexec => ok diagnostics
+      | sudoers.ast.Modifier.Cwd _ => ok diagnostics
+      | sudoers.ast.Modifier.AppArmorProfile _ => ok diagnostics
+      | sudoers.ast.Modifier.Ignored span =>
+        do
+        let message ←
+          alloc.string.String.Insts.CoreConvertFromShared0Str.from (toStr
+            "this tag is ignored by sudo-rs")
+        sudoers.report diagnostics cur_path span message
+      | sudoers.ast.Modifier.NoOp => ok diagnostics
+    let i2 ← i + 1#usize
+    sudoers.ignored_modifiers_loop cur_path modifiers diagnostics1 i2
+  else ok diagnostics
+partial_fixpoint
+
+/-- [sudo_rs::sudoers::ignored_modifiers]:
+    Source: 'src/sudoers/mod.rs', lines 1187:0-1196:1 -/
+@[reducible]
+def sudoers.ignored_modifiers
+  (cur_path : std.path.Path) (modifiers : Slice sudoers.ast.Modifier)
+  (diagnostics : alloc.vec.Vec sudoers.Error) :
+  Result (alloc.vec.Vec sudoers.Error)
+  := do
+  sudoers.ignored_modifiers_loop cur_path modifiers diagnostics 0#usize
+
+/-- [sudo_rs::sudoers::ignored_tags]: loop 1:
+    Source: 'src/sudoers/mod.rs', lines 1177:8-1181:9 -/
+@[rust_loop]
+def sudoers.ignored_tags_loop0_loop0
+  (cur_path : std.path.Path) (diagnostics : alloc.vec.Vec sudoers.Error)
+  (runas_cmds : alloc.vec.Vec ((Option sudoers.ast.RunAs) ×
+  sudoers.ast.CommandSpec)) (j : Std.Usize) :
+  Result (alloc.vec.Vec sudoers.Error)
+  := do
+  let i := alloc.vec.Vec.len runas_cmds
+  if j < i
+  then
+    let (_, cs) ←
+      alloc.vec.Vec.index (core.slice.index.SliceIndexUsizeSlice ((Option
+        sudoers.ast.RunAs) × sudoers.ast.CommandSpec)) runas_cmds j
+    let (modifiers, _) := cs
+    let s := alloc.vec.Vec.deref modifiers
+    let diagnostics1 ← sudoers.ignored_modifiers cur_path s diagnostics
+    let j1 ← j + 1#usize
+    sudoers.ignored_tags_loop0_loop0 cur_path diagnostics1 runas_cmds j1
+  else ok diagnostics
+partial_fixpoint
+
+/-- [sudo_rs::sudoers::ignored_tags]: loop 0:
+    Source: 'src/sudoers/mod.rs', lines 1174:4-1183:5 -/
+@[rust_loop]
+def sudoers.ignored_tags_loop0
+  (cur_path : std.path.Path) (diagnostics : alloc.vec.Vec sudoers.Error)
+  (permissions : alloc.vec.Vec ((alloc.vec.Vec (sudoers.ast.Qualified
+  (sudoers.tokens.Meta sudoers.tokens.Hostname))) × (alloc.vec.Vec ((Option
+  sudoers.ast.RunAs) × sudoers.ast.CommandSpec)))) (i : Std.Usize) :
+  Result (alloc.vec.Vec sudoers.Error)
+  := do
+  let i1 := alloc.vec.Vec.len permissions
+  if i < i1
+  then
+    let (_, runas_cmds) ←
+      alloc.vec.Vec.index (core.slice.index.SliceIndexUsizeSlice
+        ((alloc.vec.Vec (sudoers.ast.Qualified (sudoers.tokens.Meta
+        sudoers.tokens.Hostname))) × (alloc.vec.Vec ((Option
+        sudoers.ast.RunAs) × sudoers.ast.CommandSpec)))) permissions i
+    let diagnostics1 ←
+      sudoers.ignored_tags_loop0_loop0 cur_path diagnostics runas_cmds 0#usize
+    let i2 ← i + 1#usize
+    sudoers.ignored_tags_loop0 cur_path diagnostics1 permissions i2
+  else ok diagnostics
+partial_fixpoint
+
+/-- [sudo_rs::sudoers::ignored_tags]:
+    Source: 'src/sudoers/mod.rs', lines 1171:0-1184:1 -/
+@[reducible]
+def sudoers.ignored_tags
+  (cur_path : std.path.Path) (permission : sudoers.ast.PermissionSpec)
+  (diagnostics : alloc.vec.Vec sudoers.Error) :
+  Result (alloc.vec.Vec sudoers.Error)
+  := do
+  sudoers.ignored_tags_loop0 cur_path diagnostics permission.permissions
+    0#usize
+
+/-- [sudo_rs::sudoers::{sudo_rs::sudoers::IncludeState}::limit_reached]:
+    Source: 'src/sudoers/mod.rs', lines 1055:4-1061:5 -/
+def sudoers.IncludeState.limit_reached
+  (self : sudoers.IncludeState) : Result Bool := do
+  let ⟨ x ⟩ := self
+  ok (x >= sudoers.INCLUDE_LIMIT)
+
+/-- [sudo_rs::sudoers::{sudo_rs::sudoers::IncludeState}::inc]:
+    Source: 'src/sudoers/mod.rs', lines 1047:4-1053:5 -/
+def sudoers.IncludeState.inc
+  (self : sudoers.IncludeState) : Result sudoers.IncludeState := do
+  let ⟨ x ⟩ := self
+  let x1 ← x + 1#u8
+  ok (sudoers.IncludeState.Allowed x1)
+
+mutual
+
+/-- [sudo_rs::sudoers::process]: loop 0:
+    Source: 'src/sudoers/mod.rs', lines 1087:4-1092:5 -/
+@[rust_loop]
+def sudoers.process_loop
+  (cfg : sudoers.Sudoers) (cur_path : std.path.Path)
+  (diagnostics : alloc.vec.Vec sudoers.Error)
+  (include_state : sudoers.IncludeState)
+  (items : alloc.vec.into_iter.IntoIter (core.result.Result sudoers.ast.Sudo
+  sudoers.basic_parser.Status)) (more : Bool) :
+  Result (sudoers.Sudoers × (alloc.vec.Vec sudoers.Error) ×
+    sudoers.IncludeState)
+  := do
+  if more
+  then
+    let (o, items1) ← alloc.vec.into_iter.IteratorIntoIter.next items
+    match o with
+    | none =>
+      sudoers.process_loop cfg cur_path diagnostics include_state items1 false
+    | some item =>
+      let (cfg1, diagnostics1, include_state1) ←
+        sudoers.process_item cfg cur_path item diagnostics include_state
+      sudoers.process_loop cfg1 cur_path diagnostics1 include_state1 items1
+        more
+  else ok (cfg, diagnostics, include_state)
+partial_fixpoint
+
+/-- [sudo_rs::sudoers::process]:
+    Source: 'src/sudoers/mod.rs', lines 1078:0-1093:1 -/
+def sudoers.process
+  (cfg : sudoers.Sudoers) (cur_path : std.path.Path)
+  (items : alloc.vec.Vec (core.result.Result sudoers.ast.Sudo
+  sudoers.basic_parser.Status)) (diagnostics : alloc.vec.Vec sudoers.Error)
+  (include_state : sudoers.IncludeState) :
+  Result (sudoers.Sudoers × (alloc.vec.Vec sudoers.Error) ×
+    sudoers.IncludeState)
+  := do
+  let items1 ← alloc.vec.IntoIteratorVec.into_iter items
+  sudoers.process_loop cfg cur_path diagnostics include_state items1 true
+partial_fixpoint
+
+/-- [sudo_rs::sudoers::process_item]:
+    Source: 'src/sudoers/mod.rs', lines 1096:0-1152:1 -/
+def sudoers.process_item
+  (cfg : sudoers.Sudoers) (cur_path : std.path.Path)
+  (item : core.result.Result sudoers.ast.Sudo sudoers.basic_parser.Status)
+  (diagnostics : alloc.vec.Vec sudoers.Error)
+  (include_state : sudoers.IncludeState) :
+  Result (sudoers.Sudoers × (alloc.vec.Vec sudoers.Error) ×
+    sudoers.IncludeState)
+  := do
+  match item with
+  | core.result.Result.Ok s =>
+    match s with
+    | sudoers.ast.Sudo.Spec permission =>
+      let diagnostics1 ← sudoers.ignored_tags cur_path permission diagnostics
+      let v ← alloc.vec.Vec.push cfg.rules permission
+      ok ({ cfg with rules := v }, diagnostics1, include_state)
+    | sudoers.ast.Sudo.Decl d =>
+      match d with
+      | sudoers.ast.Directive.UserAlias «def» =>
+        let (v, v1) := cfg.aliases.user
+        let v2 ← sudoers.append_defs v1 «def»
+        ok ({ cfg with aliases := { cfg.aliases with user := (v, v2) } },
+          diagnostics, include_state)
+      | sudoers.ast.Directive.HostAlias «def» =>
+        let (v, v1) := cfg.aliases.host
+        let v2 ← sudoers.append_defs v1 «def»
+        ok ({ cfg with aliases := { cfg.aliases with host := (v, v2) } },
+          diagnostics, include_state)
+      | sudoers.ast.Directive.CmndAlias «def» =>
+        let (v, v1) := cfg.aliases.cmnd
+        let v2 ← sudoers.append_defs v1 «def»
+        ok ({ cfg with aliases := { cfg.aliases with cmnd := (v, v2) } },
+          diagnostics, include_state)
+      | sudoers.ast.Directive.RunasAlias «def» =>
+        let (v, v1) := cfg.aliases.runas
+        let v2 ← sudoers.append_defs v1 «def»
+        ok ({ cfg with aliases := { cfg.aliases with runas := (v, v2) } },
+          diagnostics, include_state)
+      | sudoers.ast.Directive.Defaults params cs =>
+        match cs with
+        | sudoers.ast.ConfigScope.Generic =>
+          let v ←
+            alloc.vec.Vec.push cfg.customisers.non_cmnd
+              (sudoers.ast.ConfigScope.Generic, params)
+          ok
+            ({ cfg with customisers := { cfg.customisers with non_cmnd := v } },
+            diagnostics, include_state)
+        | sudoers.ast.ConfigScope.Host _ =>
+          let v ← alloc.vec.Vec.push cfg.customisers.non_cmnd (cs, params)
+          ok
+            ({ cfg with customisers := { cfg.customisers with non_cmnd := v } },
+            diagnostics, include_state)
+        | sudoers.ast.ConfigScope.User _ =>
+          let v ← alloc.vec.Vec.push cfg.customisers.non_cmnd (cs, params)
+          ok
+            ({ cfg with customisers := { cfg.customisers with non_cmnd := v } },
+            diagnostics, include_state)
+        | sudoers.ast.ConfigScope.RunAs _ =>
+          let v ← alloc.vec.Vec.push cfg.customisers.non_cmnd (cs, params)
+          ok
+            ({ cfg with customisers := { cfg.customisers with non_cmnd := v } },
+            diagnostics, include_state)
+        | sudoers.ast.ConfigScope.Command specs =>
+          let v ← sudoers.command_scope specs
+          let v1 ← alloc.vec.Vec.push cfg.customisers.cmnd (v, params)
+          ok ({ cfg with customisers := { cfg.customisers with cmnd := v1 } },
+            diagnostics, include_state)
+    | sudoers.ast.Sudo.Include path span =>
+      sudoers.include cfg cur_path (sudoers.IncludeFile.Named path) span
+        diagnostics include_state
+    | sudoers.ast.Sudo.IncludeDir path span =>
+      sudoers.include_dir cfg cur_path path span diagnostics include_state
+    | sudoers.ast.Sudo.LineComment => ok (cfg, diagnostics, include_state)
+  | core.result.Result.Err s =>
+    match s with
+    | sudoers.basic_parser.Status.Fatal pos kind =>
+      let s1 ← sudoers.fatal_message kind
+      let diagnostics1 ← sudoers.report diagnostics cur_path pos s1
+      ok (cfg, diagnostics1, include_state)
+    | sudoers.basic_parser.Status.Reject => fail panic
+partial_fixpoint
+
+/-- [sudo_rs::sudoers::include]:
+    Source: 'src/sudoers/mod.rs', lines 1237:0-1255:1 -/
+def sudoers.include
+  (cfg : sudoers.Sudoers) (cur_path : std.path.Path)
+  (file : sudoers.IncludeFile) (span : sudoers.basic_parser.Span)
+  (diagnostics : alloc.vec.Vec sudoers.Error)
+  (include_state : sudoers.IncludeState) :
+  Result (sudoers.Sudoers × (alloc.vec.Vec sudoers.Error) ×
+    sudoers.IncludeState)
+  := do
+  let refused ← sudoers.IncludeState.limit_reached include_state
+  let refusal ← if refused
+                  then ok (some include_state)
+                  else ok none
+  let opened ← sudoers.include_file cur_path file refusal
+  let include_state1 ←
+    if refused
+    then ok include_state
+    else sudoers.IncludeState.inc include_state
+  match opened with
+  | core.result.Result.Ok p =>
+    let (path, items) := p
+    let p1 ← std.path.PathBuf.as_path path
+    sudoers.process cfg p1 items diagnostics include_state1
+  | core.result.Result.Err message =>
+    let diagnostics1 ← sudoers.report diagnostics cur_path span message
+    ok (cfg, diagnostics1, include_state1)
+partial_fixpoint
+
+/-- [sudo_rs::sudoers::include_dir]: loop 0:
+    Source: 'src/sudoers/mod.rs', lines 1271:12-1283:13 -/
+@[rust_loop]
+def sudoers.include_dir_loop
+  (cfg : sudoers.Sudoers) (cur_path : std.path.Path)
+  (span : sudoers.basic_parser.Span)
+  (diagnostics : alloc.vec.Vec sudoers.Error)
+  (include_state : sudoers.IncludeState)
+  (files : alloc.vec.into_iter.IntoIter std.path.PathBuf) (more : Bool) :
+  Result (sudoers.Sudoers × (alloc.vec.Vec sudoers.Error) ×
+    sudoers.IncludeState)
+  := do
+  if more
+  then
+    let (o, files1) ← alloc.vec.into_iter.IteratorIntoIter.next files
+    match o with
+    | none =>
+      sudoers.include_dir_loop cfg cur_path span diagnostics include_state
+        files1 false
+    | some file =>
+      let (cfg1, diagnostics1, include_state1) ←
+        sudoers.include cfg cur_path (sudoers.IncludeFile.Listed file) span
+          diagnostics include_state
+      sudoers.include_dir_loop cfg1 cur_path span diagnostics1 include_state1
+        files1 more
+  else ok (cfg, diagnostics, include_state)
+partial_fixpoint
+
+/-- [sudo_rs::sudoers::include_dir]:
+    Source: 'src/sudoers/mod.rs', lines 1259:0-1287:1 -/
+def sudoers.include_dir
+  (cfg : sudoers.Sudoers) (cur_path : std.path.Path) (path : String)
+  (span : sudoers.basic_parser.Span)
+  (diagnostics : alloc.vec.Vec sudoers.Error)
+  (include_state : sudoers.IncludeState) :
+  Result (sudoers.Sudoers × (alloc.vec.Vec sudoers.Error) ×
+    sudoers.IncludeState)
+  := do
+  let r ← sudoers.include_dir_files cur_path path
+  match r with
+  | core.result.Result.Ok files =>
+    let files1 ← alloc.vec.IntoIteratorVec.into_iter files
+    sudoers.include_dir_loop cfg cur_path span diagnostics include_state files1
+      true
+  | core.result.Result.Err message =>
+    let diagnostics1 ← sudoers.report diagnostics cur_path span message
+    ok (cfg, diagnostics1, include_state)
+partial_fixpoint
+
+end
+
+/-- [sudo_rs::sudoers::analyze]:
+    Source: 'src/sudoers/mod.rs', lines 1015:0-1030:1 -/
+def sudoers.analyze
+  (path : std.path.Path)
+  (items : alloc.vec.Vec (core.result.Result sudoers.ast.Sudo
+  sudoers.basic_parser.Status)) :
+  Result (sudoers.Sudoers × (alloc.vec.Vec sudoers.Error))
+  := do
+  let result ← sudoers.Sudoers.Insts.CoreDefaultDefault.default
+  let (result1, diagnostics, _) ←
+    sudoers.process result path items (alloc.vec.Vec.new sudoers.Error)
+      (sudoers.IncludeState.Allowed 0#u8)
+  let («at», diagnostics1) ←
+    sudoers.sanitize_alias_tables result1.aliases diagnostics
+  ok ({ result1 with aliases := «at» }, diagnostics1)
 
 /-- [sudo_rs::sudoers::policy::{sudo_rs::sudoers::Judgement}::authorization::{closure}::{impl core::ops::function::FnOnce<(&'_1 str,), core::option::Option<sudo_rs::sudoers::tokens::ChDir>> for sudo_rs::sudoers::policy::{sudo_rs::sudoers::Judgement}::authorization::{closure}::{closure}<'_0, '_1>}::call_once]:
     Source: 'src/sudoers/policy.rs', lines 143:56-145:25 -/
