@@ -346,9 +346,11 @@ fn dump_items(first: Vec<Result<Sudo, Status>>, second: Vec<Result<Sudo, Status>
 
 /// The dump of `text`: one line per item returned by `parse_lines::<Sudo>`, in order.
 pub(super) fn dump(text: &str) -> String {
-    let first = parse_lines::<Sudo>(&mut CharStream::new(text));
-    let second = parse_lines::<Sudo>(&mut CharStream::new(text));
-    dump_items(first, second)
+    CharStream::with_text(text, |cursor| {
+        let first = parse_lines::<Sudo>(&mut cursor.clone());
+        let second = parse_lines::<Sudo>(cursor);
+        dump_items(first, second)
+    })
 }
 
 /// [dump], with a panic of the parser recorded as the single line `panic <quoted message>`.
@@ -381,7 +383,7 @@ fn host_paths(text: &str) -> Vec<String> {
             }
         }
     };
-    for item in parse_lines::<Sudo>(&mut CharStream::new(text))
+    for item in CharStream::with_text(text, parse_lines::<Sudo>)
         .into_iter()
         .flatten()
     {

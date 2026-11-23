@@ -81,11 +81,11 @@ impl<'a> CharStream<'a> {
 }
 
 #[cfg(test)]
-impl CharStream<'static> {
-    /// Test helper: a stream over a copy of `src` that is never freed.
-    pub fn new(src: &str) -> Self {
-        let chars: &'static [char] = Vec::leak(src.chars().collect());
-        Self::from_chars(chars)
+impl CharStream<'_> {
+    /// Lend a cursor to a test parser, dropping the input buffer when the call returns.
+    pub fn with_text<R>(src: &str, parse: impl FnOnce(&mut CharStream<'_>) -> R) -> R {
+        let chars: Vec<char> = src.chars().collect();
+        parse(&mut CharStream::from_chars(&chars))
     }
 }
 
@@ -102,7 +102,7 @@ mod test {
 
     #[test]
     fn test_iter() {
-        let mut stream = CharStream::new("12\n3\n");
+        let mut stream = CharStream::from_chars(&['1', '2', '\n', '3', '\n']);
         assert_eq!(stream.peek(), Some('1'));
         assert!(stream.eat_char('1'));
         assert_eq!(stream.peek(), Some('2'));

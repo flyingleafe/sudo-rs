@@ -96,8 +96,8 @@ The rules below were all exercised by M1; each says what fails otherwise.
   `ErrorKind::Message` is produced by a P1/P2 construct or production.
 - `CharStream` is `Clone`, not `Copy` (clippy `clone_on_copy` in `ast.rs`); backtracking is
   `let saved = stream.clone(); … *stream = saved;`.
-- Tests that build streams from text use the test-only `CharStream::new(&str)` (it leaks a copy
-  of the characters); live code calls `chars_of` once and `CharStream::from_chars(&chars)`.
+- Tests use `CharStream::with_text` to borrow a cursor for one call. The character buffer is
+  freed on return. Live code calls `chars_of` once and borrows the result with `from_chars`.
 - Every change runs the harness of section 4 (`cargo test --lib sudoers::equiv`) and the
   extraction with the new item added to `start_from`.
 
@@ -105,7 +105,7 @@ The rules below were all exercised by M1; each says what fails otherwise.
 
 | Legacy (`src/sudoers/legacy/…`) | Live | Change |
 |---|---|---|
-| `CharStream { iter: Peekable<Chars>, line, col }` | `CharStream { src: &[char], pos, line, col }` | cursor; `new(&str)` is now test-only, live code uses `from_chars`/`new_with_pos` over `chars_of(&text)` |
+| `CharStream { iter: Peekable<Chars>, line, col }` | `CharStream { src: &[char], pos, line, col }` | `from_chars`/`new_with_pos` borrow a character slice; test code can use `with_text` |
 | `CharStream::next_if(f)` | `peek` + `bump(c)` | no closure |
 | `eat_char`, `skip_to_newline`, `peek`, `get_pos`, `advance` | same names | loops with a flag |
 | `Status::Fatal(Span, String)` | `Status::Fatal(Span, ErrorKind)` | `kind.to_string()` is the legacy text |
@@ -433,8 +433,6 @@ legacy shape would; that is a measurement for the proof stage.
   `unrecoverable!` user; every other message site of P1/P2 has an `ErrorKind` variant.
 - The legacy snapshot's `Defaults` block is the legacy-style parser at the branch's base (with
   the data API); the printer in `equiv.rs` (`settings_modifier`) and `bases()` follow it.
-- `CharStream::new(&str)` is test-only; a new test module that builds streams from text keeps
-  working unchanged (`src/sudoers/test/parser_dump.rs` does).
 - For the proof: `Status` is in the result, not in a separate error channel (`Result
   ((core.result.Result T Status) × CharStream)`); Aeneas `fail` arises only from arithmetic
   overflow, slice indexing, `chars_of`/`String::len` on texts beyond `usize`, the opaque

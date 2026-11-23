@@ -121,7 +121,7 @@ macro_rules! request {
 
 macro_rules! sudoer {
     ($($e:expr),*) => {
-        parse_lines(&mut CharStream::new(&[$($e),*, ""].join("\n")))
+        CharStream::with_text(&[$($e),*, ""].join("\n"), parse_lines)
             .into_iter()
             .map(|x| Ok::<_,basic_parser::Status>(x.unwrap()))
     }
@@ -135,10 +135,7 @@ fn parse_line(s: &str) -> Sudo {
 
 /// Returns `None` if a syntax error is encountered
 fn try_parse_line(s: &str) -> Option<Sudo> {
-    parse_lines(&mut CharStream::new(&[s, ""].join("")))
-        .into_iter()
-        .next()?
-        .ok()
+    CharStream::with_text(s, parse_lines).into_iter().next()?.ok()
 }
 
 #[test]
@@ -804,8 +801,7 @@ fn alias_tables_sanitized_in_table_order() {
 
 #[cfg(feature = "unstable-remote-sudoers")]
 fn assert_remote_failure(line: &str, expected_msg: &str) {
-    let [Err(Status::Fatal(_, msg)), ..] = &parse_lines::<Sudo>(&mut CharStream::new(line))[..]
-    else {
+    let [Err(Status::Fatal(_, msg)), ..] = &CharStream::with_text(line, parse_lines::<Sudo>)[..] else {
         panic!("Expected Fatal error");
     };
 
