@@ -15,7 +15,7 @@ use std::panic::{AssertUnwindSafe, catch_unwind};
 
 use super::ast::*;
 use super::basic_parser;
-use super::char_stream::{CharStream, chars_of};
+use super::char_stream::CharStream;
 use super::legacy;
 use super::tokens::*;
 use crate::defaults::{self, Settings};
@@ -191,11 +191,15 @@ fn fatal(s: &basic_parser::Span, message: &str) -> String {
     format!("fatal {} {message}", span(s))
 }
 
+fn parse_live(text: &str) -> Vec<basic_parser::Parsed<Sudo>> {
+    let chars: Vec<char> = text.chars().collect();
+    basic_parser::parse_lines::<Sudo>(&mut CharStream::from_chars(&chars))
+}
+
 /// The live parser on `text`, printed; `Err` with the panic message if it panicked.
 pub(crate) fn live(text: &str, base: &Settings) -> Result<Vec<String>, String> {
     let run = || {
-        let chars = chars_of(&text.to_string());
-        basic_parser::parse_lines::<Sudo>(&mut CharStream::from_chars(&chars))
+        parse_live(text)
             .into_iter()
             .map(|item| match item {
                 Ok(item) => sudo(item, base),
@@ -283,6 +287,20 @@ mod test {
     use super::*;
     use std::io::Write;
 
+    /// The first word of each printed item kind, for the corpus summary.
+    const ITEM_KINDS: [&str; 10] = [
+        "spec",
+        "User_Alias",
+        "Host_Alias",
+        "Cmnd_Alias",
+        "Runas_Alias",
+        "Defaults",
+        "include",
+        "includedir",
+        "comment",
+        "fatal",
+    ];
+
     /// Compare on every text; panics with the first differences. Returns the number of texts
     /// and a summary of what the parsers produced on them.
     fn check_all(texts: &[String]) -> (usize, String) {
@@ -299,10 +317,7 @@ mod test {
                     let mut fatal = false;
                     for line in &lines {
                         let kind = line.split(' ').next().unwrap_or("");
-                        for known in [
-                            "spec", "User_Alias", "Host_Alias", "Cmnd_Alias", "Runas_Alias",
-                            "Defaults", "include", "includedir", "comment", "fatal",
-                        ] {
+                        for known in ITEM_KINDS {
                             if kind == known {
                                 *items.entry(known).or_default() += 1;
                             }
@@ -332,6 +347,247 @@ mod test {
             messages.len()
         );
         (texts.len(), summary)
+    }
+
+    fn check_kind(text: &str, expected: basic_parser::ErrorKind) {
+        assert!(compare(text).unwrap().is_ok());
+        assert!(
+            parse_live(text).into_iter().any(|item| {
+                matches!(item, Err(basic_parser::Status::Fatal(_, kind)) if
+                    std::mem::discriminant(&kind) == std::mem::discriminant(&expected))
+            }),
+            "did not observe {expected:?} on {text:?}",
+        );
+    }
+
+    /// Directed corpus for variant coverage, including cases rare in random policies.
+    #[test]
+    fn diagnostic_kinds() {
+        use basic_parser::ErrorKind::*;
+
+        let cases = [
+            ("alice,\\x\n", StrayEscape),
+            ("alice host )\n", Expecting('=', Some(')'))),
+            ("alice host =\n", Expected("elem")),
+            ("alice\\q host = /tools/example\n", IllegalEscape),
+            ("alice host = ALL", MissingLineTerminator),
+            ("alice host = ALL )\n", GarbageAtEndOfLine),
+            ("alice 192.0.2.1 = /tools/example\n", HostIpv4),
+            ("al$ice host = /tools/example\n", EmbeddedDollar),
+            ("%#4294967296 host = /tools/example\n", ValueTooLarge),
+            ("alice host = /tools/example ^arg\n", RegexNotSupported),
+            ("alice host = /tools/example a*b\n", GlobInArguments),
+            ("alice host = list argument\n", ListArguments),
+            ("alice host = /tools/[\n", WildcardPattern(String::new())),
+            ("alice host = sha256:abc /tools/example\n", DigestNotSupported),
+            ("alice host = localcmd\n", FullyQualifiedPath),
+            ("alice host = CWD=/a*b /tools/example\n", StarInPath),
+            ("+netgroup host = /tools/example\n", NetgroupsNotSupported),
+            ("alice host = TIMEOUT=5 /tools/example\n", TagNotSupported(String::new())),
+            ("alice host = ROLE=example /tools/example\n", SelinuxNotSupported),
+            ("alice host = CUSTOM=value /tools/example\n", UnsupportedModifier(String::new())),
+            ("Defaults unknown_option\n", Message(String::new())),
+        ];
+        for (text, kind) in cases {
+            check_kind(text, kind);
+        }
+        check_kind(
+            &format!("alice {}host = /tools/example\n", "host,".repeat(127)),
+            TooManyItems,
+        );
+        check_kind(
+            &format!("{} host = /tools/example\n", "a".repeat(256)),
+            TokenTooLong,
+        );
+        check_kind(
+            &format!("alice host = {} /tools/example\n", "PASSWD: ".repeat(128)),
+            TooManyTags,
+        );
+
+        // Additional positive boundary cases for command token construction.
+        for text in [
+            "alice host = /tools/example\u{2003}first second *\n",
+            "alice host = /tools/example \"\"\n",
+            "alice host = list *\n",
+            "alice host = /tools/directory/\n",
+            "\"al ice\" host = (%wheel:#4294967295) APPARMOR_PROFILE=example /tools/example\n",
+        ] {
+            assert!(compare(text).unwrap().is_ok());
+        }
+    }
+
+    #[test]
+    fn non_utf8_canonical_path() {
+        use std::ffi::OsStr;
+        use std::os::unix::{ffi::OsStrExt, fs::symlink};
+        use std::{fs, path::PathBuf};
+
+        struct Scratch(PathBuf);
+        impl Drop for Scratch {
+            fn drop(&mut self) {
+                let _ = fs::remove_dir_all(&self.0);
+            }
+        }
+
+        let nonce = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let path = std::env::temp_dir()
+            .join(format!("sudo-rs-equiv-{}-{nonce}", std::process::id()));
+        fs::create_dir(&path).unwrap();
+        let scratch = Scratch(path);
+        let real = OsStr::from_bytes(b"non-utf8-\xff");
+        fs::create_dir(scratch.0.join(real)).unwrap();
+        fs::write(scratch.0.join(real).join("command"), "").unwrap();
+        symlink(real, scratch.0.join("link")).unwrap();
+        let line = format!("alice host = {}/link/command\n", scratch.0.display());
+        check_kind(&line, basic_parser::ErrorKind::NonUtf8Path);
+    }
+
+    #[test]
+    fn nul_in_constructor_arguments() {
+        use basic_parser::{ErrorKind, Token};
+
+        // The token character classes exclude NUL, so these are constructor-level cases.
+        let name = "a\0b".to_owned();
+        let path = "/a\0b".to_owned();
+        assert!(matches!(
+            Username::construct(name.clone()),
+            Err(ErrorKind::NulInString(text)) if text == name
+        ));
+        assert!(matches!(
+            ChDir::construct(path.clone()),
+            Err(ErrorKind::NulInPath(text)) if text == path
+        ));
+        assert_eq!(
+            ErrorKind::NulInString(name.clone()).to_string(),
+            crate::common::SudoString::new(name).unwrap_err().to_string()
+        );
+        assert_eq!(
+            ErrorKind::NulInPath(path.clone()).to_string(),
+            crate::common::SudoPath::try_from(path).unwrap_err().to_string()
+        );
+    }
+
+    /// The name of an error kind, for the coverage table (`ErrorKind` has no `Debug` outside
+    /// tests, and the names must be checked exhaustively).
+    fn kind_name(kind: &basic_parser::ErrorKind) -> &'static str {
+        use basic_parser::ErrorKind::*;
+        match kind {
+            SuperfluousWhitespace => "SuperfluousWhitespace",
+            StrayEscape => "StrayEscape",
+            Expecting(..) => "Expecting",
+            Expected(..) => "Expected",
+            IllegalEscape => "IllegalEscape",
+            TokenTooLong => "TokenTooLong",
+            TooManyItems => "TooManyItems",
+            MissingLineTerminator => "MissingLineTerminator",
+            GarbageAtEndOfLine => "GarbageAtEndOfLine",
+            HostIpv4 => "HostIpv4",
+            EmbeddedDollar => "EmbeddedDollar",
+            NulInString(..) => "NulInString",
+            NulInPath(..) => "NulInPath",
+            ValueTooLarge => "ValueTooLarge",
+            RegexNotSupported => "RegexNotSupported",
+            GlobInArguments => "GlobInArguments",
+            ListArguments => "ListArguments",
+            WildcardPattern(..) => "WildcardPattern",
+            DigestNotSupported => "DigestNotSupported",
+            FullyQualifiedPath => "FullyQualifiedPath",
+            NonUtf8Path => "NonUtf8Path",
+            StarInPath => "StarInPath",
+            NetgroupsNotSupported => "NetgroupsNotSupported",
+            TagNotSupported(..) => "TagNotSupported",
+            SelinuxNotSupported => "SelinuxNotSupported",
+            UnsupportedModifier(..) => "UnsupportedModifier",
+            TooManyTags => "TooManyTags",
+            Message(..) => "Message",
+        }
+    }
+
+    /// Which error kinds the corpora produce, and how often (`RESTYLE.md` section 4).
+    #[test]
+    fn corpus_kind_coverage() {
+        let (generated, mutated) = corpus::generated(corpus::SEED, 8_000, 16_000);
+        let corpora = [
+            ("unit", corpus::unit_test_texts()),
+            ("gen", generated),
+            ("mut", mutated),
+        ];
+        let mut hits = std::collections::BTreeMap::<(&'static str, &str), usize>::new();
+        for (corpus, texts) in &corpora {
+            for text in texts {
+                for item in parse_live(text) {
+                    if let Err(basic_parser::Status::Fatal(_, kind)) = item {
+                        *hits.entry((kind_name(&kind), corpus)).or_default() += 1;
+                    }
+                }
+            }
+        }
+
+        let mut table = String::from("kind | unit | gen | mut\n");
+        for kind in kinds() {
+            let counts: Vec<String> = ["unit", "gen", "mut"]
+                .iter()
+                .map(|c| hits.get(&(kind, c)).copied().unwrap_or(0).to_string())
+                .collect();
+            table += &format!("{kind} | {}\n", counts.join(" | "));
+        }
+        writeln!(std::io::stdout(), "{table}").unwrap();
+
+        // `NonUtf8Path` needs a file system (see `non_utf8_canonical_path`); `SuperfluousWhitespace`
+        // is the sentinel of `parse_lines` (it stops the line loop, so it never reaches a result)
+        // and is covered by `basic_parser::test::superfluous_whitespace_at_eof`; the two NUL kinds
+        // are unreachable from text, because every token class that can reach those constructors
+        // rejects control characters (`nul_in_constructor_arguments` covers them).
+        let exceptional = [
+            "NonUtf8Path",
+            "SuperfluousWhitespace",
+            "NulInString",
+            "NulInPath",
+        ];
+        let missing: Vec<&str> = kinds()
+            .into_iter()
+            .filter(|kind| !exceptional.contains(kind))
+            .filter(|kind| !["unit", "gen", "mut"].iter().any(|c| hits.contains_key(&(kind, c))))
+            .collect();
+        assert!(missing.is_empty(), "not produced by any corpus text: {missing:?}");
+    }
+
+    /// The variant names of `ErrorKind`, in declaration order.
+    fn kinds() -> Vec<&'static str> {
+        use basic_parser::ErrorKind::*;
+        vec![
+            kind_name(&SuperfluousWhitespace),
+            kind_name(&StrayEscape),
+            kind_name(&Expecting('x', None)),
+            kind_name(&Expected("")),
+            kind_name(&IllegalEscape),
+            kind_name(&TokenTooLong),
+            kind_name(&TooManyItems),
+            kind_name(&MissingLineTerminator),
+            kind_name(&GarbageAtEndOfLine),
+            kind_name(&HostIpv4),
+            kind_name(&EmbeddedDollar),
+            kind_name(&NulInString(String::new())),
+            kind_name(&NulInPath(String::new())),
+            kind_name(&ValueTooLarge),
+            kind_name(&RegexNotSupported),
+            kind_name(&GlobInArguments),
+            kind_name(&ListArguments),
+            kind_name(&WildcardPattern(String::new())),
+            kind_name(&DigestNotSupported),
+            kind_name(&FullyQualifiedPath),
+            kind_name(&NonUtf8Path),
+            kind_name(&StarInPath),
+            kind_name(&NetgroupsNotSupported),
+            kind_name(&TagNotSupported(String::new())),
+            kind_name(&SelinuxNotSupported),
+            kind_name(&UnsupportedModifier(String::new())),
+            kind_name(&TooManyTags),
+            kind_name(&Message(String::new())),
+        ]
     }
 
     #[test]

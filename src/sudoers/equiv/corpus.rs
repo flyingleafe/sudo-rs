@@ -354,6 +354,16 @@ fn long_token(rng: &mut Rng) -> String {
 }
 
 fn cmd_spec(rng: &mut Rng) -> String {
+    if rng.chance(2) {
+        // around the 127-tag limit (`Identifier::LIMIT`)
+        let n = [126, 127, 128, 129][rng.below(4)];
+        let mut out = String::new();
+        for _ in 0..n {
+            out.push_str("PASSWD:");
+        }
+        out.push_str("/bin/ls");
+        return out;
+    }
     let mut out = rng.pick(RUNAS).to_string();
     out.push_str(spaces(rng));
     for _ in 0..rng.below(3) {

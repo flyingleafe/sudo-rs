@@ -27,6 +27,26 @@ pub(super) fn host_list(stream: &mut CharStream) -> Parsed<SpecList<Hostname>> {
     try_nonterminal(stream)
 }
 
+/// The user list of a rule (`SpecList<UserSpecifier>`), as `try_nonterminal`: a named instance
+/// for the extraction, called by `Sudo::parse` and `RunAs::parse`.
+pub(super) fn user_list(stream: &mut CharStream) -> Parsed<SpecList<UserSpecifier>> {
+    try_nonterminal(stream)
+}
+
+/// The user list of a rule, as `expect_nonterminal`: a named instance for the extraction.
+pub(super) fn expect_user_list(stream: &mut CharStream) -> Parsed<SpecList<UserSpecifier>> {
+    expect_nonterminal(stream)
+}
+
+/// The permissions of one rule: `hostlist = [runas] cmds` groups separated by `:`.
+pub type Permissions = PairVec<SpecList<Hostname>, (Option<RunAs>, CommandSpec)>;
+
+/// The permissions of a rule (`hosts = [runas] commands : …`), as `expect_nonterminal`: a named
+/// instance for the extraction, called by `Sudo::parse`.
+pub(super) fn permissions(stream: &mut CharStream) -> Parsed<Permissions> {
+    expect_nonterminal(stream)
+}
+
 /// A generic mapping function (only used for turning `Spec<SimpleCommand>` into `Spec<Command>`)
 impl<T> Spec<T> {
     pub fn map<U>(self, f: impl Fn(T) -> U) -> Spec<U> {
@@ -249,26 +269,37 @@ impl<T: Many> Many for Qualified<T> {
     const LIMIT: usize = T::LIMIT;
 }
 
+/// The user-name case of `Meta<T>` for a `T` that is not a token (`parse_meta`).
+trait FromUsername {
+    fn from_username(name: SudoString) -> Self;
+}
+
+impl FromUsername for Identifier {
+    fn from_username(name: SudoString) -> Self {
+        Identifier::Name(name)
+    }
+}
+
+impl FromUsername for UserSpecifier {
+    fn from_username(name: SudoString) -> Self {
+        UserSpecifier::User(Identifier::Name(name))
+    }
+}
+
 /// Helper function for parsing `Meta<T>` things where T is not a token
-fn parse_meta<T: Parse>(
-    stream: &mut CharStream,
-    embed: impl FnOnce(SudoString) -> T,
-) -> Parsed<Meta<T>> {
-    if let Some(meta) = try_nonterminal(stream)? {
-        make(match meta {
-            Meta::All => Meta::All,
-            Meta::Alias(alias) => Meta::Alias(alias),
-            Meta::Only(Username(name)) => Meta::Only(embed(name)),
-        })
-    } else {
-        make(Meta::Only(T::parse(stream)?))
+fn parse_meta<T: Parse + FromUsername>(stream: &mut CharStream) -> Parsed<Meta<T>> {
+    match try_nonterminal::<Option<Meta<Username>>>(stream)? {
+        Some(Meta::All) => make(Meta::All),
+        Some(Meta::Alias(alias)) => make(Meta::Alias(alias)),
+        Some(Meta::Only(Username(name))) => make(Meta::Only(T::from_username(name))),
+        None => make(Meta::Only(T::parse(stream)?)),
     }
 }
 
 /// Since Identifier is not a token, add the parser for `Meta<Identifier>`
 impl Parse for Meta<Identifier> {
     fn parse(stream: &mut CharStream) -> Parsed<Self> {
-        parse_meta(stream, Identifier::Name)
+        parse_meta(stream)
     }
 }
 
@@ -282,23 +313,22 @@ impl Parse for Meta<Identifier> {
 impl Parse for UserSpecifier {
     fn parse(stream: &mut CharStream) -> Parsed<Self> {
         fn parse_user(stream: &mut CharStream) -> Parsed<UserSpecifier> {
-            let userspec = if stream.eat_char('%') {
-                let ctor = if stream.eat_char(':') {
-                    UserSpecifier::NonunixGroup
-                } else {
-                    UserSpecifier::Group
-                };
+            if stream.eat_char('%') {
+                let nonunix = stream.eat_char(':');
                 // in this case we must fail 'hard', since input has been consumed
-                ctor(expect_nonterminal(stream)?)
+                let group = expect_nonterminal(stream)?;
+                if nonunix {
+                    make(UserSpecifier::NonunixGroup(group))
+                } else {
+                    make(UserSpecifier::Group(group))
+                }
             } else if stream.eat_char('+') {
                 // TODO Netgroups
-                unrecoverable!(stream, "netgroups are not supported yet");
+                fatal_here(stream, ErrorKind::NetgroupsNotSupported)
             } else {
                 // in this case we must fail 'softly', since no input has been consumed yet
-                UserSpecifier::User(try_nonterminal(stream)?)
-            };
-
-            make(userspec)
+                make(UserSpecifier::User(try_nonterminal(stream)?))
+            }
         }
 
         // if we see a quote, first parse the quoted text as a token and then
@@ -322,7 +352,7 @@ impl Many for UserSpecifier {}
 /// UserSpecifier is not a token, implement the parser for `Meta<UserSpecifier>`
 impl Parse for Meta<UserSpecifier> {
     fn parse(stream: &mut CharStream) -> Parsed<Self> {
-        parse_meta(stream, |name| UserSpecifier::User(Identifier::Name(name)))
+        parse_meta(stream)
     }
 }
 
@@ -333,9 +363,25 @@ impl Parse for Meta<UserSpecifier> {
 impl Parse for RunAs {
     fn parse(stream: &mut CharStream) -> Parsed<Self> {
         try_syntax('(', stream)?;
-        let users = try_nonterminal(stream).unwrap_or_default();
-        let groups = maybe(try_syntax(':', stream).and_then(|_| try_nonterminal(stream)))?
-            .unwrap_or_default();
+        // `try_nonterminal(stream).unwrap_or_default()`: any error, fatal ones included, is an
+        // empty user list. Written as a `match` (`unwrap_or_default` has no Aeneas model).
+        #[allow(clippy::manual_unwrap_or_default)]
+        let users = match user_list(stream) {
+            Ok(users) => users,
+            // the status is bound (moved), so that every arm consumes the scrutinee
+            Err(_status) => Vec::new(),
+        };
+        // `maybe(try_syntax(':', stream).and_then(|_| try_nonterminal(stream)))?
+        //      .unwrap_or_default()`
+        let groups = match try_syntax(':', stream) {
+            Ok(()) => match try_nonterminal(stream) {
+                Ok(groups) => groups,
+                Err(Status::Reject) => Vec::new(),
+                Err(status) => return Err(status),
+            },
+            Err(Status::Reject) => Vec::new(),
+            Err(status) => return Err(status),
+        };
         expect_syntax(')', stream)?;
 
         make(RunAs { users, groups })
@@ -385,26 +431,25 @@ impl Modifier {
 // the parseability by a thread (although the original sudo also has some ugly parts, like 'sha224' being an illegal user name).
 // to be more general, we impl Parse for Meta<Tag> so a future tag like "AFOOBAR" can be added with no problem
 
+/// A tag that only needs its colon: `expect_syntax(':')`, then the modifier.
+fn switch(modifier: Modifier, stream: &mut CharStream) -> Parsed<Modifier> {
+    expect_syntax(':', stream)?;
+    make(modifier)
+}
+
 impl Parse for MetaOrTag {
     fn parse(stream: &mut CharStream) -> Parsed<Self> {
-        use Meta::*;
-
         let start_pos = stream.get_pos();
         let AliasName(keyword) = try_nonterminal(stream)?;
 
-        let mut switch = |modifier: Modifier| {
-            expect_syntax(':', stream)?;
-            make(modifier)
-        };
-
         let result: Modifier = match keyword.as_str() {
-            "EXEC" => switch(Modifier::Exec)?,
-            "NOEXEC" => switch(Modifier::Noexec)?,
+            "EXEC" => switch(Modifier::Exec, stream)?,
+            "NOEXEC" => switch(Modifier::Noexec, stream)?,
 
-            "SETENV" => switch(Modifier::Setenv)?,
-            "NOSETENV" => switch(Modifier::Nosetenv)?,
-            "PASSWD" => switch(Modifier::Passwd)?,
-            "NOPASSWD" => switch(Modifier::Nopasswd)?,
+            "SETENV" => switch(Modifier::Setenv, stream)?,
+            "NOSETENV" => switch(Modifier::Nosetenv, stream)?,
+            "PASSWD" => switch(Modifier::Passwd, stream)?,
+            "NOPASSWD" => switch(Modifier::Nopasswd, stream)?,
 
             "CWD" => {
                 expect_syntax('=', stream)?;
@@ -413,18 +458,12 @@ impl Parse for MetaOrTag {
             }
 
             // we do not support these, and that should make sudo-rs "fail safe"
-            spec @ ("INTERCEPT" | "CHROOT" | "TIMEOUT" | "NOTBEFORE" | "NOTAFTER") => {
-                unrecoverable!(
-                    pos = start_pos,
-                    stream,
-                    "{spec} is not supported by sudo-rs"
-                )
+            "INTERCEPT" | "CHROOT" | "TIMEOUT" | "NOTBEFORE" | "NOTAFTER" => {
+                return fatal_from(start_pos, stream, ErrorKind::TagNotSupported(keyword));
             }
-            "ROLE" | "TYPE" => unrecoverable!(
-                pos = start_pos,
-                stream,
-                "SELinux role based access control is not yet supported by sudo-rs"
-            ),
+            "ROLE" | "TYPE" => {
+                return fatal_from(start_pos, stream, ErrorKind::SelinuxNotSupported);
+            }
 
             // this is less fatal
             "LOG_INPUT" | "NOLOG_INPUT" | "LOG_OUTPUT" | "NOLOG_OUTPUT" | "MAIL" | "NOMAIL"
@@ -438,7 +477,7 @@ impl Parse for MetaOrTag {
             }
 
             // 'NOFOLLOW' and 'NOINTERCEPT' are the default behaviour.
-            "NOFOLLOW" | "NOINTERCEPT" => switch(Modifier::NoOp)?,
+            "NOFOLLOW" | "NOINTERCEPT" => switch(Modifier::NoOp, stream)?,
 
             "APPARMOR_PROFILE" => {
                 expect_syntax('=', stream)?;
@@ -446,17 +485,38 @@ impl Parse for MetaOrTag {
                 Modifier::AppArmorProfile(profile)
             }
 
-            "ALL" => return make(MetaOrTag(All)),
-            alias => {
+            "ALL" => return make(MetaOrTag(Meta::All)),
+            _ => {
                 if is_syntax('=', stream)? {
-                    unrecoverable!(pos = start_pos, stream, "unsupported modifier '{}'", alias);
+                    return fatal_from(start_pos, stream, ErrorKind::UnsupportedModifier(keyword));
                 } else {
-                    return make(MetaOrTag(Alias(alias.to_string())));
+                    return make(MetaOrTag(Meta::Alias(keyword)));
                 }
             }
         };
 
-        make(MetaOrTag(Only(result)))
+        make(MetaOrTag(Meta::Only(result)))
+    }
+}
+
+/// Read one tag, or return the end of the tag list. An alias or `ALL` also supplies
+/// the command, so the inner option distinguishes those from an ordinary command.
+fn command_tag_step(
+    stream: &mut CharStream,
+    tags: &mut Vec<Modifier>,
+) -> Parsed<Option<Option<Meta<Command>>>> {
+    match try_nonterminal::<Option<MetaOrTag>>(stream)? {
+        Some(MetaOrTag(Meta::Only(modifier))) => {
+            tags.push(modifier);
+            if tags.len() > <Identifier as Many>::LIMIT {
+                fatal_here(stream, ErrorKind::TooManyTags)
+            } else {
+                make(None)
+            }
+        }
+        Some(MetaOrTag(Meta::All)) => make(Some(Some(Meta::All))),
+        Some(MetaOrTag(Meta::Alias(name))) => make(Some(Some(Meta::Alias(name)))),
+        None => make(Some(None)),
     }
 }
 
@@ -466,22 +526,35 @@ impl Parse for MetaOrTag {
 /// ```
 impl Parse for CommandSpec {
     fn parse(stream: &mut CharStream) -> Parsed<Self> {
-        use Qualified::Allow;
-        let mut tags = vec![];
-        while let Some(MetaOrTag(keyword)) = try_nonterminal(stream)? {
-            match keyword {
-                Meta::Only(modifier) => tags.push(modifier),
-                Meta::All => return make(CommandSpec(tags, Allow(Meta::All))),
-                Meta::Alias(name) => return make(CommandSpec(tags, Allow(Meta::Alias(name)))),
-            }
-            if tags.len() > Identifier::LIMIT {
-                unrecoverable!(stream, "too many tags for command specifier")
+        let mut tags = Vec::new();
+        // the loop ends on an error, on `ALL` or an alias (`found`), or on anything else
+        let mut failure = None;
+        let mut found = None;
+        let mut more = true;
+        while more {
+            match command_tag_step(stream, &mut tags) {
+                Ok(None) => {}
+                Ok(Some(command)) => {
+                    found = command;
+                    more = false;
+                }
+                Err(status) => {
+                    failure = Some(status);
+                    more = false;
+                }
             }
         }
 
-        let cmd: Spec<Command> = expect_nonterminal(stream)?;
-
-        make(CommandSpec(tags, cmd))
+        if let Some(status) = failure {
+            return Err(status);
+        }
+        match found {
+            Some(meta) => make(CommandSpec(tags, Qualified::Allow(meta))),
+            None => {
+                let cmd: Spec<Command> = expect_nonterminal(stream)?;
+                make(CommandSpec(tags, cmd))
+            }
+        }
     }
 }
 
@@ -514,10 +587,9 @@ impl Many for (SpecList<Hostname>, Vec<(Option<RunAs>, CommandSpec)>) {
 impl Parse for (Option<RunAs>, CommandSpec) {
     fn parse(stream: &mut CharStream) -> Parsed<Self> {
         let runas: Option<RunAs> = try_nonterminal(stream)?;
-        let cmd = if runas.is_some() {
-            expect_nonterminal(stream)?
-        } else {
-            try_nonterminal(stream)?
+        let cmd = match runas {
+            Some(_) => expect_nonterminal(stream)?,
+            None => try_nonterminal(stream)?,
         };
 
         make((runas, cmd))
@@ -573,14 +645,14 @@ impl Parse for Sudo {
                 let first_user = Qualified::Allow(Meta::Only(UserSpecifier::User(ident)));
                 let users = if is_syntax(',', stream)? {
                     // parse the rest of the userlist and add the already-parsed user in front
-                    let mut rest = expect_nonterminal::<SpecList<_>>(stream)?;
+                    let mut rest = expect_user_list(stream)?;
                     rest.insert(0, first_user);
                     rest
                 } else {
                     vec![first_user]
                 };
                 // no need to check get_directive as no other directive starts with #
-                let permissions = expect_nonterminal(stream)?;
+                let permissions = permissions(stream)?;
                 make(Sudo::Spec(PermissionSpec { users, permissions }))
             } else {
                 // the failed "try_nonterminal::<Identifier>" will have consumed the '#'
@@ -595,10 +667,10 @@ impl Parse for Sudo {
         let start_state = stream.clone();
         if stream.peek() == Some('"') {
             // a quoted userlist follows; this forces us to read a userlist
-            let users = expect_nonterminal(stream)?;
-            let permissions = expect_nonterminal(stream)?;
+            let users = expect_user_list(stream)?;
+            let permissions = permissions(stream)?;
             make(Sudo::Spec(PermissionSpec { users, permissions }))
-        } else if let Some(users) = maybe(try_nonterminal::<SpecList<_>>(stream))? {
+        } else if let Some(users) = maybe(user_list(stream))? {
             // this could be the start of a Defaults or Alias definition, so distinguish.
             // element 1 always exists (parse_list fails on an empty list)
             let key = &users[0];
@@ -610,7 +682,7 @@ impl Parse for Sudo {
                 }
                 make(Sudo::Decl(directive))
             } else {
-                let permissions = expect_nonterminal(stream)?;
+                let permissions = permissions(stream)?;
                 make(Sudo::Spec(PermissionSpec { users, permissions }))
             }
         } else {

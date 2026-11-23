@@ -3,7 +3,7 @@
 use crate::common::{SudoPath, SudoString};
 use std::ffi::OsString;
 
-use super::basic_parser::{ErrorKind, Many, Token};
+use super::basic_parser::{ErrorKind, Many, Token, escape_char};
 use super::char_stream::chars_of;
 use crate::common::{HARDENED_ENUM_VALUE_0, HARDENED_ENUM_VALUE_1, HARDENED_ENUM_VALUE_2};
 
@@ -16,17 +16,18 @@ pub struct Username(pub SudoString);
 impl Token for Username {
     fn construct(text: String) -> Result<Self, ErrorKind> {
         // if a '$' occurs in a username, it has to be the final character
-        if text.strip_suffix('$').unwrap_or(&text).contains('$') {
-            return Err(ErrorKind::Message("embedded $ in username".to_string()));
+        if embedded_dollar(&chars_of(&text)) {
+            return Err(ErrorKind::EmbeddedDollar);
         }
 
-        SudoString::new(text)
-            .map_err(|e| ErrorKind::Message(e.to_string()))
-            .map(Username)
+        match sudo_string(text) {
+            Ok(name) => Ok(Username(name)),
+            Err(kind) => Err(kind),
+        }
     }
 
     fn accept(c: char) -> bool {
-        c.is_alphanumeric() || ".-_@$".contains(c)
+        c.is_alphanumeric() || c == '.' || c == '-' || c == '_' || c == '@' || c == '$'
     }
 
     fn accept_1st(c: char) -> bool {
@@ -35,7 +36,64 @@ impl Token for Username {
 
     const ALLOW_ESCAPE: bool = true;
     fn escaped(c: char) -> bool {
-        matches!(c, '\\' | '"' | ',' | ':' | '=' | '!' | '(' | ')' | ' ')
+        c == escape_char()
+            || c == '"'
+            || c == ','
+            || c == ':'
+            || c == '='
+            || c == '!'
+            || c == '('
+            || c == ')'
+            || c == ' '
+    }
+}
+
+/// `text.strip_suffix('$').unwrap_or(&text).contains('$')`: a `$` before the last character.
+fn embedded_dollar(text: &[char]) -> bool {
+    let len = text.len();
+    let body_len = if len > 0 && text[len - 1] == '$' {
+        len - 1
+    } else {
+        len
+    };
+    contains_char(text, body_len, '$')
+}
+
+/// Whether `c` occurs among the first `len` characters of `text`.
+fn contains_char(text: &[char], len: usize, c: char) -> bool {
+    let mut found = false;
+    let mut i = 0;
+    while !found && i < len {
+        found = text[i] == c;
+        i += 1;
+    }
+    found
+}
+
+/// `text == word`, characterwise.
+fn equals_text(text: &[char], word: &[char]) -> bool {
+    text.len() == word.len() && starts_with_text(text, word)
+}
+
+/// `text.starts_with(prefix)`, characterwise.
+fn starts_with_text(text: &[char], prefix: &[char]) -> bool {
+    let mut ok = prefix.len() <= text.len();
+    let mut i = 0;
+    while ok && i < prefix.len() {
+        ok = text[i] == prefix[i];
+        i += 1;
+    }
+    ok
+}
+
+/// `SudoString::new(text)`, with the error as an [ErrorKind]. Kept opaque for Charon
+/// (`Cargo.toml`): `crate::common::string` is opaque, and the error type of `SudoString::new`
+/// carries I/O errors; `FunsExternal.lean` models it.
+pub(super) fn sudo_string(text: String) -> Result<SudoString, ErrorKind> {
+    match SudoString::new(text) {
+        Ok(name) => Ok(name),
+        Err(crate::common::Error::StringValidation(text)) => Err(ErrorKind::NulInString(text)),
+        Err(_) => unreachable!("SudoString::new only returns StringValidation"),
     }
 }
 
@@ -47,14 +105,37 @@ impl Token for DigitsU32 {
     const MAX_LEN: usize = 10;
 
     fn construct(s: String) -> Result<Self, ErrorKind> {
-        s.parse()
-            .map(Self)
-            .map_err(|_| ErrorKind::Message("value too large".to_string()))
+        match parse_u32(&chars_of(&s)) {
+            Some(value) => Ok(DigitsU32(value)),
+            None => Err(ErrorKind::ValueTooLarge),
+        }
     }
 
     fn accept(c: char) -> bool {
         c.is_ascii_digit()
     }
+}
+
+/// `s.parse::<u32>().ok()` for a text of decimal digits (what the `DigitsU32` token accepts):
+/// `None` on overflow, on an empty text and on any other character.
+fn parse_u32(text: &[char]) -> Option<u32> {
+    let mut value: u32 = 0;
+    let mut ok = !text.is_empty();
+    let mut i = 0;
+    while ok && i < text.len() {
+        match text[i].to_digit(10) {
+            Some(digit) => match value.checked_mul(10) {
+                Some(shifted) => match shifted.checked_add(digit) {
+                    Some(sum) => value = sum,
+                    None => ok = false,
+                },
+                None => ok = false,
+            },
+            None => ok = false,
+        }
+        i += 1;
+    }
+    if ok { Some(value) } else { None }
 }
 
 pub struct Numeric(pub String);
@@ -257,58 +338,67 @@ impl Token for Command {
     const MAX_LEN: usize = 1024;
 
     fn construct(s: String) -> Result<Self, ErrorKind> {
+        // the words of the token, `s.split_whitespace()`
+        let chars = chars_of(&s);
+        let words = split_words(&chars);
         // the tokenizer should not give us a token that consists of only whitespace
-        let mut cmd_iter = s.split_whitespace();
-        let cmd = cmd_iter.next().unwrap().to_string();
-        let mut args = cmd_iter.map(OsString::from).collect::<Vec<OsString>>();
+        let first = if !words.is_empty() {
+            let (start, end) = words[0];
+            Some(word_text(&chars, start, end))
+        } else {
+            None
+        };
+        let cmd = first.unwrap();
+        let is_list = cmd.as_str() == "list";
+        let n_args = words.len() - 1;
 
         let command = SimpleCommand::construct(cmd)?;
 
-        let argpat = if args.is_empty() {
+        // `argpat == Args::Prefix(Box::default())`: no arguments, or only the magic `*`
+        let mut unrestricted = true;
+        let argpat = if n_args == 0 {
             // if no arguments are mentioned, anything is allowed
-            Args::Prefix(Box::default())
+            Args::Prefix(Vec::new().into_boxed_slice())
         } else {
-            if args
-                .first()
-                .is_some_and(|x| x.as_encoded_bytes().starts_with(b"^"))
-            {
+            if chars[words[1].0] == '^' {
                 // regular expressions are not supported, give an error message. If there is only a
                 // terminating '$', this is not treated as a malformed regex by millersudo, so we don't
                 // need to seperately check for that
-                return Err(ErrorKind::Message(
-                    "regular expressions are not supported".to_string(),
-                ));
+                return Err(ErrorKind::RegexNotSupported);
             }
-            let match_type = match args.last().map(|x| x.as_encoded_bytes()) {
+            let (last_start, last_end) = words[n_args];
+            // the arguments that remain after the magic last one
+            let mut kept = n_args;
+            let mut prefix = false;
+            if last_end - last_start == 1 && chars[last_start] == '*' {
                 // if the magic * appears, any further arguments are allowed
-                Some(b"*") => {
-                    args.pop();
-                    Args::Prefix
-                }
-                // if the magic "" appears, no (further) arguments are allowed
-                Some(b"\"\"") => {
-                    args.pop();
-                    Args::Exact
-                }
-                _ => Args::Exact,
-            };
-
-            if args
-                .iter()
-                .any(|arg| arg.as_encoded_bytes().iter().any(|c| b"?*[".contains(c)))
+                kept = n_args - 1;
+                prefix = true;
+            } else if last_end - last_start == 2
+                && chars[last_start] == '"'
+                && chars[last_start + 1] == '"'
             {
-                return Err(ErrorKind::Message(
-                    "glob patterns are not allowed in command arguments".to_string(),
-                ));
+                // if the magic "" appears, no (further) arguments are allowed
+                kept = n_args - 1;
             }
 
-            match_type(args.into_boxed_slice())
+            if any_glob(&chars, &words, kept + 1) {
+                return Err(ErrorKind::GlobInArguments);
+            }
+
+            let args = os_strings(&chars, &words, kept + 1).into_boxed_slice();
+            unrestricted = prefix && kept == 0;
+            if prefix {
+                Args::Prefix(args)
+            } else {
+                Args::Exact(args)
+            }
         };
 
-        if command.as_str() == "list" && argpat != Args::Prefix(Box::default()) {
-            return Err(ErrorKind::Message(
-                "list does not take arguments".to_string(),
-            ));
+        // `command.as_str() == "list"`: the pattern text of `SimpleCommand::construct` is `list`
+        // exactly when its input is (every other result starts with `/` or is `sudoedit`)
+        if is_list && !unrestricted {
+            return Err(ErrorKind::ListArguments);
         }
 
         Ok((command, argpat))
@@ -320,7 +410,7 @@ impl Token for Command {
     }
 
     fn accept(c: char) -> bool {
-        SimpleCommand::accept(c) || matches!(c, ' ' | '\t')
+        SimpleCommand::accept(c) || c == ' ' || c == '\t'
     }
 
     const ALLOW_ESCAPE: bool = SimpleCommand::ALLOW_ESCAPE;
@@ -329,51 +419,122 @@ impl Token for Command {
     }
 }
 
+/// `text.split_whitespace()` as ranges into `text`, without storing another copy of each word.
+fn split_words(text: &[char]) -> Vec<(usize, usize)> {
+    let mut words = Vec::new();
+    let mut start = skip_word_class(text, 0, true);
+    while start < text.len() {
+        let end = skip_word_class(text, start, false);
+        words.push((start, end));
+        start = skip_word_class(text, end, true);
+    }
+    words
+}
+
+/// Advance over contiguous characters with the requested whitespace classification.
+fn skip_word_class(text: &[char], mut pos: usize, whitespace: bool) -> usize {
+    let mut more = true;
+    while more && pos < text.len() {
+        if text[pos].is_whitespace() == whitespace {
+            pos += 1;
+        } else {
+            more = false;
+        }
+    }
+    pos
+}
+
+/// Whether one of the arguments `words[1..end]` contains `?`, `*` or `[` (in UTF-8 these bytes
+/// only occur as these characters).
+fn any_glob(text: &[char], words: &[(usize, usize)], end: usize) -> bool {
+    let mut found = false;
+    let mut i = 1;
+    while !found && i < end {
+        let (start, stop) = words[i];
+        found = has_glob_char(text, start, stop);
+        i += 1;
+    }
+    found
+}
+
+fn has_glob_char(text: &[char], mut i: usize, end: usize) -> bool {
+    let mut found = false;
+    while !found && i < end {
+        let c = text[i];
+        if c == '?' || c == '*' || c == '[' {
+            found = true;
+        }
+        i += 1;
+    }
+    found
+}
+
+/// Encode one word from its range in the token.
+fn word_text(text: &[char], mut i: usize, end: usize) -> String {
+    let mut word = String::new();
+    while i < end {
+        word.push(text[i]);
+        i += 1;
+    }
+    word
+}
+
+/// The arguments `words[1..end]` as `OsString`s.
+fn os_strings(text: &[char], words: &[(usize, usize)], end: usize) -> Vec<OsString> {
+    let mut args = Vec::with_capacity(end - 1);
+    let mut i = 1;
+    while i < end {
+        let (start, stop) = words[i];
+        args.push(os_string(word_text(text, start, stop)));
+        i += 1;
+    }
+    args
+}
+
+/// `OsString::from(text)`. The opaque Lean oracle takes UTF-8 text and returns the same
+/// `OsString` type used by the decision proofs.
+pub(super) fn os_string(text: String) -> OsString {
+    OsString::from(text)
+}
+
 impl Token for SimpleCommand {
     const MAX_LEN: usize = 1024;
 
-    fn construct(mut cmd: String) -> Result<Self, ErrorKind> {
-        let cvt_err = |pat: Result<_, glob::PatternError>| {
-            pat.map_err(|err| ErrorKind::Message(format!("wildcard pattern error {err}")))
-        };
+    fn construct(cmd: String) -> Result<Self, ErrorKind> {
+        let chars = chars_of(&cmd);
 
         // detect the two edges cases
-        if cmd == "list" || cmd == "sudoedit" {
-            return cvt_err(glob::Pattern::new(&cmd));
-        } else if cmd.starts_with("sha") {
-            return Err(ErrorKind::Message(
-                "digest specifications are not supported".to_string(),
-            ));
-        } else if cmd.starts_with('^') {
-            return Err(ErrorKind::Message(
-                "regular expressions are not supported".to_string(),
-            ));
-        } else if !cmd.starts_with('/') {
-            return Err(ErrorKind::Message(
-                "fully qualified path needed".to_string(),
-            ));
+        if equals_text(&chars, &['l', 'i', 's', 't'])
+            || equals_text(&chars, &['s', 'u', 'd', 'o', 'e', 'd', 'i', 't'])
+        {
+            return compile_pattern(&cmd);
+        } else if starts_with_text(&chars, &['s', 'h', 'a']) {
+            return Err(ErrorKind::DigestNotSupported);
+        } else if starts_with_text(&chars, &['^']) {
+            return Err(ErrorKind::RegexNotSupported);
+        } else if !starts_with_text(&chars, &['/']) {
+            return Err(ErrorKind::FullyQualifiedPath);
         }
 
-        // record if the cmd ends in a slash and remove it if it does
-        let is_dir = cmd.ends_with('/') && {
-            cmd.pop();
-            true
-        };
+        // record if the cmd ends in a slash and remove it if it does (`cmd` starts with '/')
+        let len = chars.len();
+        let is_dir = chars[len - 1] == '/';
+        let mut cmd = if is_dir { string_of(&chars, len - 1) } else { cmd };
 
         // canonicalize path (if possible)
-        if let Ok(real_cmd) = crate::common::resolve::canonicalize(&cmd) {
-            cmd = real_cmd
-                .to_str()
-                .ok_or_else(|| ErrorKind::Message("non-UTF8 characters in filesystem".to_string()))?
-                .to_string();
+        match canonical(&cmd) {
+            Canonical::Unresolved => {}
+            Canonical::Resolved(real_cmd) => cmd = real_cmd,
+            Canonical::NotUtf8 => return Err(ErrorKind::NonUtf8Path),
         }
 
         // if the cmd ends with a slash, any command in that directory is allowed
         if is_dir {
-            cmd.push_str("/*");
+            cmd.push('/');
+            cmd.push('*');
         }
 
-        cvt_err(glob::Pattern::new(&cmd))
+        compile_pattern(&cmd)
     }
 
     // all commands start with "/" except "sudoedit" or "list"
@@ -388,7 +549,40 @@ impl Token for SimpleCommand {
 
     const ALLOW_ESCAPE: bool = true;
     fn escaped(c: char) -> bool {
-        matches!(c, '\\' | ',' | ':' | '=' | '#' | ' ')
+        c == escape_char() || c == ',' || c == ':' || c == '=' || c == '#' || c == ' '
+    }
+}
+
+/// The outcome of `common::resolve::canonicalize` on a command path.
+pub enum Canonical {
+    /// `canonicalize` failed: the path is kept as written
+    Unresolved,
+    /// the canonical path
+    Resolved(String),
+    /// the canonical path is not UTF-8
+    NotUtf8,
+}
+
+/// `common::resolve::canonicalize(path)` and `to_str` of the result: file-system state. Kept
+/// opaque for Charon (`Cargo.toml`); an `opaque` constant (oracle) in `FunsExternal.lean`.
+#[allow(clippy::ptr_arg)] // `&String`, not `&str`: the model works on the Lean `String`
+pub(super) fn canonical(path: &String) -> Canonical {
+    match crate::common::resolve::canonicalize(path) {
+        Err(_) => Canonical::Unresolved,
+        Ok(real_cmd) => match real_cmd.to_str() {
+            Some(text) => Canonical::Resolved(text.to_string()),
+            None => Canonical::NotUtf8,
+        },
+    }
+}
+
+/// `glob::Pattern::new(text)`, its error rendered as in the legacy parser. Kept opaque for
+/// Charon (`Cargo.toml`); an `opaque` constant (oracle) in `FunsExternal.lean`.
+#[allow(clippy::ptr_arg)] // `&String`, not `&str`: the model works on the Lean `String`
+pub(super) fn compile_pattern(text: &String) -> Result<glob::Pattern, ErrorKind> {
+    match glob::Pattern::new(text) {
+        Ok(pattern) => Ok(pattern),
+        Err(error) => Err(ErrorKind::WildcardPattern(error.to_string())),
     }
 }
 
@@ -502,7 +696,7 @@ impl Token for StringParameter {
 
     const ALLOW_ESCAPE: bool = true;
     fn escaped(c: char) -> bool {
-        matches!(c, '\\' | '"' | ' ' | '#' | ',')
+        c == escape_char() || c == '"' || c == ' ' || c == '#' || c == ','
     }
 }
 
@@ -519,14 +713,13 @@ impl Token for ChDir {
     const MAX_LEN: usize = 1024;
 
     fn construct(s: String) -> Result<Self, ErrorKind> {
-        if s == "*" {
-            Ok(ChDir::Any)
-        } else if s.contains('*') {
-            Err(ErrorKind::Message("path cannot contain '*'".to_string()))
-        } else {
-            Ok(ChDir::Path(
-                SudoPath::try_from(s).map_err(|e| ErrorKind::Message(e.to_string()))?,
-            ))
+        match classify_chdir(&s) {
+            ChDirForm::Any => Ok(ChDir::Any),
+            ChDirForm::ContainsStar => Err(ErrorKind::StarInPath),
+            ChDirForm::Path => match sudo_path(s) {
+                Ok(path) => Ok(ChDir::Path(path)),
+                Err(kind) => Err(kind),
+            },
         }
     }
 
@@ -535,12 +728,43 @@ impl Token for ChDir {
     }
 
     fn accept_1st(c: char) -> bool {
-        "~/*".contains(c)
+        c == '~' || c == '/' || c == '*'
     }
 
     const ALLOW_ESCAPE: bool = true;
     fn escaped(c: char) -> bool {
-        matches!(c, '\\' | '"' | ' ')
+        c == escape_char() || c == '"' || c == ' '
+    }
+}
+
+enum ChDirForm {
+    Any,
+    ContainsStar,
+    Path,
+}
+
+/// The two star checks use UTF-8 bytes directly. The model is total on Lean strings:
+/// `construct_ok_eq` has no representability premise.
+#[allow(clippy::ptr_arg)] // Match the existing Lean `String` model without a bounded `Str`.
+fn classify_chdir(s: &String) -> ChDirForm {
+    if s.as_bytes() == b"*" {
+        ChDirForm::Any
+    } else if s.as_bytes().contains(&b'*') {
+        ChDirForm::ContainsStar
+    } else {
+        ChDirForm::Path
+    }
+}
+
+/// The `String`-to-path boundary. Modelled without the platform-specific path conversions.
+fn sudo_path(s: String) -> Result<SudoPath, ErrorKind> {
+    match SudoPath::try_from(s) {
+        Ok(path) => Ok(path),
+        Err(crate::common::Error::PathValidation(path)) => {
+            // The input to `try_from` was a `String`, so the rejected path is UTF-8.
+            Err(ErrorKind::NulInPath(path.into_os_string().into_string().unwrap()))
+        }
+        Err(_) => unreachable!("SudoPath::try_from only returns PathValidation"),
     }
 }
 
@@ -551,12 +775,16 @@ impl<T: Token> Token for Unquoted<T> {
     const MAX_LEN: usize = 1024;
 
     fn construct(text: String) -> Result<Self, ErrorKind> {
+        let chars = chars_of(&text);
         let mut quoted = String::new();
-        for ch in text.chars() {
+        let mut i = 0;
+        while i < chars.len() {
+            let ch = chars[i];
             if T::escaped(ch) {
-                quoted.push('\\');
+                quoted.push(escape_char());
             }
             quoted.push(ch);
+            i += 1;
         }
 
         Ok(Self(quoted, std::marker::PhantomData))

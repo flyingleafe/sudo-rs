@@ -67,6 +67,40 @@ pub enum ErrorKind {
     GarbageAtEndOfLine,
     /// `Hostname::construct`: the text resembles an IPv4 address
     HostIpv4,
+    /// `Username::construct`: a `$` that is not the last character
+    EmbeddedDollar,
+    /// `SudoString::new` rejected the text (a NUL character); the text
+    NulInString(String),
+    /// `SudoPath::try_from` rejected the text (a NUL character); the text
+    NulInPath(String),
+    /// `DigitsU32::construct`: not a `u32`
+    ValueTooLarge,
+    /// `Command`/`SimpleCommand::construct`: an argument or a command starting with `^`
+    RegexNotSupported,
+    /// `Command::construct`: `?`, `*` or `[` in an argument
+    GlobInArguments,
+    /// `Command::construct`: `list` with arguments
+    ListArguments,
+    /// `SimpleCommand::construct`: `glob::Pattern::new` failed; its message
+    WildcardPattern(String),
+    /// `SimpleCommand::construct`: a command starting with `sha`
+    DigestNotSupported,
+    /// `SimpleCommand::construct`: a command not starting with `/`
+    FullyQualifiedPath,
+    /// `SimpleCommand::construct`: the canonical path is not UTF-8
+    NonUtf8Path,
+    /// `ChDir::construct`: a `*` in a path
+    StarInPath,
+    /// `UserSpecifier::parse`: `+netgroup`
+    NetgroupsNotSupported,
+    /// `MetaOrTag::parse`: `INTERCEPT`, `CHROOT`, `TIMEOUT`, `NOTBEFORE`, `NOTAFTER`; the keyword
+    TagNotSupported(String),
+    /// `MetaOrTag::parse`: `ROLE`, `TYPE`
+    SelinuxNotSupported,
+    /// `MetaOrTag::parse`: `NAME=` with an unknown name; the name
+    UnsupportedModifier(String),
+    /// `CommandSpec::parse`: more than 127 tags
+    TooManyTags,
     /// An already formatted message: the productions not yet rewritten in the restricted style
     /// (`unrecoverable!`, the `construct` functions of their tokens).
     Message(String),
@@ -90,6 +124,31 @@ impl fmt::Display for ErrorKind {
             }
             ErrorKind::GarbageAtEndOfLine => f.write_str("garbage at end of line"),
             ErrorKind::HostIpv4 => f.write_str("hosts cannot be specified using an IPv4 address"),
+            ErrorKind::EmbeddedDollar => f.write_str("embedded $ in username"),
+            ErrorKind::NulInString(text) => {
+                fmt::Display::fmt(&crate::common::Error::StringValidation(text.clone()), f)
+            }
+            ErrorKind::NulInPath(text) => {
+                fmt::Display::fmt(&crate::common::Error::PathValidation(text.into()), f)
+            }
+            ErrorKind::ValueTooLarge => f.write_str("value too large"),
+            ErrorKind::RegexNotSupported => f.write_str("regular expressions are not supported"),
+            ErrorKind::GlobInArguments => {
+                f.write_str("glob patterns are not allowed in command arguments")
+            }
+            ErrorKind::ListArguments => f.write_str("list does not take arguments"),
+            ErrorKind::WildcardPattern(error) => write!(f, "wildcard pattern error {error}"),
+            ErrorKind::DigestNotSupported => f.write_str("digest specifications are not supported"),
+            ErrorKind::FullyQualifiedPath => f.write_str("fully qualified path needed"),
+            ErrorKind::NonUtf8Path => f.write_str("non-UTF8 characters in filesystem"),
+            ErrorKind::StarInPath => f.write_str("path cannot contain '*'"),
+            ErrorKind::NetgroupsNotSupported => f.write_str("netgroups are not supported yet"),
+            ErrorKind::TagNotSupported(spec) => write!(f, "{spec} is not supported by sudo-rs"),
+            ErrorKind::SelinuxNotSupported => {
+                f.write_str("SELinux role based access control is not yet supported by sudo-rs")
+            }
+            ErrorKind::UnsupportedModifier(alias) => write!(f, "unsupported modifier '{alias}'"),
+            ErrorKind::TooManyTags => f.write_str("too many tags for command specifier"),
             ErrorKind::Message(message) => f.write_str(message),
         }
     }
@@ -557,6 +616,19 @@ mod test {
     }
 
     impl Many for String {}
+
+    #[test]
+    fn superfluous_whitespace_at_eof() {
+        let mut stream = CharStream::from_chars(&[' ', '\t']);
+        match LeadingWhitespace::parse(&mut stream) {
+            Err(Status::Fatal(span, kind @ ErrorKind::SuperfluousWhitespace)) => {
+                assert_eq!(span.start, (1, 3));
+                assert_eq!(span.end, (1, 3));
+                assert_eq!(kind.to_string(), "superfluous whitespace");
+            }
+            _ => panic!("expected the leading-whitespace EOF sentinel"),
+        }
+    }
 
     #[test]
     fn comment_test() {
