@@ -18,21 +18,27 @@ git archive HEAD | tar -x -C /tmp/compliance/B
 proofs/compliance/run.sh /tmp/fi/src/sudo-rs /tmp/compliance/B
 ```
 
-For each tree the script deletes the `sudo-test-rs` image, then runs, in `<tree>/test-framework`,
+Use a dedicated Docker engine with no existing `sudo-test-rs:latest` tag. For each tree
+the script starts a fresh BuildKit builder and a fresh Cargo target directory, then runs
+the following command from `<tree>/test-framework`:
 
 ```
-env -u CI SUDO_UNDER_TEST=ours CARGO_TARGET_DIR=$OUT/target \
+env -u CI SUDO_UNDER_TEST=ours CARGO_TARGET_DIR="$target" BUILDX_BUILDER="$builder" \
   nix shell nixpkgs#cargo nixpkgs#rustc nixpkgs#gcc -c \
   cargo test --locked -p sudo-compliance-tests -- --test-threads $(nproc)
 ```
 
-The framework builds the `sudo-test-rs` Docker image from that tree (`ours.linux.Dockerfile`,
-features `gettext,pam-login,unstable-remote-sudoers`) and runs each test in a fresh container.
-Per-test outcomes go to `$OUT/{A,B}.results` (sorted `name ok|FAILED|ignored`; `$OUT` defaults to
-`/tmp/compliance`). Exit 0 means both runs completed with at least one non-ignored test and identical outcomes. A build
-failure, truncated log, or filter that ran no tests cannot produce a passing comparison.
-Trees run sequentially because the image tag is fixed. No filter was used: the full suite ran.
-`#[ignore]`d tests (features sudo-rs does not implement) are not run, as in upstream CI.
+`sudo-test` embeds `CARGO_MANIFEST_DIR` when compiled. Sharing a Cargo target can reuse
+the first tree's helper and silently build its Docker image twice. The Dockerfile also
+has a writable Cargo cache mount; each tree gets an independent builder so that mount
+cannot supply the other tree's binaries. The fixed image tag is used sequentially.
+
+The framework builds with `gettext,pam-login,unstable-remote-sudoers` and runs each test
+in a fresh container. `$OUT/{A,B}.results` record the per-test outcomes; `.image` records
+the image ID and `.sha256` records the installed `sudo`, `su` and `visudo` hashes before
+the image tag is removed. Exit 0 means identical completed outcome sets, **not** that
+every test passed. Check the outcome counts and the artifact identities for the two
+revisions being compared. The default run uses no filter and does not run ignored tests.
 
 ## Results (full suite, 863 tests, about 10-20 min per tree on 14 cores)
 
@@ -43,7 +49,12 @@ Trees run sequentially because the image tag is fixed. No filter was used: the f
 | 2 | A `81dff9a1` | 826 | 1 | 36 |
 | 2 | B `5002dab6` (src = `46d955a1`) | **827** | **0** | 36 |
 
-Each run differed in exactly one test, and in both cases it was a timing flake unrelated to sudoers:
+These are historical libtest counts. Run 1 exported the **same** image configuration
+(`584150968c95…`) on both sides, so it is not evidence that the two revisions agreed.
+Run 2 logged distinct image configurations (`584150968c95…` and `d893dc284b43…`);
+the old driver did not retain installed-binary hashes.
+
+Each pair of logs differed in one per-test outcome:
 
 - Run 1, B: `sudo::child_process::signal_handling::no_tty::signal_is_forwarded_to_child` failed with
   `program failed with exit status: 143` (the `kill-sudo.sh` helper was itself killed by SIGTERM,
@@ -53,7 +64,7 @@ Each run differed in exactly one test, and in both cases it was a timing flake u
   by hand 16 minutes later. Re-run 15 times in isolation: 15/15 pass on A and on B.
 
 Neither test reaches policy-dependent behaviour: both use a `ALL ALL=(ALL:ALL) NOPASSWD: ALL`-style sudoers.
-Excluding these two flaky tests, the per-test outcome sets of A and B are identical (827 pass, 36 ignored).
+In run 2 all recorded outcomes except `stdin_pipe` matched.
 
 ### Run 3: after the list/validate, authorization and alias-table refactors
 
@@ -70,6 +81,18 @@ stored results above (the test framework is unchanged, so the 863 tests are the 
 Both outcome sets equal run 2 B test for test. Against run 2 A they differ only in
 `sudo::flag_background::stdin_pipe`, the upstream flake described above.
 
+### Run 4: parser rewrite, isolated builds
+
+The two-vCPU KVM guest ran the default, unfiltered suite on baseline `70fdb56b` and
+candidate `58a225fe`. **827 passed, 0 failed, 36 ignored on each tree; zero outcomes
+changed across the same 863 test names.** Each helper compiled in its own source
+tree. The builders used the same base image (`6f14b2b4b278…`), but the installed
+`/usr/bin/sudo` hashes differed: `fbed553b54ae…` on A, `cd38f67be2cb…` on B.
+
+An earlier attempt is excluded: both runs completed but used the same image because
+the Cargo target was shared. Neither that attempt nor the ignored tests is counted
+as evidence of candidate behavior.
+
 ### `warn_ignored` ordering
 
 Between `ccf4489e` and `46d955a1` the two `warn_ignored` warnings ("non-unix group ... was ignored",
@@ -81,8 +104,7 @@ for either B revision.
 
 ## Caveats
 
-- The host sets `CI`, which makes the framework pass `--cache-to=type=local` to `docker buildx`;
-  the default `docker` driver rejects it ("Cache export is not supported"), so `run.sh` unsets `CI`.
+- `run.sh` unsets `CI`; it does not import or export the hosted CI's builder cache.
 - The suite is Docker-timing sensitive; a single flake per run is normal. Rerun a suspect test with
   `proofs/compliance/run.sh A B --exact <test-name>`.
 - Disk: about 0.4 GB of BuildKit cache (base image, cargo cache mount, layers) plus about 300 MB of

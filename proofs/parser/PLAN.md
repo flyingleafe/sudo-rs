@@ -313,10 +313,9 @@ passed tokens, spec, Lean, axioms, Quint and the sudoers Rust unit tests. A sepa
   2,700 seconds each (173,633,180 executions). Eight saved no failing input; `parser_equiv`
   found no text on which the rewritten and the legacy parser differ (364,997 executions).
   All 6,981 saved `timestamp` inputs reproduce the two known corrupt-file defects.
-- The 863-test A/B compliance suite **did not run**: the `uni-cpu` preflight
-  `parser-conformance-safe-fce65f` at `c0f8b8bc` found no Docker executable. The
-  [older complete test logs](../compliance/README.md) predate the parser rewrite;
-  they are not results for this revision.
+- The `uni-cpu` preflight found no Docker. The [private two-vCPU KVM comparison](../compliance/README.md#run-4-parser-rewrite-isolated-builds)
+  subsequently ran the unfiltered default suite on `70fdb56b` and `58a225fe`.
+  Independent builds produced distinct `sudo` binaries. All 863 per-test outcomes matched.
 
 ## 8. Risks and open decisions
 
