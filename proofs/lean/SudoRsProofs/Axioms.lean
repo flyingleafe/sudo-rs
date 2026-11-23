@@ -9,6 +9,7 @@ import SudoRsProofs.Expansion
 import SudoRsProofs.Escape
 import SudoRsProofs.Parser.Examples
 import SudoRsProofs.Parser.Grammar
+import SudoRsProofs.Parser.File
 import SudoRsProofs.Defaults.Range
 
 /-!
@@ -128,6 +129,7 @@ of `SudoRs/{Types,Funs}External.lean` are definitions or `opaque` constants, nev
 #print axioms SudoRsProofs.Parser.host_list_printed
 #print axioms SudoRsProofs.Parser.parse_lines_recovery
 #print axioms SudoRsProofs.Parser.parse_lines_refines_on
+#print axioms SudoRsProofs.Parser.parseSudoersWith_of_refinement
 
 #print axioms SudoRsProofs.Defaults.absDefaults_eq
 #print axioms SudoRsProofs.Defaults.apply_eq
