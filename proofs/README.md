@@ -10,7 +10,9 @@ The policy proofs (P1–P9) start from a parsed policy and a resolved request, n
 of `sudo`. They transfer to the extracted code under the oracle and representation assumptions
 below. Alias flattening preserves decisions and tags under the stated conditions, not
 unconditionally. Separate proofs cover shell-mode argument escaping for every input and
-the compiled AArch64 `-u '#uid'` parser. The sudoers text parser is tested, not proved.
+the compiled AArch64 `-u '#uid'` parser. For sudoers text, the reference host-list grammar
+and line recovery have proofs; the whole Rust parser has differential tests, not yet
+an end-to-end proof.
 
 ## Verification boundary
 
@@ -118,7 +120,7 @@ re-checks it (copied source, engine trusted files, fresh export, instruction wor
 the object file, clean build, axioms). Trusted: the Lean kernel, the engine's ISA and memory
 model and its `parseDecimalU32`, and the specification.
 
-The parser, include processing, Defaults parsing and scoping, real OS identity lookup,
+The full path from text through analysis and Defaults scoping to authorization, real OS identity lookup,
 glob matching, credential changes, authentication, command execution, rustc, and the
 deployed binary are outside the verified boundary. The Quint lifecycle model is a
 separate abstraction, not a proof about the Rust execution path.
@@ -189,7 +191,7 @@ Each item says what kind of evidence it is. A test covers only the inputs it ran
 | `kani/` | Runner and results of the Kani bounded proofs (harnesses in `src/**/kani_proofs.rs`). |
 | `machine-code/` | AArch64 machine-code proof of `NameOrId::<UserId>::parse` (own Lean project, pinned engine) and its re-check script. |
 | `compliance/` | Docker comparison of upstream and refactored sudo-rs. |
-| `parser/PLAN.md` | Plan and feasibility measurements for a parser proof. Nothing proved yet. |
+| [`parser/`](parser/PLAN.md) | Parser verification plan, evidence and limits: [Lean/Rust comparison](parser/P0.md), [reference grammar](spec/SudoersSpec/Grammar/README.md), [line recovery](spec/SudoersSpec/Syntax/Recovery.lean). |
 
 ## Prerequisites
 

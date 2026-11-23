@@ -32,6 +32,7 @@ import SudoersSpec.Syntax.Oracles
 import SudoersSpec.Syntax.TestsGrammar
 import SudoersSpec.Syntax.SettingsParser
 import SudoersSpec.Syntax.Sudo
+import SudoersSpec.Syntax.Recovery
 import SudoersSpec.Syntax.TestsSudo
 import SudoersSpec.Grammar.Basic
 import SudoersSpec.Grammar.Lexical

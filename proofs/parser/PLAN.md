@@ -1,7 +1,10 @@
 # Plan: proving the sudoers parser
 
-Status: plan only. Nothing in this directory is proved. The measurements below were taken on
-`9c30990f` with the pinned toolchain (Charon 0.1.321, Aeneas `8f4466db`).
+Status: in progress. The [executable reference parser](../spec/SudoersSpec/Syntax/README.md)
+has been [compared with Rust](P0.md). The reference [host-list grammar](../spec/SudoersSpec/Grammar/README.md)
+and [line-recovery theorems](../spec/SudoersSpec/Syntax/Recovery.lean) are kernel-checked.
+The text-to-authorization theorem is not established. Feasibility measurements below are
+from `9c30990f` (Charon 0.1.321, Aeneas `8f4466db`).
 
 ## 1. Goal
 
@@ -181,6 +184,13 @@ Names are provisional.
 | PA | The pure part of `analyze` equals `policyOf`: rules and alias definitions in file order, then the sanitizer order | refinement |
 | E2E | For a text without includes: `Sudoers::read` then `check` gives flags `r` with `r.map absTag = authorize O (policyOf (accepted (parseLines O (chars t)))) request` | PR + PA + `permission_flags_eq` |
 | E2E-clean | If no diagnostic is produced: the same with the unique grammar-assigned policy, and alias references equal to their expansion | E2E + PT6 + sanitizer order theorem + `demonstration` |
+
+**PT7, checked interpretation.** [`parseLines_iff_trace` and `source_partition`](../spec/SudoersSpec/Syntax/Recovery.lean)
+account for the whole input: leading blanks, the attempted item, an optional comment, and
+the terminator or text skipped on recovery. `garbage_point` shows why coverage by the
+*reported diagnostic spans* is false: the span has zero width even when the parser discards
+one or more characters. For PT6, `cleanFile_sound` transfers single-item grammar soundness
+to a clean file; its single-item premise still has to be discharged for the full grammar.
 
 ## 5. Specification design
 

@@ -7,6 +7,7 @@ import SudoersSpec.Escape
 import SudoersSpec.Syntax.Ast
 import SudoersSpec.Settings.Properties
 import SudoersSpec.Syntax.Sudo
+import SudoersSpec.Syntax.Recovery
 import SudoersSpec.Grammar.Examples
 
 /-! Axiom audit: every main result depends on at most `propext`, `Classical.choice` and
@@ -226,3 +227,10 @@ open SudoersSpec
 #print axioms SudoersSpec.Grammar.hostname_rejectPure
 #print axioms SudoersSpec.Grammar.hostname_sound
 #print axioms SudoersSpec.Grammar.hostname_complete
+#print axioms SudoersSpec.Syntax.Recovery.parseLinesItem_finish
+#print axioms SudoersSpec.Syntax.Recovery.parseLines_iff_trace
+#print axioms SudoersSpec.Syntax.Recovery.source_partition
+#print axioms SudoersSpec.Syntax.Recovery.garbage_point
+#print axioms SudoersSpec.Syntax.Recovery.parseLines_end
+#print axioms SudoersSpec.Syntax.Recovery.cleanFile_sound
+#print axioms SudoersSpec.Syntax.Recovery.cleanFile_complete
