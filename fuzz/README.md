@@ -1,7 +1,7 @@
 # Fuzzing sudo-rs
 
 Evidence kind: **test** (only the inputs the fuzzer generated were tried; nothing here is a
-proof). Eight [libFuzzer](https://llvm.org/docs/LibFuzzer.html) targets drive the real sudo-rs
+proof). Nine [libFuzzer](https://llvm.org/docs/LibFuzzer.html) targets drive the real sudo-rs
 code, built with AddressSanitizer, debug assertions and integer-overflow checks.
 
 ## How the targets reach the code
@@ -10,7 +10,8 @@ code, built with AddressSanitizer, debug assertions and integer-overflow checks.
 `src/lib.rs` contains `pub mod fuzz_api` (`src/fuzz_api.rs`): thin wrappers that call the same
 crate-private functions the `sudo`, `su` and `visudo` binaries call and return their results in
 plain types. A few `#[cfg(fuzzing)]` hooks sit next to private items (`su::cli`, `visudo`,
-`common::resolve`, `common::command`); `Hostname::fake` and the `SudoAction` re-export are
+`common::resolve`, `common::command`); `Hostname::fake`, the `SudoAction` re-export, the legacy
+sudoers parser (`sudoers::legacy`) and its comparison with the live one (`sudoers::equiv`) are
 compiled for `cfg(any(test, fuzzing))`. A normal build contains none of it.
 
 ## Targets
@@ -25,6 +26,7 @@ compiled for `cfg(any(test, fuzzing))`. A normal build contains none of it.
 | `visudo_cli` | `VisudoOptions::parse_arguments` | NUL-separated argv, UTF-8 | same result twice |
 | `timestamp` | `SessionRecord::from_bytes`/`as_bytes`; `SessionRecordFile::new`, `touch`, `create`, `disable` on a memfd | one record, or file contents + up to 8 operations | re-encoding keeps the length and is stable; `touch` right after `create` finds a fresh record; `touch` right after `disable` finds none |
 | `name_escape` | `NameOrId::parse` (`-u`/`-g` values); `escaped` and `CommandAndArguments::build_from_args` with a shell (`sudo -s`/`-i`) | a name, or NUL-separated arguments (any bytes) | empty rejected; no `#` → the name unchanged; `#…` never a name, an id exactly when the rest is a `uid_t`, ids print back to themselves; every byte outside `[A-Za-z0-9_$-]` escaped; splitting at unescaped spaces and unescaping returns the arguments (escaping is injective); the shell gets `-c` and that string |
+| `parser_equiv` | the restricted-style `parse_lines::<Sudo>` against the legacy parser it replaced (`sudoers::equiv::compare`, `src/sudoers/legacy/`) | arbitrary bytes | on UTF-8 input both parsers give the same items, spans and message texts, and every `Defaults` modifier has the same effect on two base settings (`Settings::dump_fields`) |
 
 The request header of `sudoers_decide`/`sudoers_defaults` is
 `invoking-user:target-user:target-group:host`, then a line with the command and its arguments,

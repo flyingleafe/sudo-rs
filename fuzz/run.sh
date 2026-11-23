@@ -27,8 +27,8 @@ tc=${FUZZ_TOOLCHAIN:-nightly-2026-11-20}
 out=${FUZZ_OUT:-${TMPDIR:-/tmp}/sudo-rs-fuzz}
 seconds=${FUZZ_SECONDS:-1800}
 parallel=${FUZZ_PARALLEL:-4}
-all_targets=(sudoers_parse sudoers_decide sudoers_defaults sudo_cli su_cli visudo_cli timestamp name_escape)
-dict_targets=" sudoers_parse sudoers_decide sudoers_defaults "
+all_targets=(sudoers_parse sudoers_decide sudoers_defaults sudo_cli su_cli visudo_cli timestamp name_escape parser_equiv)
+dict_targets=" sudoers_parse sudoers_decide sudoers_defaults parser_equiv "
 
 nix_bin() { echo "$(nix build --no-link --print-out-paths "nixpkgs#$1")/bin"; }
 command -v rustup > /dev/null || PATH="$(nix_bin rustup):$PATH"

@@ -28,6 +28,13 @@ doc = false
 bench = false
 
 [[bin]]
+name = "parser_equiv"
+path = "fuzz_targets/parser_equiv.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
 name = "sudoers_decide"
 path = "fuzz_targets/sudoers_decide.rs"
 test = false

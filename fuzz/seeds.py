@@ -104,6 +104,8 @@ example = read("docs/sudoers.example")
 policy_lines.add(example)
 for line in policy_lines:
     add("sudoers_parse", line if line.endswith("\n") else line + "\n")
+    # the legacy-vs-live parser comparison reads the same texts
+    add("parser_equiv", line if line.endswith("\n") else line + "\n")
 
 # ---------------------------------------------------------------- decisions
 
