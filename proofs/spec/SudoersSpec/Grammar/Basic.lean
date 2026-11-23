@@ -180,6 +180,8 @@ theorem bind_complete {p : Parser α} {f : α → Parser β} {G : Gram α} {H : 
   obtain ⟨s₂, h₂, hs₂⟩ := hf a c₂ b rest s₁ hd₂ hs₁
   exact ⟨s₂, by rw [run_bind_of_ok h₁, h₂], hs₂⟩
 
+theorem PureG.trunc (a : α) : Trunc (PureG a) := fun _ _ _ _ h => h
+
 theorem SeqG.trunc {G : Gram α} {H : α → Gram β} (hG : Trunc G) (hH : ∀ a, Trunc (H a)) :
     Trunc (SeqG G H) := by
   rintro c b x y ⟨c₁, c₂, a, rfl, hd₁, hd₂⟩
