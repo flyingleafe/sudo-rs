@@ -14,6 +14,7 @@ for every `Settings` value (see `SettingsInRange`). Without it the extracted fun
 -/
 
 open Aeneas Aeneas.Std Result
+open sudo_rs -- the extracted names live in this namespace
 
 namespace SudoRsProofs
 
@@ -159,8 +160,9 @@ theorem construct_ok_eq (s : String) :
       let r ← sudoers.tokens.ChDir.Insts.Sudo_rsSudoersBasic_parserToken.construct s
       core.result.Result.ok r) = ok ((SudoersSpec.runcwdDir s).map concChDir) := by
   simp only [sudoers.tokens.ChDir.Insts.Sudo_rsSudoersBasic_parserToken.construct,
-    SudoersSpec.runcwdDir]
-  split_ifs <;> simp [core.result.Result.ok, concChDir]
+    sudoers.tokens.classify_chdir, sudoers.tokens.sudo_path, SudoersSpec.runcwdDir,
+    core.result.Result.ok, concChDir]
+  split_ifs <;> simp_all [core.result.Result.ok, concChDir]
 
 /-- The `runcwd` fallback closure of `authorization`. -/
 theorem runcwd_closure_eq (j : sudo_rs.sudoers.Judgement) :

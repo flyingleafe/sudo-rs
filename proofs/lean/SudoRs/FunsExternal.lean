@@ -207,10 +207,6 @@ the decoding is lossless on every value that has a Rust counterpart. -/
 def stringOfStr (b : Str) : String :=
   String.fromUTF8Lossy ⟨(b.val.map fun u => UInt8.ofNat u.val).toArray⟩
 
-/-- The message of `Error::PathValidation(path).to_string()` for a rejected `ChDir` path. Its
-text is not modelled; the only caller in the extracted code discards it (`.ok()`). -/
-opaque chdirPathErrorText : String → String
-
 end sudo_rs
 
 /-- [core::convert::num::{impl core::convert::TryFrom<u64> for u16}::try_from]: `Ok` iff the
@@ -266,19 +262,19 @@ bytes. -/
 def alloc.string.String.Insts.CoreConvertFromShared0Str.from (s : Str) : Result String :=
   ok (stringOfStr s)
 
-/-- [sudo_rs::sudoers::tokens::{impl Token for ChDir}::construct] (`src/sudoers/tokens.rs`
-lines 521-531), kept opaque for Charon (it reaches `str::contains`, whose `Pattern` trait Aeneas
-cannot translate). `"*"` is `Any`; any other text with a `*` is rejected; otherwise
-`SudoPath::try_from` (`src/common/path.rs` lines 19-34, 86-92) rejects text with a NUL byte
-(the UTF-8 check cannot fail on a `String`) and keeps the text unchanged. In UTF-8 the bytes
-`*` and NUL only occur as the characters `'*'` and `'\x00'`. The errors are formatted messages
-(`ErrorKind::Message`). -/
-def sudoers.tokens.ChDir.Insts.Sudo_rsSudoersBasic_parserToken.construct (s : String) :
-    Result (core.result.Result sudoers.tokens.ChDir sudoers.basic_parser.ErrorKind) :=
-  if s = "*" then ok (.Ok .Any)
-  else if s.toList.contains '*' then ok (.Err (.Message "path cannot contain '*'"))
-  else if s.toList.contains (Char.ofNat 0) then ok (.Err (.Message (chdirPathErrorText s)))
-  else ok (.Ok (.Path ⟨s⟩))
+/-- Plain UTF-8 byte equality and membership for ASCII `*`. A model over the Lean
+`String` is total, as required by the existing `construct_ok_eq` theorem. -/
+def sudoers.tokens.classify_chdir (s : String) : Result sudoers.tokens.ChDirForm :=
+  if s = "*" then ok .Any
+  else if s.toList.contains '*' then ok .ContainsStar
+  else ok .Path
+
+/-- `SudoPath::try_from(String)`: the input is already UTF-8. The only invalid
+character is NUL; otherwise the resulting path retains the string. -/
+def sudoers.tokens.sudo_path (s : String) :
+    Result (core.result.Result common.path.SudoPath sudoers.basic_parser.ErrorKind) :=
+  if s.toList.contains (Char.ofNat 0) then ok (.Err (.NulInPath s))
+  else ok (.Ok ⟨s⟩)
 
 /-! ## Sudoers parser: characters and strings
 
@@ -338,6 +334,35 @@ def sudoers.char_stream.chars_of (s : String) : Result (alloc.vec.Vec Char) :=
 /-- [sudo_rs::sudoers::basic_parser::escape_char]: `'\\'`, kept opaque for Charon because the
 pinned Aeneas prints this literal as `'\'`, which Lean rejects. -/
 def sudoers.basic_parser.escape_char : Result Char := ok '\\'
+
+/-! ### Permission-line parser externals -/
+
+/-- `char::is_alphanumeric`, the union of the Unicode alphabetic and numeric classes. -/
+opaque core.char.methods.Char.is_alphanumeric : Char → Result Bool
+
+/-- Unicode `Cc`: the C0, DEL and C1 code points. -/
+def core.char.methods.Char.is_control (c : Char) : Result Bool :=
+  ok (c.toNat ≤ 0x1f || (0x7f ≤ c.toNat && c.toNat ≤ 0x9f))
+
+/-- Boxing a vector as a slice retains its elements and their order. -/
+def alloc.vec.Vec.into_boxed_slice {T : Type _} (_A : Type _) (v : alloc.vec.Vec T) :
+    Result (Slice T) := ok v.slice
+
+/-- `SudoString::new`: reject interior NUL and otherwise append the terminator, which the
+existing `SudoString` model deliberately omits. -/
+def sudoers.tokens.sudo_string (s : String) :
+    Result (core.result.Result common.string.SudoString sudoers.basic_parser.ErrorKind) :=
+  if s.toList.contains (Char.ofNat 0) then ok (.Err (.NulInString s)) else ok (.Ok ⟨s⟩)
+
+/-- File-system canonicalization, retaining the distinction between failure and non-UTF-8. -/
+opaque sudoers.tokens.canonical : String → Result sudoers.tokens.Canonical
+
+/-- Pattern compilation with the error payload used by the Rust diagnostic renderer. -/
+opaque sudoers.tokens.compile_pattern :
+  String → Result (core.result.Result glob.Pattern sudoers.basic_parser.ErrorKind)
+
+/-- Native argument conversion. The oracle speaks about the existing Unix byte model. -/
+opaque sudoers.tokens.os_string : String → Result std.ffi.os_str.OsString
 
 /-! ### Models used by the `Defaults` modifiers and value checkers (`src/defaults`) -/
 
@@ -409,6 +434,12 @@ def fromStrRadix (ty : UScalarTy) (src : Str) (radix : U32) :
       ok (.Ok x)
 
 end sudo_rs
+
+/-- Digit values of Unicode scalar values are ASCII-only, as for the byte
+inputs to `fromStrRadix`. -/
+def core.char.methods.Char.to_digit (c : Char) (radix : U32) : Result (Option U32) :=
+  if radix.val < 2 ∨ 36 < radix.val then fail .panic
+  else ok ((sudo_rs.asciiDigit c.toNat radix.val).map (fun d => ⟨BitVec.ofNat 32 d⟩))
 
 /-- [core::str::{str}::split_at]: the first `mid` bytes and the rest; panics unless `mid` is a
 char boundary (`split_at_checked`, else `slice_error_fail`). -/
