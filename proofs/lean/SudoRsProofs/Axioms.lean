@@ -10,6 +10,8 @@ import SudoRsProofs.Escape
 import SudoRsProofs.Parser.Examples
 import SudoRsProofs.Parser.Grammar
 import SudoRsProofs.Parser.File
+import SudoRsProofs.Parser.EndToEnd
+import SudoRsProofs.Parser.NoDefaults
 import SudoRsProofs.Defaults.Range
 import SudoRsProofs.Defaults.Observations
 import SudoRsProofs.Parser.Analysis.AliasOrder
@@ -249,3 +251,7 @@ of `SudoRs/{Types,Funs}External.lean` are definitions or `opaque` constants, nev
 #print axioms SudoRsProofs.Parser.Analysis.Ref.sudo_grammar_item_fits
 #print axioms SudoRsProofs.Parser.Analysis.Ref.parseSudoersWith_items_fit
 #print axioms SudoRsProofs.Parser.Analysis.Ref.parseSudoers_items_fit
+#print axioms SudoRsProofs.Parser.text_to_authorization
+#print axioms SudoRsProofs.Parser.TextAgreement.clean_unique
+#print axioms SudoRsProofs.Parser.TextAgreement.clean_expanded_flags
+#print axioms SudoRsProofs.Parser.TextAgreement.no_defaults
