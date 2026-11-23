@@ -18,7 +18,7 @@ private def ignoredMessage : String := "this tag is ignored by sudo-rs"
 def DiagnosticPath (path : std.path.Path) (source : Option std.path.PathBuf) : Prop :=
   ∃ owned, source = some owned ∧ std.path.Path.to_path_buf path = ok owned
 
-private def rawReport (source : Option std.path.PathBuf) (span : basic_parser.Span)
+def rawReport (source : Option std.path.PathBuf) (span : basic_parser.Span)
     (message : String) : sudoers.Error := ⟨source, some span, message⟩
 
 private def ignoredModifier : ast.Modifier → Option basic_parser.Span
@@ -45,7 +45,7 @@ private theorem ignoredMessage_ok :
   rw [← show ignoredMessage = "this tag is ignored by sudo-rs" from rfl, bytes]
   exact String.fromUTF8Lossy_toByteArray
 
-private theorem report_spec (path : std.path.Path) (source : Option std.path.PathBuf)
+theorem report_spec (path : std.path.Path) (source : Option std.path.PathBuf)
     (span : basic_parser.Span) (message : String) (ds : Vec sudoers.Error)
     (hp : DiagnosticPath path source) (hb : ds.val.length < Usize.max) :
     sudoers.report ds path span message ⦃ out => out.val = ds.val ++ [rawReport source span message] ⦄ := by
@@ -240,13 +240,13 @@ private theorem any_arguments_ok (s : RSpec glob.Pattern) :
     simp [sudoers.any_arguments, sudoers.any_arguments_meta, anySpec, anyMeta,
       BoxSlice.Insts.CoreDefaultDefault.default]
 
-private theorem intoIter_next_nil {α : Type} (it : alloc.vec.into_iter.IntoIter α)
+theorem intoIter_next_nil {α : Type} (it : alloc.vec.into_iter.IntoIter α)
     (h : it.val = []) :
     alloc.vec.into_iter.IteratorIntoIter.next it = ok (none, it) := by
   unfold alloc.vec.into_iter.IteratorIntoIter.next
   split <;> simp_all
 
-private theorem intoIter_next_cons {α : Type} (it : alloc.vec.into_iter.IntoIter α)
+theorem intoIter_next_cons {α : Type} (it : alloc.vec.into_iter.IntoIter α)
     {x : α} {xs : List α} (h : it.val = x :: xs) :
     ∃ rest : alloc.vec.into_iter.IntoIter α,
       alloc.vec.into_iter.IteratorIntoIter.next it = ok (some x, rest) ∧ rest.val = xs := by
@@ -296,18 +296,20 @@ abbrev RItem := RParsed ast.Sudo
 abbrev Item := SudoersSpec.Syntax.Parsed SudoersSpec.Syntax.Sudo
 
 /-- A diagnostic read with its exact source, optional span, and message. -/
-def diagnosticView (e : sudoers.Error) :
-    Option std.path.PathBuf × Option SudoersSpec.Span × String :=
+abbrev Diagnostic := Option std.path.PathBuf × Option SudoersSpec.Span × String
+
+def diagnosticView (e : sudoers.Error) : Diagnostic :=
   (e.source, e.location.map absSpan, e.message)
 
 def localDiagnosticView (source : Option std.path.PathBuf) (d : SudoersSpec.Span × String) :
-    Option std.path.PathBuf × Option SudoersSpec.Span × String :=
+    Diagnostic :=
   (source, some d.1, d.2)
 
 /-- The raw alias definition vectors are compared in their written order, not through the
-sanitizer's index vectors. Diagnostic sources and spans are checked rather than discarded. -/
+sanitizer's index vectors. Diagnostic sources and spans are checked rather than discarded.
+`prior` is an independent prefix (used when earlier files supplied reports). -/
 structure CollectedRel (A : GlobAbs) (source : Option std.path.PathBuf) (cfg : Sudoers)
-    (ds : Vec sudoers.Error) (c : Collected) : Prop where
+    (ds : Vec sudoers.Error) (c : Collected) (prior : List Diagnostic := []) : Prop where
   rules : cfg.rules.val.map (absPermissionSpec A) = c.rules
   user : cfg.aliases.user.2.val.map (absDef absUserSpecifier) = c.written.user
   host : cfg.aliases.host.2.val.map (absDef id) = c.written.host
@@ -315,7 +317,7 @@ structure CollectedRel (A : GlobAbs) (source : Option std.path.PathBuf) (cfg : S
   runas : cfg.aliases.runas.2.val.map (absDef absUserSpecifier) = c.written.runas
   nonCommand : absNonCommand cfg.customisers.non_cmnd = c.nonCommand
   command : absCommandCustomisers A cfg.customisers.cmnd = c.command
-  diagnostics : ds.val.map diagnosticView = c.diagnostics.map (localDiagnosticView source)
+  diagnostics : ds.val.map diagnosticView = prior ++ c.diagnostics.map (localDiagnosticView source)
 
 /-- Names needed by the scope matchers, before or after adding empty command arguments. -/
 def ScopeFits : ast.ConfigScope → Prop
@@ -487,25 +489,27 @@ private theorem customisersOK_push_command {c : CustomiserTable}
   exact he.elim (old.command entry) (fun h => h ▸ fits)
 
 private theorem update_nonCommand {A : GlobAbs} {source : Option std.path.PathBuf} {cfg : Sudoers}
-    {ds : Vec sudoers.Error} {c : Collected} (h : CollectedRel A source cfg ds c)
+    {ds : Vec sudoers.Error} {c : Collected} {prior : List Diagnostic}
+    (h : CollectedRel A source cfg ds c prior)
     {scope : ast.ConfigScope} {mods : Vec defaults.SettingsModifier}
     {s : SudoersSpec.Analysis.NonCommandScope} (hs : absNonCommandScope scope = some s)
     {v} (hv : v.val = cfg.customisers.non_cmnd.val ++ [(scope, mods)]) :
     CollectedRel A source { cfg with customisers := { cfg.customisers with non_cmnd := v } } ds
-      { c with nonCommand := c.nonCommand ++ [(s, mods.val.map Defaults.absModifier)] } := by
+      { c with nonCommand := c.nonCommand ++ [(s, mods.val.map Defaults.absModifier)] } prior := by
   refine { h with nonCommand := ?_ }
   have hn := h.nonCommand
   unfold absNonCommand at hn ⊢
   simp [hv, hn, hs]
 
 private theorem update_command {A : GlobAbs} {source : Option std.path.PathBuf} {cfg : Sudoers}
-    {ds : Vec sudoers.Error} {c : Collected} (h : CollectedRel A source cfg ds c)
+    {ds : Vec sudoers.Error} {c : Collected} {prior : List Diagnostic}
+    (h : CollectedRel A source cfg ds c prior)
     {scope : Vec (RSpec RCommand)} {mods : Vec defaults.SettingsModifier}
     {s : SudoersSpec.SpecList SudoersSpec.Command}
     (hs : absSpecList (absCommand A) scope.val = s)
     {v} (hv : v.val = cfg.customisers.cmnd.val ++ [(scope, mods)]) :
     CollectedRel A source { cfg with customisers := { cfg.customisers with cmnd := v } } ds
-      { c with command := c.command ++ [(s, mods.val.map Defaults.absModifier)] } := by
+      { c with command := c.command ++ [(s, mods.val.map Defaults.absModifier)] } prior := by
   refine { h with command := ?_ }
   have hc := h.command
   unfold absCommandCustomisers at hc ⊢
@@ -515,17 +519,18 @@ private theorem update_command {A : GlobAbs} {source : Option std.path.PathBuf} 
 by sanitization, scope matching, and the decision. In particular it neither calls an include
 oracle nor touches the include attempt counter: the only two oracle branches cannot satisfy
 the `collectItem` premise. -/
-theorem process_item_refines (A : GlobAbs) (path : std.path.Path) (source : Option std.path.PathBuf)
+theorem process_item_refines {prior : List Diagnostic} (A : GlobAbs) (path : std.path.Path)
+    (source : Option std.path.PathBuf)
     (cfg : Sudoers) (ds : Vec sudoers.Error) (st : IncludeState)
     (item : RItem) (ref : Item) (c c' : Collected)
     (hitem : collectItem c ref = some c')
     (hr : ResultRel (absSudo A) item ref) (hm : RenderOn item ref)
     (hp : NeedsDiagnosticPath item → DiagnosticPath path source)
     (hfits : ItemFits item) (hok : CollectorOK cfg)
-    (hab : CollectedRel A source cfg ds c)
+    (hab : CollectedRel A source cfg ds c prior)
     (hb : collectSize cfg ds + itemSize item ≤ Usize.max) :
     sudoers.process_item cfg path item ds st ⦃ out =>
-      CollectedRel A source out.1 out.2.1 c' ∧ CollectorOK out.1 ∧
+      CollectedRel A source out.1 out.2.1 c' prior ∧ CollectorOK out.1 ∧
       out.1.settings = cfg.settings ∧ out.2.2 = st ∧
       collectSize out.1 out.2.1 = collectSize cfg ds + itemSize item ⦄ := by
   cases item with
@@ -547,7 +552,7 @@ theorem process_item_refines (A : GlobAbs) (path : std.path.Path) (source : Opti
         intro next hn
         simp only [WP.spec_ok]
         refine ⟨{ hab with diagnostics := ?_ }, hok, trivial, trivial, ?_⟩
-        · simp [hn, hab.diagnostics, rawReport, diagnosticView, localDiagnosticView]
+        · simp [hn, hab.diagnostics, rawReport, diagnosticView, localDiagnosticView, List.append_assoc]
         · simp only [collectSize, itemSize, hn, List.length_append, List.length_singleton]
           omega
   | Ok line =>
@@ -575,8 +580,8 @@ theorem process_item_refines (A : GlobAbs) (path : std.path.Path) (source : Opti
         refine ⟨{ hab with rules := ?_, diagnostics := ?_ }, { hok with rules := ?_ },
           trivial, trivial, ?_⟩
         · simp [hrules, hab.rules]
-        · rw [hdiags, List.map_append, hab.diagnostics, List.map_append, ignoredReports_view A source rule]
-          rfl
+        · simp only [hdiags, List.map_append, hab.diagnostics, ignoredReports_view A source rule,
+            List.append_assoc, ignoredMessage]
         · intro r h
           change r ∈ rules.val at h
           rw [hrules, List.mem_append, List.mem_singleton] at h
@@ -819,6 +824,14 @@ private theorem default_returns_empty :
     alloc.vec.Vec.Insts.CoreDefaultDefault.default, sudoers.VecOrd, e, Std.bind_ok,
     emptyCfg, emptyOrder]
 
+/-- The real default constructor supplies an empty collection with the checked initial settings. -/
+theorem default_collection_seed (A : GlobAbs) :
+    ∃ cfg, sudoers.Sudoers.Insts.CoreDefaultDefault.default = ok cfg ∧
+      CollectorOK cfg ∧ CollectedRel A none cfg (Vec.new _) {} ∧
+      collectSize cfg (Vec.new _) = 0 ∧ Defaults.absSettings cfg.settings = Defaults.initialModel := by
+  obtain ⟨s, e, hs⟩ := default_returns_empty
+  exact ⟨emptyCfg s, e, emptyCfg_OK s, emptyCfg_rel A none s, emptyCfg_size s, hs⟩
+
 /-- Collection and the actual sanitizer are the two phases of `analyze`.
 The intermediate state exposes the four written definition lists, untouched settings, and
 local source/span/message triples. Sanitization establishes policy index well-formedness.
@@ -894,12 +907,13 @@ theorem analyze_refines (A : GlobAbs) (path : std.path.Path) (source : Option st
     rw [hab.user, hab.host, hab.cmnd, hab.runas]
   refine ⟨{ pre with aliases := aliases }, out, eq, ?_⟩
   refine ⟨?_, ?_, hab.nonCommand, hab.command, hsettings, hpolicy,
-    hok.customisers, ⟨ds.val, hprefix, hab.diagnostics⟩, ?_, ?_⟩
+    hok.customisers, ⟨ds.val, hprefix, by simpa using hab.diagnostics⟩, ?_, ?_⟩
   · simp only [absPolicy, policyOf, Vec.deref_val, hab.rules, haliases, written]
   · simpa only [absWrittenAliasTable, eu, eh, ec, er] using written
   · have hlocal : ds.val.map sudoers.Error.message = c.diagnostics.map Prod.snd := by
       have e := congrArg (List.map (fun x => x.2.2)) hab.diagnostics
-      simpa only [List.map_map, Function.comp_def, diagnosticView, localDiagnosticView] using e
+      simpa only [List.nil_append, List.map_map, Function.comp_def, diagnosticView,
+        localDiagnosticView] using e
     simpa only [written, hlocal] using hmessages
   · intro clean
     have hlen := hprefix.length_le
