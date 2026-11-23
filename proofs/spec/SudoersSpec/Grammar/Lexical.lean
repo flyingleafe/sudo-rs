@@ -308,6 +308,48 @@ theorem isSyntax_true_iff {ch : Char} {s s' : Stream} :
     | ok a => simp
     | error e => cases e <;> simp
 
+/-- `is_syntax` never rejects. -/
+theorem isSyntax_rejectPure (ch : Char) : RejectPure (isSyntax ch) := by
+  intro s s' h
+  rw [isSyntax_run] at h
+  revert h
+  cases (trySyntax ch).run s with
+  | mk r s1 =>
+    cases r with
+    | ok a => simp
+    | error e => cases e <;> simp
+
+/-! ## `expect_syntax` -/
+
+/-- On success `expect_syntax` is `try_syntax`. -/
+theorem expectSyntax_ok_iff {ch : Char} {s s' : Stream} :
+    (expectSyntax ch).run s = (.ok (), s') ↔ (trySyntax ch).run s = (.ok (), s') := by
+  simp only [expectSyntax, run_bind, run_observe]
+  cases (trySyntax ch).run s with
+  | mk r s1 =>
+    cases r with
+    | ok a => simp
+    | error e => simp [run_bind]
+
+theorem expectSyntax_sound (ch : Char) : Sound (expectSyntax ch) (SynG ch) :=
+  fun s a s' h => trySyntax_sound ch s a s' (expectSyntax_ok_iff.mp h)
+
+theorem expectSyntax_complete (ch : Char) : Complete (expectSyntax ch) (SynG ch) := by
+  intro c a rest s hd hs
+  obtain ⟨s', h, hs'⟩ := trySyntax_complete ch c a rest s hd hs
+  exact ⟨s', expectSyntax_ok_iff.mpr h, hs'⟩
+
+/-- `expect_syntax` never rejects. -/
+theorem expectSyntax_rejectPure (ch : Char) : RejectPure (expectSyntax ch) := by
+  intro s s' h
+  simp only [expectSyntax, run_bind, run_observe] at h
+  revert h
+  cases (trySyntax ch).run s with
+  | mk r s1 =>
+    cases r with
+    | ok a => simp
+    | error e => simp [run_bind]
+
 /-! ## `try_nonterminal` and `expect_nonterminal` -/
 
 /-- A nonterminal and the whitespace after it (`try_nonterminal`): `c₁` derives `a` by `G`,

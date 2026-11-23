@@ -204,7 +204,7 @@ theorem qualified_run (description : String) (p : Parser α) (s : Stream) :
           cases r₂ with
           | error e => rfl
           | ok neg =>
-            simp only [run_bind]
+            simp only
             cases (expectNonterminal description p).run s₂ with
             | mk r₃ s₃ =>
               cases r₃ with

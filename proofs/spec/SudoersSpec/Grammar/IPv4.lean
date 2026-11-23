@@ -50,10 +50,10 @@ theorem takeWhile_of_prefix {f : Char → Bool} {bs r : List Char} (hb : ∀ x �
     | nil => rfl
     | cons d r =>
       have : f d = false := by simpa using NextNot.cons_iff.mp hr
-      simp [List.takeWhile_cons, this]
+      simp [this]
   | cons x bs ih =>
     simp only [List.mem_cons, forall_eq_or_imp] at hb
-    simp [List.takeWhile_cons, hb.1, ih hb.2]
+    simp [hb.1, ih hb.2]
 
 theorem span_of_prefix {sep : Char} {p r : List Char} (hp : sep ∉ p) :
     (p ++ sep :: r).span (· != sep) = (p, sep :: r) := by
@@ -165,8 +165,7 @@ theorem joinWith_reverse (sep : Char) :
       List.singleton_append]
     rw [joinWith_reverse sep (q :: ps)]
     rw [show (q :: ps).reverse = ps.reverse ++ [q] from List.reverse_cons ..]
-    simp only [List.map_append, List.map_cons, List.map_nil, List.append_assoc,
-      List.singleton_append]
+    simp only [List.map_append, List.map_cons, List.map_nil]
     rw [show (List.map List.reverse ps.reverse ++ q.reverse :: [p.reverse]) =
       (List.map List.reverse ps.reverse ++ [q.reverse]) ++ [p.reverse] by simp]
     rw [joinWith_append_single sep p.reverse _ (by simp)]
@@ -180,7 +179,7 @@ theorem looksLikeIPv4_iff (O : CharOracle) (raw : List Char) :
   have good_iff : ∀ p : List Char,
       ((!p.isEmpty && decide (utf8Len p ≤ 3) && p.all O.isNumeric) = true) ↔
         (p ≠ [] ∧ utf8Len p ≤ 3 ∧ ∀ x ∈ p, O.isNumeric x = true) := by
-    intro p; simp [List.isEmpty_iff, List.all_eq_true, and_assoc]
+    intro p; simp [List.all_eq_true, and_assoc]
   constructor
   · intro h
     simp only [Bool.and_eq_true] at h

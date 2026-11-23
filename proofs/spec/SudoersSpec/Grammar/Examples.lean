@@ -1,4 +1,4 @@
-import SudoersSpec.Grammar.RoundTrip
+import SudoersSpec.Grammar.Follow
 
 /-!
 # Non-vacuity of the grammar theorems
@@ -150,6 +150,28 @@ example (s' : Stream)
     (h : (specListHostname O Descriptions.release).run (Stream.ofString "=x") = (.error .reject, s')) :
     s' = Stream.ofString "=x" :=
   specListHostname_rejectPure O _ _ _ h
+
+/-! ## The follow condition on the sample -/
+
+/-- `#` may follow the sample (a comment after the list). -/
+example : HostListG O "web1, !DB, ALL".toList sample ['#', 'x'] := by
+  refine (hostList_follow_iff hostOracle_latin1).mpr
+    ⟨((hostList_follow_iff hostOracle_latin1).mp sample_derives).1, ?_⟩
+  intro d e
+  simp only [List.head?_cons, Option.some.injEq] at e
+  subst e
+  exact ⟨by decide, by decide, fun _ => by decide⟩
+
+/-- `,` may not: the list would go on. -/
+example : ¬ HostListG O "web1, !DB, ALL".toList sample [',', 'x'] :=
+  fun h => ((hostList_follow_iff hostOracle_latin1).mp h).2 ',' rfl |>.1 rfl
+
+/-- Nor may a host-name character: the last item would go on. -/
+example : ¬ HostListG O "web1, !DB, ALL".toList sample ['x'] := by
+  intro h
+  have := (((hostList_follow_iff hostOracle_latin1).mp h).2 'x' rfl).2.2
+  have hend : EndsHost O "web1, !DB, ALL".toList := ⟨'L', by decide, by decide⟩
+  exact absurd (this hend) (by decide)
 
 /-! ## PT2 fails for tokens with escapes -/
 

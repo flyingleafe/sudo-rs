@@ -141,6 +141,51 @@ theorem Complete.run_eq {p : Parser α} {G : Gram α} (h : Complete p G) {c : Li
   obtain ⟨s', hr, hs⟩ := h c a rest ⟨c ++ rest, line, col⟩ hd rfl
   rw [hr, run_eq_of_rest hr hs]
 
+/-! ## Sequencing: `pure` and `do let a ← p; f a`
+
+A production written in `do` notation gets its grammar from these two rules; branches on a
+lookahead (`if ← is_syntax(..)`) use `isSyntax_true_iff` / `isSyntax_false_iff`. -/
+
+/-- The grammar of `pure a`: nothing consumed, value `a`. -/
+def PureG (a : α) : Gram α := fun c b _ => c = [] ∧ b = a
+
+/-- The grammar of `p >>= f`: `c₁` derives `a` by `G` with the rest of the input as right
+context, then `c₂` derives `b` by `H a`. -/
+def SeqG (G : Gram α) (H : α → Gram β) : Gram β :=
+  fun c b rest => ∃ c₁ c₂ a, c = c₁ ++ c₂ ∧ G c₁ a (c₂ ++ rest) ∧ H a c₂ b rest
+
+theorem pure_sound (a : α) : Sound (pure a : Parser α) (PureG a) := by
+  intro s b s' h
+  simp only [run_pure, Prod.mk.injEq, Except.ok.injEq] at h
+  obtain ⟨rfl, rfl⟩ := h
+  exact ⟨[], rfl, rfl, rfl⟩
+
+theorem pure_complete (a : α) : Complete (pure a : Parser α) (PureG a) := by
+  rintro c b rest s ⟨rfl, rfl⟩ hs
+  exact ⟨s, rfl, hs⟩
+
+theorem bind_sound {p : Parser α} {f : α → Parser β} {G : Gram α} {H : α → Gram β}
+    (hp : Sound p G) (hf : ∀ a, Sound (f a) (H a)) : Sound (p >>= f) (SeqG G H) := by
+  intro s b s' h
+  obtain ⟨a, s₁, h₁, h₂⟩ := run_bind_eq_ok.mp h
+  obtain ⟨c₁, hc₁, hd₁⟩ := hp _ _ _ h₁
+  obtain ⟨c₂, hc₂, hd₂⟩ := hf a _ _ _ h₂
+  refine ⟨c₁ ++ c₂, by rw [hc₁, hc₂, List.append_assoc], c₁, c₂, a, rfl, ?_, hd₂⟩
+  rw [← hc₂]; exact hd₁
+
+theorem bind_complete {p : Parser α} {f : α → Parser β} {G : Gram α} {H : α → Gram β}
+    (hp : Complete p G) (hf : ∀ a, Complete (f a) (H a)) : Complete (p >>= f) (SeqG G H) := by
+  rintro c b rest s ⟨c₁, c₂, a, rfl, hd₁, hd₂⟩ hs
+  obtain ⟨s₁, h₁, hs₁⟩ := hp c₁ a (c₂ ++ rest) s hd₁ (by rw [hs, List.append_assoc])
+  obtain ⟨s₂, h₂, hs₂⟩ := hf a c₂ b rest s₁ hd₂ hs₁
+  exact ⟨s₂, by rw [run_bind_of_ok h₁, h₂], hs₂⟩
+
+theorem SeqG.trunc {G : Gram α} {H : α → Gram β} (hG : Trunc G) (hH : ∀ a, Trunc (H a)) :
+    Trunc (SeqG G H) := by
+  rintro c b x y ⟨c₁, c₂, a, rfl, hd₁, hd₂⟩
+  exact ⟨c₁, c₂, a, rfl, hG c₁ a (c₂ ++ x) y (by rw [List.append_assoc]; exact hd₁),
+    hH a c₂ b x y hd₂⟩
+
 /-! ## Consequences of PT3 and PT4 together -/
 
 /-- The parser succeeds on `c ++ rest` leaving exactly `rest` if and only if the grammar
