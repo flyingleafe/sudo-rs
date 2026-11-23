@@ -37,8 +37,10 @@ theorem parse_list_loop_false (sep : Char) (max : Usize) (st : CS) (elems : allo
       ok (st.src, st.pos, st.line, st.col, elems, failure) := by
   rw [sudo_rs.sudoers.basic_parser.parse_list_loop]; simp
 
-theorem parse_list_loop_eq (hP : ParseRefines P f p) (hD : DescRel UF d) (sep : Char)
-    (max : Usize) (st : CS) (h : StreamOK st) (elems : alloc.vec.Vec T) :
+private theorem parse_list_loop_eq_on {I : Stream → Prop} (hI : ForwardStable I)
+    (hP : ParseRefinesOn I P f p) (hD : DescRel UF d) (sep : Char)
+    (max : Usize) (st : CS) (h : StreamOK st) (hi : I (absStream st))
+    (elems : alloc.vec.Vec T) :
     ∃ (s' : CS) (elems' : alloc.vec.Vec T) (failure : Option RStatus),
       sudo_rs.sudoers.basic_parser.parse_list_loop P UF sep max st elems none true =
         ok (s'.src, s'.pos, s'.line, s'.col, elems', failure) ∧ StreamOK s' ∧
@@ -46,6 +48,7 @@ theorem parse_list_loop_eq (hP : ParseRefines P f p) (hD : DescRel UF d) (sep : 
         ((refListLoop sep max.val d p (absVec f elems)).run (absStream st)).1 ∧
       absStream s' = ((refListLoop sep max.val d p (absVec f elems)).run (absStream st)).2 := by
   obtain ⟨r, s1, e1, hr, h1, a1⟩ := try_syntax_refines h sep
+  have hi1 := hI.after hi (SudoersSpec.Syntax.trySyntax sep) a1
   rw [sudo_rs.sudoers.basic_parser.parse_list_loop]
   simp only [↓reduceIte, e1, bind_ok, uncurry_apply_pair]
   unfold refListLoop Parser.whileMaybe
@@ -68,7 +71,8 @@ theorem parse_list_loop_eq (hP : ParseRefines P f p) (hD : DescRel UF d) (sep : 
       · simp [hge, Parser.run_fatalHere]
     · have hge' : ¬ alloc.vec.Vec.len elems ≥ max := by
         simp only [absVec, List.length_map] at hge; scalar_tac
-      obtain ⟨r2, s2, e2, hr2, h2, a2⟩ := expect_nonterminal_refines hP hD h1
+      obtain ⟨r2, s2, e2, hr2, h2, a2⟩ := expect_nonterminal_refines_at (hP s1 h1 hi1) hD
+      have hi2 := hI.after hi1 (SudoersSpec.Syntax.expectNonterminal d p) a2
       simp only [hge, hge', ↓reduceIte, e2, bind_ok, uncurry_apply_pair, Parser.run_bind]
       rcases hE : (SudoersSpec.Syntax.expectNonterminal d p).run (absStream s1) with ⟨r2', s3⟩
       rw [hE] at hr2 a2
@@ -83,7 +87,7 @@ theorem parse_list_loop_eq (hP : ParseRefines P f p) (hD : DescRel UF d) (sep : 
         have hlt : s2.src.val.length - s2.pos.val < st.src.val.length - st.pos.val := by
           simp only [absStream_rest, List.length_drop] at hc hl2; omega
         obtain ⟨s', elems', failure, e', h', hr', a'⟩ :=
-          parse_list_loop_eq hP hD sep max s2 h2 elems1
+          parse_list_loop_eq_on hI hP hD sep max s2 h2 hi2 elems1
         have habs : absVec f elems1 = absVec f elems ++ [a] := by
           simp [absVec, hpv, hr2]
         simp only [hpush, bind_ok, Parser.run_pure]
@@ -99,12 +103,25 @@ theorem parse_list_loop_eq (hP : ParseRefines P f p) (hD : DescRel UF d) (sep : 
       simp [SudoersSpec.Syntax.maybe, Parser.run_pure]
 termination_by (absStream st).rest.length
 
+theorem parse_list_loop_eq (hP : ParseRefines P f p) (hD : DescRel UF d) (sep : Char)
+    (max : Usize) (st : CS) (h : StreamOK st) (elems : alloc.vec.Vec T) :
+    ∃ (s' : CS) (elems' : alloc.vec.Vec T) (failure : Option RStatus),
+      sudo_rs.sudoers.basic_parser.parse_list_loop P UF sep max st elems none true =
+        ok (s'.src, s'.pos, s'.line, s'.col, elems', failure) ∧ StreamOK s' ∧
+      ResultRel (absVec f) (match failure with | none => .Ok elems' | some e => .Err e)
+        ((refListLoop sep max.val d p (absVec f elems)).run (absStream st)).1 ∧
+      absStream s' = ((refListLoop sep max.val d p (absVec f elems)).run (absStream st)).2 :=
+  parse_list_loop_eq_on (I := fun _ => True) (by intro; intros; trivial) hP.on hD sep max st h
+    trivial elems
+
 /-- **`parse_list` refines `parseList`.** -/
-theorem parse_list_refines (hP : ParseRefines P f p) (hD : DescRel UF d) (sep : Char)
-    (max : Usize) {s : CS} (h : StreamOK s) :
+theorem parse_list_refines_on {I : Stream → Prop} (hI : ForwardStable I)
+    (hP : ParseRefinesOn I P f p) (hD : DescRel UF d) (sep : Char)
+    (max : Usize) {s : CS} (h : StreamOK s) (hi : I (absStream s)) :
     Refines (absVec f) (sudo_rs.sudoers.basic_parser.parse_list P UF sep max s)
       ((SudoersSpec.Syntax.parseList sep max.val d p).run (absStream s)) := by
-  obtain ⟨r, s1, e1, hr, h1, a1⟩ := try_nonterminal_refines hP h
+  obtain ⟨r, s1, e1, hr, h1, a1⟩ := try_nonterminal_refines_at (hP s h hi)
+  have hi1 := hI.after hi (SudoersSpec.Syntax.tryNonterminal p) a1
   unfold sudo_rs.sudoers.basic_parser.parse_list
   simp only [SudoersSpec.Syntax.parseList, Parser.run_bind, e1, bind_ok, uncurry_apply_pair]
   rcases hR : (SudoersSpec.Syntax.tryNonterminal p).run (absStream s) with ⟨r', s''⟩
@@ -114,7 +131,7 @@ theorem parse_list_refines (hP : ParseRefines P f p) (hD : DescRel UF d) (sep : 
   · obtain ⟨elems, hpush, hpv⟩ := exists_eq_ok_of_spec
       (alloc.vec.Vec.push_spec (alloc.vec.Vec.new T) x (by simp; scalar_tac))
     obtain ⟨s', elems', failure, e', h', hr', a'⟩ :=
-      parse_list_loop_eq hP hD sep max s1 h1 elems
+      parse_list_loop_eq_on hI hP hD sep max s1 h1 hi1 elems
     have habs : absVec f elems = [a] := by simp [absVec, hpv, hr]
     rw [habs] at hr' a'
     simp only [branch_Ok, hpush, bind_ok, e', uncurry_apply_pair]
@@ -126,20 +143,33 @@ theorem parse_list_refines (hP : ParseRefines P f p) (hD : DescRel UF d) (sep : 
       simp [h', hr']
   · simp [hr, h1]
 
+theorem parse_list_refines (hP : ParseRefines P f p) (hD : DescRel UF d) (sep : Char)
+    (max : Usize) {s : CS} (h : StreamOK s) :
+    Refines (absVec f) (sudo_rs.sudoers.basic_parser.parse_list P UF sep max s)
+      ((SudoersSpec.Syntax.parseList sep max.val d p).run (absStream s)) :=
+  parse_list_refines_on (I := fun _ => True) (by intro; intros; trivial) hP.on hD sep max h trivial
+
 /-- **The `Vec<T>` instance refines `parseVec`.** -/
-theorem vec_refines {M : sudo_rs.sudoers.basic_parser.Many T} {m : SudoersSpec.Syntax.Many}
-    (hP : ParseRefines P f p) (hM : ManyRefines M m) (hD : DescRel UF d) :
-    ParseRefines (sudo_rs.alloc.vec.Vec.Insts.Sudo_rsSudoersBasic_parserParse P M UF) (absVec f)
+theorem vec_refines_on {I : Stream → Prop} {M : sudo_rs.sudoers.basic_parser.Many T}
+    {m : SudoersSpec.Syntax.Many} (hI : ForwardStable I)
+    (hP : ParseRefinesOn I P f p) (hM : ManyRefines M m) (hD : DescRel UF d) :
+    ParseRefinesOn I (sudo_rs.alloc.vec.Vec.Insts.Sudo_rsSudoersBasic_parserParse P M UF) (absVec f)
       (SudoersSpec.Syntax.parseVec m d p) := by
-  constructor
-  intro s h
+  intro s h hi
   obtain ⟨n, hn, hnv⟩ := hM.limit
   show Refines (absVec f)
     (sudo_rs.alloc.vec.Vec.Insts.Sudo_rsSudoersBasic_parserParse.parse P M UF s) _
   unfold sudo_rs.alloc.vec.Vec.Insts.Sudo_rsSudoersBasic_parserParse.parse
   simp only [hM.sep, hn, bind_ok, SudoersSpec.Syntax.parseVec]
   rw [← hnv]
-  exact parse_list_refines hP hD m.sep n h
+  exact parse_list_refines_on hI hP hD m.sep n h hi
+
+theorem vec_refines {M : sudo_rs.sudoers.basic_parser.Many T} {m : SudoersSpec.Syntax.Many}
+    (hP : ParseRefines P f p) (hM : ManyRefines M m) (hD : DescRel UF d) :
+    ParseRefines (sudo_rs.alloc.vec.Vec.Insts.Sudo_rsSudoersBasic_parserParse P M UF) (absVec f)
+      (SudoersSpec.Syntax.parseVec m d p) :=
+  ⟨fun s hs => vec_refines_on (I := fun _ => True) (by intro; intros; trivial)
+    hP.on hM hD s hs trivial⟩
 
 private theorem listLoop_ok_next (sep : Char) (max : Nat) (d : String) (p : Parser α)
     (elems : List α) (s : Stream) (hs : NoBlankNext s) {out : List α} {s' : Stream}

@@ -313,11 +313,31 @@ theorem is_syntax_refines {s : CS} (h : StreamOK s) (c : Char) :
 
 /-! ## Nonterminals -/
 
-theorem try_nonterminal_refines {T α : Type} {P : sudo_rs.sudoers.basic_parser.Parse T}
-    {f : T → α} {p : Parser α} (hP : ParseRefines P f p) {s : CS} (h : StreamOK s) :
+/-- A condition on reference cursors preserved by every forward parse, including errors. -/
+def ForwardStable (I : Stream → Prop) : Prop :=
+  ∀ ⦃s s'⦄, I s → s.Reaches s' → I s'
+
+/-- Refinement on representable cursors satisfying an additional reference-stream condition. -/
+def ParseRefinesOn (I : Stream → Prop) {T α : Type}
+    (P : sudo_rs.sudoers.basic_parser.Parse T) (f : T → α) (p : Parser α) : Prop :=
+  ∀ s, StreamOK s → I (absStream s) → Refines f (P.parse s) (p.run (absStream s))
+
+theorem ParseRefines.on {I : Stream → Prop} {T α : Type}
+    {P : sudo_rs.sudoers.basic_parser.Parse T} {f : T → α} {p : Parser α}
+    (hP : ParseRefines P f p) : ParseRefinesOn I P f p :=
+  fun s hs _ => hP.parse s hs
+
+theorem ForwardStable.after {I : Stream → Prop} (hI : ForwardStable I) {s s' : CS}
+    (hi : I (absStream s)) {α : Type} (p : Parser α)
+    (ha : absStream s' = (p.run (absStream s)).2) : I (absStream s') :=
+  ha ▸ hI hi (p.reaches _)
+
+theorem try_nonterminal_refines_at {T α : Type} {P : sudo_rs.sudoers.basic_parser.Parse T}
+    {f : T → α} {p : Parser α} {s : CS}
+    (hP : Refines f (P.parse s) (p.run (absStream s))) :
     Refines f (sudo_rs.sudoers.basic_parser.try_nonterminal P s)
       ((SudoersSpec.Syntax.tryNonterminal p).run (absStream s)) := by
-  obtain ⟨r, s1, e1, hr, h1, a1⟩ := hP.parse s h
+  obtain ⟨r, s1, e1, hr, h1, a1⟩ := hP
   unfold sudo_rs.sudoers.basic_parser.try_nonterminal
   simp only [SudoersSpec.Syntax.tryNonterminal, Parser.run_bind, e1, bind_ok, uncurry_apply_pair]
   rcases hT : p.run (absStream s) with ⟨r', s''⟩
@@ -331,13 +351,19 @@ theorem try_nonterminal_refines {T α : Type} {P : sudo_rs.sudoers.basic_parser.
     rcases u with ⟨⟩ | st <;> rcases u' with e' | ⟨⟩ <;> simp_all
   · simp [hr, h1]
 
-theorem expect_nonterminal_refines {T α : Type} {P : sudo_rs.sudoers.basic_parser.Parse T}
+theorem try_nonterminal_refines {T α : Type} {P : sudo_rs.sudoers.basic_parser.Parse T}
+    {f : T → α} {p : Parser α} (hP : ParseRefines P f p) {s : CS} (h : StreamOK s) :
+    Refines f (sudo_rs.sudoers.basic_parser.try_nonterminal P s)
+      ((SudoersSpec.Syntax.tryNonterminal p).run (absStream s)) :=
+  try_nonterminal_refines_at (hP.parse s h)
+
+theorem expect_nonterminal_refines_at {T α : Type} {P : sudo_rs.sudoers.basic_parser.Parse T}
     {UF : sudo_rs.sudoers.ast_names.UserFriendly T} {f : T → α} {p : Parser α} {d : String}
-    (hP : ParseRefines P f p) (hD : DescRel UF d) {s : CS} (h : StreamOK s) :
+    {s : CS} (hP : Refines f (P.parse s) (p.run (absStream s))) (hD : DescRel UF d) :
     Refines f (sudo_rs.sudoers.basic_parser.expect_nonterminal P UF s)
       ((SudoersSpec.Syntax.expectNonterminal d p).run (absStream s)) := by
   obtain ⟨sd, hsd, hsdv⟩ := hD
-  obtain ⟨r, s1, e1, hr, h1, a1⟩ := try_nonterminal_refines hP h
+  obtain ⟨r, s1, e1, hr, h1, a1⟩ := try_nonterminal_refines_at hP
   unfold sudo_rs.sudoers.basic_parser.expect_nonterminal
   simp only [SudoersSpec.Syntax.expectNonterminal, Parser.run_bind, Parser.run_getPos,
     Parser.run_observe, get_pos_eq', e1, bind_ok, uncurry_apply_pair]
@@ -346,6 +372,13 @@ theorem expect_nonterminal_refines {T α : Type} {P : sudo_rs.sudoers.basic_pars
   subst a1
   rcases r with x | (⟨sp, k⟩ | _) <;> rcases r' with (⟨sp', k'⟩ | _) | a <;>
     simp_all [Parser.run_lift, Parser.run_fatalFrom]
+
+theorem expect_nonterminal_refines {T α : Type} {P : sudo_rs.sudoers.basic_parser.Parse T}
+    {UF : sudo_rs.sudoers.ast_names.UserFriendly T} {f : T → α} {p : Parser α} {d : String}
+    (hP : ParseRefines P f p) (hD : DescRel UF d) {s : CS} (h : StreamOK s) :
+    Refines f (sudo_rs.sudoers.basic_parser.expect_nonterminal P UF s)
+      ((SudoersSpec.Syntax.expectNonterminal d p).run (absStream s)) :=
+  expect_nonterminal_refines_at (hP.parse s h) hD
 
 /-! ## The character after trailing whitespace
 

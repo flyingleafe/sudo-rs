@@ -72,14 +72,15 @@ theorem qualified_loop_eq (st : CS) (h : StreamOK st) (neg : Bool) :
 termination_by (absStream st).rest.length
 
 /-- **`impl Parse for Qualified<T>` refines `qualified`.** -/
-theorem qualified_refines {T α : Type} {P : sudo_rs.sudoers.basic_parser.Parse T}
+theorem qualified_refines_on {I : Stream → Prop} {T α : Type}
+    {P : sudo_rs.sudoers.basic_parser.Parse T}
     {UF : sudo_rs.sudoers.ast_names.UserFriendly T} {f : T → α} {p : Parser α} {d : String}
-    (hP : ParseRefines P f p) (hD : DescRel UF d) :
-    ParseRefines (sudo_rs.sudoers.ast.Qualified.Insts.Sudo_rsSudoersBasic_parserParse P UF)
+    (hI : ForwardStable I) (hP : ParseRefinesOn I P f p) (hD : DescRel UF d) :
+    ParseRefinesOn I (sudo_rs.sudoers.ast.Qualified.Insts.Sudo_rsSudoersBasic_parserParse P UF)
       (absQualified f) (SudoersSpec.Syntax.qualified d p) := by
-  constructor
-  intro s h
+  intro s h hi
   obtain ⟨r, s1, e1, hr, h1, a1⟩ := is_syntax_refines h '!'
+  have hi1 := hI.after hi (SudoersSpec.Syntax.isSyntax '!') a1
   show Refines (absQualified f)
     (sudo_rs.sudoers.ast.Qualified.Insts.Sudo_rsSudoersBasic_parserParse.parse P UF s) _
   unfold sudo_rs.sudoers.ast.Qualified.Insts.Sudo_rsSudoersBasic_parserParse.parse
@@ -93,6 +94,7 @@ theorem qualified_refines {T α : Type} {P : sudo_rs.sudoers.basic_parser.Parse 
     | true =>
       simp only [id_eq, ↓reduceIte, Parser.run_bind]
       obtain ⟨s2, neg, failure, e2, h2, hr2, a2⟩ := qualified_loop_eq s1 h1 true
+      have hi2 := hI.after hi1 (refBangLoop true) a2
       simp only [branch_Ok, ↓reduceIte, e2, bind_ok, uncurry_apply_pair]
       rcases hW : (refBangLoop true).run (absStream s1) with ⟨w, s3⟩
       rw [hW] at hr2 a2
@@ -100,7 +102,7 @@ theorem qualified_refines {T α : Type} {P : sudo_rs.sudoers.basic_parser.Parse 
       subst a2
       rcases failure with _ | st <;> rcases w with e3 | neg' <;> simp only [ResultRel] at hr2
       · subst hr2
-        obtain ⟨r4, s4, e4, hr4, h4, a4⟩ := expect_nonterminal_refines hP hD h2
+        obtain ⟨r4, s4, e4, hr4, h4, a4⟩ := expect_nonterminal_refines_at (hP s2 h2 hi2) hD
         simp only [e4, bind_ok, uncurry_apply_pair]
         rcases hE : (SudoersSpec.Syntax.expectNonterminal d p).run (absStream s2) with ⟨r5, s5⟩
         rw [hE] at hr4 a4
@@ -112,7 +114,7 @@ theorem qualified_refines {T α : Type} {P : sudo_rs.sudoers.basic_parser.Parse 
       · simp [h2, hr2]
     | false =>
       simp only [id_eq, Bool.false_eq_true, ↓reduceIte, Parser.run_bind]
-      obtain ⟨r4, s4, e4, hr4, h4, a4⟩ := try_nonterminal_refines hP h1
+      obtain ⟨r4, s4, e4, hr4, h4, a4⟩ := try_nonterminal_refines_at (hP s1 h1 hi1)
       simp only [branch_Ok, Bool.false_eq_true, ↓reduceIte, e4, bind_ok, uncurry_apply_pair]
       rcases hE : (SudoersSpec.Syntax.tryNonterminal p).run (absStream s1) with ⟨r5, s5⟩
       rw [hE] at hr4 a4
@@ -122,6 +124,14 @@ theorem qualified_refines {T α : Type} {P : sudo_rs.sudoers.basic_parser.Parse 
       · simp [h4, hr4, absQualified]
       · simp [h4, hr4]
   · simp [hr, h1]
+
+theorem qualified_refines {T α : Type} {P : sudo_rs.sudoers.basic_parser.Parse T}
+    {UF : sudo_rs.sudoers.ast_names.UserFriendly T} {f : T → α} {p : Parser α} {d : String}
+    (hP : ParseRefines P f p) (hD : DescRel UF d) :
+    ParseRefines (sudo_rs.sudoers.ast.Qualified.Insts.Sudo_rsSudoersBasic_parserParse P UF)
+      (absQualified f) (SudoersSpec.Syntax.qualified d p) :=
+  ⟨fun s hs => qualified_refines_on (I := fun _ => True) (by intro; intros; trivial)
+    hP.on hD s hs trivial⟩
 
 /-! ## Descriptions -/
 
