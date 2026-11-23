@@ -364,6 +364,13 @@ impl_def common.string.SudoString.Insts.CoreCmpPartialEqStr :
     common.string.SudoString.Insts.CoreCmpPartialEqStr
 }
 
+/-- [sudo_rs::defaults::SYSTEM_EDITOR]
+    Source: 'src/defaults/mod.rs', lines 33:0-37:2
+    Visibility: public -/
+@[global_simps, irreducible]
+def defaults.SYSTEM_EDITOR : Str :=
+  toStr "/usr/bin/editor:/usr/bin/nano:/usr/bin/vi"
+
 /-- [sudo_rs::defaults::apply_list]: loop 0:
     Source: 'src/defaults/mod.rs', lines 102:12-104:13 -/
 @[rust_loop]
@@ -457,7 +464,7 @@ def defaults.apply_list
     defaults.apply_list_loop2 iter set
 
 /-- [sudo_rs::defaults::{sudo_rs::defaults::SettingsModifier}::apply]:
-    Source: 'src/defaults/settings_dsl.rs', lines 286:12-290:13; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 39:0-93:1 -/
+    Source: 'src/defaults/settings_dsl.rs', lines 292:12-296:13; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 39:0-93:1 -/
 def defaults.SettingsModifier.apply
   (self : defaults.SettingsModifier) (obj : defaults.Settings) :
   Result defaults.Settings
@@ -531,7 +538,7 @@ def defaults.SettingsModifier.apply
     ok { obj with env_delete := hs }
 
 /-- [sudo_rs::defaults::setting_at]:
-    Source: 'src/defaults/settings_dsl.rs', lines 308:8-313:9; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 39:0-93:1 -/
+    Source: 'src/defaults/settings_dsl.rs', lines 314:8-319:9; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 39:0-93:1 -/
 def defaults.setting_at
   (index : Std.Usize) : Result (Option (Str × defaults.Setting)) := do
   match index.val with
@@ -605,14 +612,14 @@ def defaults.setting_named_loop
 partial_fixpoint
 
 /-- [sudo_rs::defaults::setting_named]:
-    Source: 'src/defaults/settings_dsl.rs', lines 319:8-336:9; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 39:0-93:1 -/
+    Source: 'src/defaults/settings_dsl.rs', lines 325:8-342:9; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 39:0-93:1 -/
 @[reducible]
 def defaults.setting_named
   («name» : Str) : Result (Option defaults.Setting) := do
   defaults.setting_named_loop «name» none 0#usize true
 
 /-- [sudo_rs::defaults::set]:
-    Source: 'src/defaults/settings_dsl.rs', lines 352:8-359:9; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 39:0-93:1 -/
+    Source: 'src/defaults/settings_dsl.rs', lines 358:8-365:9; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 39:0-93:1 -/
 def defaults.set («name» : Str) : Result (Option defaults.SettingKind) := do
   let o ← defaults.setting_named «name»
   match o with
@@ -715,7 +722,7 @@ def defaults.set («name» : Str) : Result (Option defaults.SettingKind) := do
       ok (some (defaults.SettingKind.List defaults.ListSetting.env_delete))
 
 /-- [sudo_rs::defaults::negate]:
-    Source: 'src/defaults/settings_dsl.rs', lines 338:8-350:9; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 39:0-93:1 -/
+    Source: 'src/defaults/settings_dsl.rs', lines 344:8-356:9; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 39:0-93:1 -/
 def defaults.negate
   («name» : Str) : Result (Option defaults.SettingsModifier) := do
   let o ← defaults.setting_named «name»
@@ -902,7 +909,7 @@ def defaults.integer_in_range
   | core.result.Result.Err _ => ok none
 
 /-- [sudo_rs::defaults::check_integer]:
-    Source: 'src/defaults/settings_dsl.rs', lines 169:8-173:9; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 39:0-93:1 -/
+    Source: 'src/defaults/settings_dsl.rs', lines 175:8-179:9; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 39:0-93:1 -/
 def defaults.check_integer
   (setting : defaults.IntegerSetting) (text : Str) :
   Result (Option defaults.SettingsModifier)
@@ -931,7 +938,7 @@ def defaults.check_integer
       ok (some (defaults.SettingsModifier.timestamp_timeout value))
 
 /-- [sudo_rs::defaults::check_text]:
-    Source: 'src/defaults/settings_dsl.rs', lines 176:8-180:9; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 39:0-93:1 -/
+    Source: 'src/defaults/settings_dsl.rs', lines 182:8-186:9; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 39:0-93:1 -/
 def defaults.check_text
   (setting : defaults.TextSetting) (text : Str) :
   Result (Option defaults.SettingsModifier)
@@ -1016,7 +1023,7 @@ def defaults.check_text
     ok (some (defaults.SettingsModifier.editor s))
 
 /-- [sudo_rs::defaults::build_list]:
-    Source: 'src/defaults/settings_dsl.rs', lines 183:8-187:9; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 39:0-93:1 -/
+    Source: 'src/defaults/settings_dsl.rs', lines 189:8-193:9; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 39:0-93:1 -/
 def defaults.build_list
   (setting : defaults.ListSetting) (mode : defaults.ListMode)
   (items : alloc.vec.Vec String) :
@@ -1030,33 +1037,567 @@ def defaults.build_list
   | defaults.ListSetting.env_delete =>
     ok (defaults.SettingsModifier.env_delete (mode, items))
 
+/-- [sudo_rs::defaults::{impl core::default::Default for sudo_rs::defaults::Settings}::default::LEN#2]
+    Source: 'src/defaults/settings_dsl.rs', lines 26:8-26:69; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 39:0-93:1 -/
+@[global_simps, irreducible]
+def defaults.DefaultSettings.default.LEN_2 : Result Std.Usize := do
+  let i ← 0#usize + 1#usize
+  let i1 ← i + 1#usize
+  let i2 ← i1 + 1#usize
+  let i3 ← i2 + 1#usize
+  let i4 ← i3 + 1#usize
+  let i5 ← i4 + 1#usize
+  let i6 ← i5 + 1#usize
+  let i7 ← i6 + 1#usize
+  let i8 ← i7 + 1#usize
+  let i9 ← i8 + 1#usize
+  let i10 ← i9 + 1#usize
+  let i11 ← i10 + 1#usize
+  let i12 ← i11 + 1#usize
+  let i13 ← i12 + 1#usize
+  let i14 ← i13 + 1#usize
+  let i15 ← i14 + 1#usize
+  let i16 ← i15 + 1#usize
+  let i17 ← i16 + 1#usize
+  let i18 ← i17 + 1#usize
+  let i19 ← i18 + 1#usize
+  let i20 ← i19 + 1#usize
+  let i21 ← i20 + 1#usize
+  let i22 ← i21 + 1#usize
+  let i23 ← i22 + 1#usize
+  let i24 ← i23 + 1#usize
+  let i25 ← i24 + 1#usize
+  let i26 ← i25 + 1#usize
+  let i27 ← i26 + 1#usize
+  let i28 ← i27 + 1#usize
+  let i29 ← i28 + 1#usize
+  let i30 ← i29 + 1#usize
+  let i31 ← i30 + 1#usize
+  let i32 ← i31 + 1#usize
+  let i33 ← i32 + 1#usize
+  let i34 ← i33 + 1#usize
+  let i35 ← i34 + 1#usize
+  i35 + 1#usize
+
+/-- [sudo_rs::defaults::{impl core::default::Default for sudo_rs::defaults::Settings}::default::LEN#1]
+    Source: 'src/defaults/settings_dsl.rs', lines 26:8-26:69; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 39:0-93:1 -/
+@[global_simps, irreducible]
+def defaults.DefaultSettings.default.LEN_1 : Result Std.Usize := do
+  let i ← 0#usize + 1#usize
+  let i1 ← i + 1#usize
+  let i2 ← i1 + 1#usize
+  let i3 ← i2 + 1#usize
+  let i4 ← i3 + 1#usize
+  let i5 ← i4 + 1#usize
+  i5 + 1#usize
+
+/-- [sudo_rs::defaults::{impl core::default::Default for sudo_rs::defaults::Settings}::default::LEN]
+    Source: 'src/defaults/settings_dsl.rs', lines 26:8-26:69; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 39:0-93:1 -/
+@[global_simps, irreducible]
+def defaults.DefaultSettings.default.LEN : Result Std.Usize := do
+  let i ← 0#usize + 1#usize
+  let i1 ← i + 1#usize
+  let i2 ← i1 + 1#usize
+  let i3 ← i2 + 1#usize
+  let i4 ← i3 + 1#usize
+  let i5 ← i4 + 1#usize
+  let i6 ← i5 + 1#usize
+  let i7 ← i6 + 1#usize
+  let i8 ← i7 + 1#usize
+  let i9 ← i8 + 1#usize
+  i9 + 1#usize
+
+/-- [sudo_rs::defaults::{impl core::default::Default for sudo_rs::defaults::Settings}::default]:
+    Source: 'src/defaults/settings_dsl.rs', lines 275:12-279:13; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 39:0-93:1
+    Visibility: public -/
+def defaults.Settings.Insts.CoreDefaultDefault.default
+  : Result defaults.Settings := do
+  let i ← 5#u64 * 60#u64
+  let i1 ← 15#u64 * 60#u64
+  let s ←
+    core.convert.IntoFrom.into BoxStr.Insts.CoreConvertFromShared0Str
+      defaults.SYSTEM_EDITOR
+  let i2 ← defaults.DefaultSettings.default.LEN
+  let keys ←
+    std.collections.hash.set.HashSetTRandomStateGlobal.with_capacity String i2
+  let s1 ←
+    alloc.string.String.Insts.CoreConvertFromShared0Str.from (toStr "COLORS")
+  let (_, keys1) ←
+    std.collections.hash.set.HashSet.insert alloc.string.String.Insts.CoreCmpEq
+      alloc.string.String.Insts.CoreHashHash
+      std.hash.random.RandomState.Insts.CoreHashBuildHasherDefaultHasher keys
+      s1
+  let s2 ←
+    alloc.string.String.Insts.CoreConvertFromShared0Str.from (toStr "DISPLAY")
+  let (_, keys2) ←
+    std.collections.hash.set.HashSet.insert alloc.string.String.Insts.CoreCmpEq
+      alloc.string.String.Insts.CoreHashHash
+      std.hash.random.RandomState.Insts.CoreHashBuildHasherDefaultHasher keys1
+      s2
+  let s3 ←
+    alloc.string.String.Insts.CoreConvertFromShared0Str.from (toStr "HOSTNAME")
+  let (_, keys3) ←
+    std.collections.hash.set.HashSet.insert alloc.string.String.Insts.CoreCmpEq
+      alloc.string.String.Insts.CoreHashHash
+      std.hash.random.RandomState.Insts.CoreHashBuildHasherDefaultHasher keys2
+      s3
+  let s4 ←
+    alloc.string.String.Insts.CoreConvertFromShared0Str.from (toStr
+      "KRB5CCNAME")
+  let (_, keys4) ←
+    std.collections.hash.set.HashSet.insert alloc.string.String.Insts.CoreCmpEq
+      alloc.string.String.Insts.CoreHashHash
+      std.hash.random.RandomState.Insts.CoreHashBuildHasherDefaultHasher keys3
+      s4
+  let s5 ←
+    alloc.string.String.Insts.CoreConvertFromShared0Str.from (toStr
+      "LS_COLORS")
+  let (_, keys5) ←
+    std.collections.hash.set.HashSet.insert alloc.string.String.Insts.CoreCmpEq
+      alloc.string.String.Insts.CoreHashHash
+      std.hash.random.RandomState.Insts.CoreHashBuildHasherDefaultHasher keys4
+      s5
+  let s6 ←
+    alloc.string.String.Insts.CoreConvertFromShared0Str.from (toStr "PATH")
+  let (_, keys6) ←
+    std.collections.hash.set.HashSet.insert alloc.string.String.Insts.CoreCmpEq
+      alloc.string.String.Insts.CoreHashHash
+      std.hash.random.RandomState.Insts.CoreHashBuildHasherDefaultHasher keys5
+      s6
+  let s7 ←
+    alloc.string.String.Insts.CoreConvertFromShared0Str.from (toStr "PS1")
+  let (_, keys7) ←
+    std.collections.hash.set.HashSet.insert alloc.string.String.Insts.CoreCmpEq
+      alloc.string.String.Insts.CoreHashHash
+      std.hash.random.RandomState.Insts.CoreHashBuildHasherDefaultHasher keys6
+      s7
+  let s8 ←
+    alloc.string.String.Insts.CoreConvertFromShared0Str.from (toStr "PS2")
+  let (_, keys8) ←
+    std.collections.hash.set.HashSet.insert alloc.string.String.Insts.CoreCmpEq
+      alloc.string.String.Insts.CoreHashHash
+      std.hash.random.RandomState.Insts.CoreHashBuildHasherDefaultHasher keys7
+      s8
+  let s9 ←
+    alloc.string.String.Insts.CoreConvertFromShared0Str.from (toStr
+      "XAUTHORITY")
+  let (_, keys9) ←
+    std.collections.hash.set.HashSet.insert alloc.string.String.Insts.CoreCmpEq
+      alloc.string.String.Insts.CoreHashHash
+      std.hash.random.RandomState.Insts.CoreHashBuildHasherDefaultHasher keys8
+      s9
+  let s10 ←
+    alloc.string.String.Insts.CoreConvertFromShared0Str.from (toStr
+      "XAUTHORIZATION")
+  let (_, keys10) ←
+    std.collections.hash.set.HashSet.insert alloc.string.String.Insts.CoreCmpEq
+      alloc.string.String.Insts.CoreHashHash
+      std.hash.random.RandomState.Insts.CoreHashBuildHasherDefaultHasher keys9
+      s10
+  let s11 ←
+    alloc.string.String.Insts.CoreConvertFromShared0Str.from (toStr
+      "XDG_CURRENT_DESKTOP")
+  let (_, keys11) ←
+    std.collections.hash.set.HashSet.insert alloc.string.String.Insts.CoreCmpEq
+      alloc.string.String.Insts.CoreHashHash
+      std.hash.random.RandomState.Insts.CoreHashBuildHasherDefaultHasher keys10
+      s11
+  let i3 ← defaults.DefaultSettings.default.LEN_1
+  let keys12 ←
+    std.collections.hash.set.HashSetTRandomStateGlobal.with_capacity String i3
+  let s12 ←
+    alloc.string.String.Insts.CoreConvertFromShared0Str.from (toStr
+      "COLORTERM")
+  let (_, keys13) ←
+    std.collections.hash.set.HashSet.insert alloc.string.String.Insts.CoreCmpEq
+      alloc.string.String.Insts.CoreHashHash
+      std.hash.random.RandomState.Insts.CoreHashBuildHasherDefaultHasher keys12
+      s12
+  let s13 ←
+    alloc.string.String.Insts.CoreConvertFromShared0Str.from (toStr "LANG")
+  let (_, keys14) ←
+    std.collections.hash.set.HashSet.insert alloc.string.String.Insts.CoreCmpEq
+      alloc.string.String.Insts.CoreHashHash
+      std.hash.random.RandomState.Insts.CoreHashBuildHasherDefaultHasher keys13
+      s13
+  let s14 ←
+    alloc.string.String.Insts.CoreConvertFromShared0Str.from (toStr "LANGUAGE")
+  let (_, keys15) ←
+    std.collections.hash.set.HashSet.insert alloc.string.String.Insts.CoreCmpEq
+      alloc.string.String.Insts.CoreHashHash
+      std.hash.random.RandomState.Insts.CoreHashBuildHasherDefaultHasher keys14
+      s14
+  let s15 ←
+    alloc.string.String.Insts.CoreConvertFromShared0Str.from (toStr "LC_*")
+  let (_, keys16) ←
+    std.collections.hash.set.HashSet.insert alloc.string.String.Insts.CoreCmpEq
+      alloc.string.String.Insts.CoreHashHash
+      std.hash.random.RandomState.Insts.CoreHashBuildHasherDefaultHasher keys15
+      s15
+  let s16 ←
+    alloc.string.String.Insts.CoreConvertFromShared0Str.from (toStr "LINGUAS")
+  let (_, keys17) ←
+    std.collections.hash.set.HashSet.insert alloc.string.String.Insts.CoreCmpEq
+      alloc.string.String.Insts.CoreHashHash
+      std.hash.random.RandomState.Insts.CoreHashBuildHasherDefaultHasher keys16
+      s16
+  let s17 ←
+    alloc.string.String.Insts.CoreConvertFromShared0Str.from (toStr "TERM")
+  let (_, keys18) ←
+    std.collections.hash.set.HashSet.insert alloc.string.String.Insts.CoreCmpEq
+      alloc.string.String.Insts.CoreHashHash
+      std.hash.random.RandomState.Insts.CoreHashBuildHasherDefaultHasher keys17
+      s17
+  let s18 ←
+    alloc.string.String.Insts.CoreConvertFromShared0Str.from (toStr "TZ")
+  let (_, keys19) ←
+    std.collections.hash.set.HashSet.insert alloc.string.String.Insts.CoreCmpEq
+      alloc.string.String.Insts.CoreHashHash
+      std.hash.random.RandomState.Insts.CoreHashBuildHasherDefaultHasher keys18
+      s18
+  let i4 ← defaults.DefaultSettings.default.LEN_2
+  let keys20 ←
+    std.collections.hash.set.HashSetTRandomStateGlobal.with_capacity String i4
+  let s19 ←
+    alloc.string.String.Insts.CoreConvertFromShared0Str.from (toStr "IFS")
+  let (_, keys21) ←
+    std.collections.hash.set.HashSet.insert alloc.string.String.Insts.CoreCmpEq
+      alloc.string.String.Insts.CoreHashHash
+      std.hash.random.RandomState.Insts.CoreHashBuildHasherDefaultHasher keys20
+      s19
+  let s20 ←
+    alloc.string.String.Insts.CoreConvertFromShared0Str.from (toStr "CDPATH")
+  let (_, keys22) ←
+    std.collections.hash.set.HashSet.insert alloc.string.String.Insts.CoreCmpEq
+      alloc.string.String.Insts.CoreHashHash
+      std.hash.random.RandomState.Insts.CoreHashBuildHasherDefaultHasher keys21
+      s20
+  let s21 ←
+    alloc.string.String.Insts.CoreConvertFromShared0Str.from (toStr
+      "LOCALDOMAIN")
+  let (_, keys23) ←
+    std.collections.hash.set.HashSet.insert alloc.string.String.Insts.CoreCmpEq
+      alloc.string.String.Insts.CoreHashHash
+      std.hash.random.RandomState.Insts.CoreHashBuildHasherDefaultHasher keys22
+      s21
+  let s22 ←
+    alloc.string.String.Insts.CoreConvertFromShared0Str.from (toStr
+      "RES_OPTIONS")
+  let (_, keys24) ←
+    std.collections.hash.set.HashSet.insert alloc.string.String.Insts.CoreCmpEq
+      alloc.string.String.Insts.CoreHashHash
+      std.hash.random.RandomState.Insts.CoreHashBuildHasherDefaultHasher keys23
+      s22
+  let s23 ←
+    alloc.string.String.Insts.CoreConvertFromShared0Str.from (toStr
+      "HOSTALIASES")
+  let (_, keys25) ←
+    std.collections.hash.set.HashSet.insert alloc.string.String.Insts.CoreCmpEq
+      alloc.string.String.Insts.CoreHashHash
+      std.hash.random.RandomState.Insts.CoreHashBuildHasherDefaultHasher keys24
+      s23
+  let s24 ←
+    alloc.string.String.Insts.CoreConvertFromShared0Str.from (toStr "NLSPATH")
+  let (_, keys26) ←
+    std.collections.hash.set.HashSet.insert alloc.string.String.Insts.CoreCmpEq
+      alloc.string.String.Insts.CoreHashHash
+      std.hash.random.RandomState.Insts.CoreHashBuildHasherDefaultHasher keys25
+      s24
+  let s25 ←
+    alloc.string.String.Insts.CoreConvertFromShared0Str.from (toStr
+      "PATH_LOCALE")
+  let (_, keys27) ←
+    std.collections.hash.set.HashSet.insert alloc.string.String.Insts.CoreCmpEq
+      alloc.string.String.Insts.CoreHashHash
+      std.hash.random.RandomState.Insts.CoreHashBuildHasherDefaultHasher keys26
+      s25
+  let s26 ←
+    alloc.string.String.Insts.CoreConvertFromShared0Str.from (toStr "LD_*")
+  let (_, keys28) ←
+    std.collections.hash.set.HashSet.insert alloc.string.String.Insts.CoreCmpEq
+      alloc.string.String.Insts.CoreHashHash
+      std.hash.random.RandomState.Insts.CoreHashBuildHasherDefaultHasher keys27
+      s26
+  let s27 ←
+    alloc.string.String.Insts.CoreConvertFromShared0Str.from (toStr "_RLD*")
+  let (_, keys29) ←
+    std.collections.hash.set.HashSet.insert alloc.string.String.Insts.CoreCmpEq
+      alloc.string.String.Insts.CoreHashHash
+      std.hash.random.RandomState.Insts.CoreHashBuildHasherDefaultHasher keys28
+      s27
+  let s28 ←
+    alloc.string.String.Insts.CoreConvertFromShared0Str.from (toStr "TERMINFO")
+  let (_, keys30) ←
+    std.collections.hash.set.HashSet.insert alloc.string.String.Insts.CoreCmpEq
+      alloc.string.String.Insts.CoreHashHash
+      std.hash.random.RandomState.Insts.CoreHashBuildHasherDefaultHasher keys29
+      s28
+  let s29 ←
+    alloc.string.String.Insts.CoreConvertFromShared0Str.from (toStr
+      "TERMINFO_DIRS")
+  let (_, keys31) ←
+    std.collections.hash.set.HashSet.insert alloc.string.String.Insts.CoreCmpEq
+      alloc.string.String.Insts.CoreHashHash
+      std.hash.random.RandomState.Insts.CoreHashBuildHasherDefaultHasher keys30
+      s29
+  let s30 ←
+    alloc.string.String.Insts.CoreConvertFromShared0Str.from (toStr "TERMPATH")
+  let (_, keys32) ←
+    std.collections.hash.set.HashSet.insert alloc.string.String.Insts.CoreCmpEq
+      alloc.string.String.Insts.CoreHashHash
+      std.hash.random.RandomState.Insts.CoreHashBuildHasherDefaultHasher keys31
+      s30
+  let s31 ←
+    alloc.string.String.Insts.CoreConvertFromShared0Str.from (toStr "TERMCAP")
+  let (_, keys33) ←
+    std.collections.hash.set.HashSet.insert alloc.string.String.Insts.CoreCmpEq
+      alloc.string.String.Insts.CoreHashHash
+      std.hash.random.RandomState.Insts.CoreHashBuildHasherDefaultHasher keys32
+      s31
+  let s32 ←
+    alloc.string.String.Insts.CoreConvertFromShared0Str.from (toStr "ENV")
+  let (_, keys34) ←
+    std.collections.hash.set.HashSet.insert alloc.string.String.Insts.CoreCmpEq
+      alloc.string.String.Insts.CoreHashHash
+      std.hash.random.RandomState.Insts.CoreHashBuildHasherDefaultHasher keys33
+      s32
+  let s33 ←
+    alloc.string.String.Insts.CoreConvertFromShared0Str.from (toStr "BASH_ENV")
+  let (_, keys35) ←
+    std.collections.hash.set.HashSet.insert alloc.string.String.Insts.CoreCmpEq
+      alloc.string.String.Insts.CoreHashHash
+      std.hash.random.RandomState.Insts.CoreHashBuildHasherDefaultHasher keys34
+      s33
+  let s34 ←
+    alloc.string.String.Insts.CoreConvertFromShared0Str.from (toStr "PS4")
+  let (_, keys36) ←
+    std.collections.hash.set.HashSet.insert alloc.string.String.Insts.CoreCmpEq
+      alloc.string.String.Insts.CoreHashHash
+      std.hash.random.RandomState.Insts.CoreHashBuildHasherDefaultHasher keys35
+      s34
+  let s35 ←
+    alloc.string.String.Insts.CoreConvertFromShared0Str.from (toStr
+      "GLOBIGNORE")
+  let (_, keys37) ←
+    std.collections.hash.set.HashSet.insert alloc.string.String.Insts.CoreCmpEq
+      alloc.string.String.Insts.CoreHashHash
+      std.hash.random.RandomState.Insts.CoreHashBuildHasherDefaultHasher keys36
+      s35
+  let s36 ←
+    alloc.string.String.Insts.CoreConvertFromShared0Str.from (toStr "BASHOPTS")
+  let (_, keys38) ←
+    std.collections.hash.set.HashSet.insert alloc.string.String.Insts.CoreCmpEq
+      alloc.string.String.Insts.CoreHashHash
+      std.hash.random.RandomState.Insts.CoreHashBuildHasherDefaultHasher keys37
+      s36
+  let s37 ←
+    alloc.string.String.Insts.CoreConvertFromShared0Str.from (toStr
+      "SHELLOPTS")
+  let (_, keys39) ←
+    std.collections.hash.set.HashSet.insert alloc.string.String.Insts.CoreCmpEq
+      alloc.string.String.Insts.CoreHashHash
+      std.hash.random.RandomState.Insts.CoreHashBuildHasherDefaultHasher keys38
+      s37
+  let s38 ←
+    alloc.string.String.Insts.CoreConvertFromShared0Str.from (toStr
+      "JAVA_TOOL_OPTIONS")
+  let (_, keys40) ←
+    std.collections.hash.set.HashSet.insert alloc.string.String.Insts.CoreCmpEq
+      alloc.string.String.Insts.CoreHashHash
+      std.hash.random.RandomState.Insts.CoreHashBuildHasherDefaultHasher keys39
+      s38
+  let s39 ←
+    alloc.string.String.Insts.CoreConvertFromShared0Str.from (toStr
+      "PERLIO_DEBUG")
+  let (_, keys41) ←
+    std.collections.hash.set.HashSet.insert alloc.string.String.Insts.CoreCmpEq
+      alloc.string.String.Insts.CoreHashHash
+      std.hash.random.RandomState.Insts.CoreHashBuildHasherDefaultHasher keys40
+      s39
+  let s40 ←
+    alloc.string.String.Insts.CoreConvertFromShared0Str.from (toStr "PERLLIB")
+  let (_, keys42) ←
+    std.collections.hash.set.HashSet.insert alloc.string.String.Insts.CoreCmpEq
+      alloc.string.String.Insts.CoreHashHash
+      std.hash.random.RandomState.Insts.CoreHashBuildHasherDefaultHasher keys41
+      s40
+  let s41 ←
+    alloc.string.String.Insts.CoreConvertFromShared0Str.from (toStr "PERL5LIB")
+  let (_, keys43) ←
+    std.collections.hash.set.HashSet.insert alloc.string.String.Insts.CoreCmpEq
+      alloc.string.String.Insts.CoreHashHash
+      std.hash.random.RandomState.Insts.CoreHashBuildHasherDefaultHasher keys42
+      s41
+  let s42 ←
+    alloc.string.String.Insts.CoreConvertFromShared0Str.from (toStr "PERL5OPT")
+  let (_, keys44) ←
+    std.collections.hash.set.HashSet.insert alloc.string.String.Insts.CoreCmpEq
+      alloc.string.String.Insts.CoreHashHash
+      std.hash.random.RandomState.Insts.CoreHashBuildHasherDefaultHasher keys43
+      s42
+  let s43 ←
+    alloc.string.String.Insts.CoreConvertFromShared0Str.from (toStr "PERL5DB")
+  let (_, keys45) ←
+    std.collections.hash.set.HashSet.insert alloc.string.String.Insts.CoreCmpEq
+      alloc.string.String.Insts.CoreHashHash
+      std.hash.random.RandomState.Insts.CoreHashBuildHasherDefaultHasher keys44
+      s43
+  let s44 ←
+    alloc.string.String.Insts.CoreConvertFromShared0Str.from (toStr "FPATH")
+  let (_, keys46) ←
+    std.collections.hash.set.HashSet.insert alloc.string.String.Insts.CoreCmpEq
+      alloc.string.String.Insts.CoreHashHash
+      std.hash.random.RandomState.Insts.CoreHashBuildHasherDefaultHasher keys45
+      s44
+  let s45 ←
+    alloc.string.String.Insts.CoreConvertFromShared0Str.from (toStr "NULLCMD")
+  let (_, keys47) ←
+    std.collections.hash.set.HashSet.insert alloc.string.String.Insts.CoreCmpEq
+      alloc.string.String.Insts.CoreHashHash
+      std.hash.random.RandomState.Insts.CoreHashBuildHasherDefaultHasher keys46
+      s45
+  let s46 ←
+    alloc.string.String.Insts.CoreConvertFromShared0Str.from (toStr
+      "READNULLCMD")
+  let (_, keys48) ←
+    std.collections.hash.set.HashSet.insert alloc.string.String.Insts.CoreCmpEq
+      alloc.string.String.Insts.CoreHashHash
+      std.hash.random.RandomState.Insts.CoreHashBuildHasherDefaultHasher keys47
+      s46
+  let s47 ←
+    alloc.string.String.Insts.CoreConvertFromShared0Str.from (toStr "ZDOTDIR")
+  let (_, keys49) ←
+    std.collections.hash.set.HashSet.insert alloc.string.String.Insts.CoreCmpEq
+      alloc.string.String.Insts.CoreHashHash
+      std.hash.random.RandomState.Insts.CoreHashBuildHasherDefaultHasher keys48
+      s47
+  let s48 ←
+    alloc.string.String.Insts.CoreConvertFromShared0Str.from (toStr
+      "TMPPREFIX")
+  let (_, keys50) ←
+    std.collections.hash.set.HashSet.insert alloc.string.String.Insts.CoreCmpEq
+      alloc.string.String.Insts.CoreHashHash
+      std.hash.random.RandomState.Insts.CoreHashBuildHasherDefaultHasher keys49
+      s48
+  let s49 ←
+    alloc.string.String.Insts.CoreConvertFromShared0Str.from (toStr
+      "PYTHONHOME")
+  let (_, keys51) ←
+    std.collections.hash.set.HashSet.insert alloc.string.String.Insts.CoreCmpEq
+      alloc.string.String.Insts.CoreHashHash
+      std.hash.random.RandomState.Insts.CoreHashBuildHasherDefaultHasher keys50
+      s49
+  let s50 ←
+    alloc.string.String.Insts.CoreConvertFromShared0Str.from (toStr
+      "PYTHONPATH")
+  let (_, keys52) ←
+    std.collections.hash.set.HashSet.insert alloc.string.String.Insts.CoreCmpEq
+      alloc.string.String.Insts.CoreHashHash
+      std.hash.random.RandomState.Insts.CoreHashBuildHasherDefaultHasher keys51
+      s50
+  let s51 ←
+    alloc.string.String.Insts.CoreConvertFromShared0Str.from (toStr
+      "PYTHONINSPECT")
+  let (_, keys53) ←
+    std.collections.hash.set.HashSet.insert alloc.string.String.Insts.CoreCmpEq
+      alloc.string.String.Insts.CoreHashHash
+      std.hash.random.RandomState.Insts.CoreHashBuildHasherDefaultHasher keys52
+      s51
+  let s52 ←
+    alloc.string.String.Insts.CoreConvertFromShared0Str.from (toStr
+      "PYTHONUSERBASE")
+  let (_, keys54) ←
+    std.collections.hash.set.HashSet.insert alloc.string.String.Insts.CoreCmpEq
+      alloc.string.String.Insts.CoreHashHash
+      std.hash.random.RandomState.Insts.CoreHashBuildHasherDefaultHasher keys53
+      s52
+  let s53 ←
+    alloc.string.String.Insts.CoreConvertFromShared0Str.from (toStr "RUBYLIB")
+  let (_, keys55) ←
+    std.collections.hash.set.HashSet.insert alloc.string.String.Insts.CoreCmpEq
+      alloc.string.String.Insts.CoreHashHash
+      std.hash.random.RandomState.Insts.CoreHashBuildHasherDefaultHasher keys54
+      s53
+  let s54 ←
+    alloc.string.String.Insts.CoreConvertFromShared0Str.from (toStr "RUBYOPT")
+  let (_, keys56) ←
+    std.collections.hash.set.HashSet.insert alloc.string.String.Insts.CoreCmpEq
+      alloc.string.String.Insts.CoreHashHash
+      std.hash.random.RandomState.Insts.CoreHashBuildHasherDefaultHasher keys55
+      s54
+  let s55 ←
+    alloc.string.String.Insts.CoreConvertFromShared0Str.from (toStr "*=()*")
+  let (_, keys57) ←
+    std.collections.hash.set.HashSet.insert alloc.string.String.Insts.CoreCmpEq
+      alloc.string.String.Insts.CoreHashHash
+      std.hash.random.RandomState.Insts.CoreHashBuildHasherDefaultHasher keys56
+      s55
+  ok
+    {
+      always_query_group_plugin := false,
+      always_set_home := false,
+      env_reset := true,
+      fqdn := false,
+      ignore_dot := true,
+      lecture := defaults.enums.lecture.never,
+      mailerpath := none,
+      mail_badpass := true,
+      match_group_by_gid := false,
+      use_pty := true,
+      visiblepw := false,
+      pwfeedback := true,
+      rootpw := false,
+      targetpw := false,
+      noexec := false,
+      noninteractive_auth := false,
+      log_allowed := true,
+      log_denied := true,
+      insults := false,
+      setenv := false,
+      runcwd := none,
+      apparmor_profile := none,
+      umask := 18#u64,
+      umask_override := false,
+      passwd_tries := 3#u64,
+      secure_path := none,
+      verifypw := defaults.enums.verifypw.all,
+      passwd_timeout := i,
+      timestamp_timeout := i1,
+      timestamp_type := defaults.enums.timestamp_type.tty,
+      editor := s,
+      env_editor := true,
+      env_keep := keys11,
+      env_check := keys19,
+      env_delete := keys57
+    }
+
 /-- [sudo_rs::defaults::{sudo_rs::defaults::Settings}::apparmor_profile]:
-    Source: 'src/defaults/settings_dsl.rs', lines 243:16-245:17; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 39:0-93:1 -/
+    Source: 'src/defaults/settings_dsl.rs', lines 249:16-251:17; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 39:0-93:1 -/
 def defaults.Settings.impl.apparmor_profile
   (self : defaults.Settings) : Result (Option Str) := do
   core.option.Option.as_deref (core.ops.deref.DerefBoxInst Str)
     self.apparmor_profile
 
 /-- [sudo_rs::defaults::{sudo_rs::defaults::Settings}::use_pty]:
-    Source: 'src/defaults/settings_dsl.rs', lines 243:16-245:17; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 39:0-93:1 -/
+    Source: 'src/defaults/settings_dsl.rs', lines 249:16-251:17; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 39:0-93:1 -/
 def defaults.Settings.impl.use_pty
   (self : defaults.Settings) : Result Bool := do
   ok self.use_pty
 
 /-- [sudo_rs::defaults::{sudo_rs::defaults::Settings}::setenv]:
-    Source: 'src/defaults/settings_dsl.rs', lines 243:16-245:17; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 39:0-93:1 -/
+    Source: 'src/defaults/settings_dsl.rs', lines 249:16-251:17; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 39:0-93:1 -/
 def defaults.Settings.impl.setenv
   (self : defaults.Settings) : Result Bool := do
   ok self.setenv
 
 /-- [sudo_rs::defaults::{sudo_rs::defaults::Settings}::noexec]:
-    Source: 'src/defaults/settings_dsl.rs', lines 243:16-245:17; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 39:0-93:1 -/
+    Source: 'src/defaults/settings_dsl.rs', lines 249:16-251:17; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 39:0-93:1 -/
 def defaults.Settings.impl.noexec
   (self : defaults.Settings) : Result Bool := do
   ok self.noexec
 
 /-- [sudo_rs::defaults::{sudo_rs::defaults::Settings}::env_keep]:
-    Source: 'src/defaults/settings_dsl.rs', lines 243:16-245:17; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 39:0-93:1 -/
+    Source: 'src/defaults/settings_dsl.rs', lines 249:16-251:17; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 39:0-93:1 -/
 def defaults.Settings.impl.env_keep
   (self : defaults.Settings) :
   Result (std.collections.hash.set.HashSet String std.hash.random.RandomState
@@ -1065,7 +1606,7 @@ def defaults.Settings.impl.env_keep
   ok self.env_keep
 
 /-- [sudo_rs::defaults::{sudo_rs::defaults::Settings}::env_check]:
-    Source: 'src/defaults/settings_dsl.rs', lines 243:16-245:17; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 39:0-93:1 -/
+    Source: 'src/defaults/settings_dsl.rs', lines 249:16-251:17; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 39:0-93:1 -/
 def defaults.Settings.impl.env_check
   (self : defaults.Settings) :
   Result (std.collections.hash.set.HashSet String std.hash.random.RandomState
@@ -1074,26 +1615,26 @@ def defaults.Settings.impl.env_check
   ok self.env_check
 
 /-- [sudo_rs::defaults::{sudo_rs::defaults::Settings}::secure_path]:
-    Source: 'src/defaults/settings_dsl.rs', lines 243:16-245:17; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 39:0-93:1 -/
+    Source: 'src/defaults/settings_dsl.rs', lines 249:16-251:17; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 39:0-93:1 -/
 def defaults.Settings.impl.secure_path
   (self : defaults.Settings) : Result (Option Str) := do
   core.option.Option.as_deref (core.ops.deref.DerefBoxInst Str)
     self.secure_path
 
 /-- [sudo_rs::defaults::{sudo_rs::defaults::Settings}::umask]:
-    Source: 'src/defaults/settings_dsl.rs', lines 243:16-245:17; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 39:0-93:1 -/
+    Source: 'src/defaults/settings_dsl.rs', lines 249:16-251:17; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 39:0-93:1 -/
 def defaults.Settings.impl.umask
   (self : defaults.Settings) : Result Std.U64 := do
   ok self.umask
 
 /-- [sudo_rs::defaults::{sudo_rs::defaults::Settings}::umask_override]:
-    Source: 'src/defaults/settings_dsl.rs', lines 243:16-245:17; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 39:0-93:1 -/
+    Source: 'src/defaults/settings_dsl.rs', lines 249:16-251:17; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 39:0-93:1 -/
 def defaults.Settings.impl.umask_override
   (self : defaults.Settings) : Result Bool := do
   ok self.umask_override
 
 /-- [sudo_rs::defaults::{sudo_rs::defaults::Settings}::log_allowed]:
-    Source: 'src/defaults/settings_dsl.rs', lines 243:16-245:17; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 39:0-93:1 -/
+    Source: 'src/defaults/settings_dsl.rs', lines 249:16-251:17; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 39:0-93:1 -/
 def defaults.Settings.impl.log_allowed
   (self : defaults.Settings) : Result Bool := do
   ok self.log_allowed
@@ -1225,55 +1766,55 @@ def defaults.Settings.Insts.CoreCloneClone.clone
     }
 
 /-- [sudo_rs::defaults::{sudo_rs::defaults::Settings}::passwd_tries]:
-    Source: 'src/defaults/settings_dsl.rs', lines 243:16-245:17; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 39:0-93:1 -/
+    Source: 'src/defaults/settings_dsl.rs', lines 249:16-251:17; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 39:0-93:1 -/
 def defaults.Settings.impl.passwd_tries
   (self : defaults.Settings) : Result Std.U64 := do
   ok self.passwd_tries
 
 /-- [sudo_rs::defaults::{sudo_rs::defaults::Settings}::timestamp_timeout]:
-    Source: 'src/defaults/settings_dsl.rs', lines 243:16-245:17; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 39:0-93:1 -/
+    Source: 'src/defaults/settings_dsl.rs', lines 249:16-251:17; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 39:0-93:1 -/
 def defaults.Settings.impl.timestamp_timeout
   (self : defaults.Settings) : Result Std.U64 := do
   ok self.timestamp_timeout
 
 /-- [sudo_rs::defaults::{sudo_rs::defaults::Settings}::pwfeedback]:
-    Source: 'src/defaults/settings_dsl.rs', lines 243:16-245:17; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 39:0-93:1 -/
+    Source: 'src/defaults/settings_dsl.rs', lines 249:16-251:17; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 39:0-93:1 -/
 def defaults.Settings.impl.pwfeedback
   (self : defaults.Settings) : Result Bool := do
   ok self.pwfeedback
 
 /-- [sudo_rs::defaults::{sudo_rs::defaults::Settings}::passwd_timeout]:
-    Source: 'src/defaults/settings_dsl.rs', lines 243:16-245:17; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 39:0-93:1 -/
+    Source: 'src/defaults/settings_dsl.rs', lines 249:16-251:17; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 39:0-93:1 -/
 def defaults.Settings.impl.passwd_timeout
   (self : defaults.Settings) : Result Std.U64 := do
   ok self.passwd_timeout
 
 /-- [sudo_rs::defaults::{sudo_rs::defaults::Settings}::timestamp_type]:
-    Source: 'src/defaults/settings_dsl.rs', lines 243:16-245:17; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 39:0-93:1 -/
+    Source: 'src/defaults/settings_dsl.rs', lines 249:16-251:17; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 39:0-93:1 -/
 def defaults.Settings.impl.timestamp_type
   (self : defaults.Settings) : Result defaults.enums.timestamp_type := do
   ok self.timestamp_type
 
 /-- [sudo_rs::defaults::{sudo_rs::defaults::Settings}::noninteractive_auth]:
-    Source: 'src/defaults/settings_dsl.rs', lines 243:16-245:17; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 39:0-93:1 -/
+    Source: 'src/defaults/settings_dsl.rs', lines 249:16-251:17; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 39:0-93:1 -/
 def defaults.Settings.impl.noninteractive_auth
   (self : defaults.Settings) : Result Bool := do
   ok self.noninteractive_auth
 
 /-- [sudo_rs::defaults::{sudo_rs::defaults::Settings}::rootpw]:
-    Source: 'src/defaults/settings_dsl.rs', lines 243:16-245:17; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 39:0-93:1 -/
+    Source: 'src/defaults/settings_dsl.rs', lines 249:16-251:17; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 39:0-93:1 -/
 def defaults.Settings.impl.rootpw
   (self : defaults.Settings) : Result Bool := do
   ok self.rootpw
 
 /-- [sudo_rs::defaults::{sudo_rs::defaults::Settings}::targetpw]:
-    Source: 'src/defaults/settings_dsl.rs', lines 243:16-245:17; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 39:0-93:1 -/
+    Source: 'src/defaults/settings_dsl.rs', lines 249:16-251:17; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 39:0-93:1 -/
 def defaults.Settings.impl.targetpw
   (self : defaults.Settings) : Result Bool := do
   ok self.targetpw
 
 /-- [sudo_rs::defaults::{sudo_rs::defaults::Settings}::runcwd]:
-    Source: 'src/defaults/settings_dsl.rs', lines 243:16-245:17; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 39:0-93:1 -/
+    Source: 'src/defaults/settings_dsl.rs', lines 249:16-251:17; this code is generated from a macro invocation at: 'src/defaults/mod.rs', lines 39:0-93:1 -/
 def defaults.Settings.impl.runcwd
   (self : defaults.Settings) : Result (Option Str) := do
   core.option.Option.as_deref (core.ops.deref.DerefBoxInst Str) self.runcwd
