@@ -95,7 +95,7 @@ private theorem starts_with_text_loop_eq (text pre : Slice Char)
 termination_by pre.val.length - i.val
 decreasing_by omega
 
-private theorem starts_with_text_eq (text pre : Slice Char) :
+theorem starts_with_text_eq (text pre : Slice Char) :
     sudoers.tokens.starts_with_text text pre = ok (pre.val.isPrefixOf text.val) := by
   have hle : Slice.len pre ≤ Slice.len text ↔ pre.val.length ≤ text.val.length := by
     simp only [UScalar.le_equiv, Slice.len_val]
@@ -109,7 +109,7 @@ private theorem starts_with_text_eq (text pre : Slice Char) :
     rw [show decide (pre.len ≤ text.len) = false by simpa using (mt hle.mp h),
       starts_with_text_loop_false, hp]
 
-private theorem equals_text_eq (text word : Slice Char) :
+theorem equals_text_eq (text word : Slice Char) :
     sudoers.tokens.equals_text text word = ok (text.val == word.val) := by
   unfold sudoers.tokens.equals_text
   dsimp only
