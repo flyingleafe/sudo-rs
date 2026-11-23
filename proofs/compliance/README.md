@@ -28,8 +28,9 @@ env -u CI SUDO_UNDER_TEST=ours CARGO_TARGET_DIR=$OUT/target \
 
 The framework builds the `sudo-test-rs` Docker image from that tree (`ours.linux.Dockerfile`,
 features `gettext,pam-login,unstable-remote-sudoers`) and runs each test in a fresh container.
-Per-test outcomes go to `$OUT/{A,B}.results` (sorted `name ok|FAILED|ignored`, `OUT` defaults to
-`/tmp/compliance`), and the script prints their `diff`; exit 0 means identical outcomes.
+Per-test outcomes go to `$OUT/{A,B}.results` (sorted `name ok|FAILED|ignored`; `$OUT` defaults to
+`/tmp/compliance`). Exit 0 means both runs completed with at least one non-ignored test and identical outcomes. A build
+failure, truncated log, or filter that ran no tests cannot produce a passing comparison.
 Trees run sequentially because the image tag is fixed. No filter was used: the full suite ran.
 `#[ignore]`d tests (features sudo-rs does not implement) are not run, as in upstream CI.
 

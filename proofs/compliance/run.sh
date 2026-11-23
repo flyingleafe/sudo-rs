@@ -11,12 +11,13 @@ set -euo pipefail
 
 [ $# -ge 2 ] || { echo "usage: $0 <tree-A> <tree-B> [filter...]" >&2; exit 2; }
 A=$(realpath "$1"); B=$(realpath "$2"); shift 2
+outcomes=$(dirname "$(realpath "${BASH_SOURCE[0]}")")/outcomes.awk
 OUT=${OUT:-/tmp/compliance}
 THREADS=${THREADS:-$(nproc)}
 mkdir -p "$OUT"
 
 run_tree() {
-  local label=$1 tree=$2
+  local label=$1 tree=$2 status=0
   echo "== $label: $tree" >&2
   # The image tag `sudo-test-rs` is fixed by the framework; trees therefore run
   # sequentially, and each run rebuilds the image from its own tree.
@@ -29,10 +30,8 @@ run_tree() {
       nix shell nixpkgs#cargo nixpkgs#rustc nixpkgs#gcc -c \
       cargo test --locked -p sudo-compliance-tests -- \
         --test-threads "$THREADS" "$@"
-  ) >"$OUT/$label.log" 2>&1 || true
-  # libtest lines: "test <name> ... ok|FAILED|ignored"
-  sed -nE 's/^test ([^ ]+) \.\.\. (ok|FAILED|ignored).*/\1 \2/p' "$OUT/$label.log" \
-    | sort >"$OUT/$label.results"
+  ) >"$OUT/$label.log" 2>&1 || status=$?
+  awk -v "status=$status" -f "$outcomes" "$OUT/$label.log" | sort >"$OUT/$label.results"
   printf '%s: passed=%s failed=%s ignored=%s total=%s\n' "$label" \
     "$(grep -c ' ok$' "$OUT/$label.results" || true)" \
     "$(grep -c ' FAILED$' "$OUT/$label.results" || true)" \
