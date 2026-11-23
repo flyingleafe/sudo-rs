@@ -4,6 +4,7 @@ import SudoersSpec.Authorization
 import SudoersSpec.Certificates
 import SudoersSpec.Expansion
 import SudoersSpec.Escape
+import SudoersSpec.Syntax.Ast
 
 /-! Axiom audit: every main result depends on at most `propext`, `Classical.choice` and
 `Quot.sound`. `lake build` prints the lists. -/
@@ -134,3 +135,18 @@ open SudoersSpec
 #print axioms SudoersSpec.Escape.escapeArgs_eq_iff
 #print axioms SudoersSpec.Escape.escapeArgs_injective
 #print axioms SudoersSpec.Escape.escapeArg_injective
+#print axioms SudoersSpec.Syntax.Stream.Reaches.eq_advance
+#print axioms SudoersSpec.Syntax.Stream.Reaches.getPos_eq
+#print axioms SudoersSpec.Syntax.Stream.skipWhile_eq
+#print axioms SudoersSpec.Syntax.Stream.skipToNewline_getPos
+#print axioms SudoersSpec.Syntax.Parser.suffix
+#print axioms SudoersSpec.Syntax.Parser.loop_run
+#print axioms SudoersSpec.Syntax.Parser.loop_invariant
+#print axioms SudoersSpec.Syntax.trySyntax_consumes
+#print axioms SudoersSpec.Syntax.trySyntax_reject
+#print axioms SudoersSpec.Syntax.expectNonterminal_ne_reject
+#print axioms SudoersSpec.Syntax.acceptEscaped_consumes
+#print axioms SudoersSpec.Syntax.token_consumes
+#print axioms SudoersSpec.Syntax.parseLinesBody_progressive
+#print axioms SudoersSpec.Syntax.parseLines_ok
+#print axioms SudoersSpec.Syntax.specListHostname_consumes

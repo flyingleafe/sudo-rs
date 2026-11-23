@@ -14,3 +14,12 @@ import SudoersSpec.RunasManual
 import SudoersSpec.Certificates
 import SudoersSpec.Escape
 import SudoersSpec.Axioms
+import SudoersSpec.Syntax.CharStream
+import SudoersSpec.Syntax.Status
+import SudoersSpec.Syntax.CharOracle
+import SudoersSpec.Syntax.Parser
+import SudoersSpec.Syntax.BasicParser
+import SudoersSpec.Syntax.Tokens
+import SudoersSpec.Syntax.AstNames
+import SudoersSpec.Syntax.Ast
+import SudoersSpec.Syntax.Tests
