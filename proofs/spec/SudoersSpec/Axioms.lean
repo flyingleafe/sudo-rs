@@ -5,6 +5,7 @@ import SudoersSpec.Certificates
 import SudoersSpec.Expansion
 import SudoersSpec.Escape
 import SudoersSpec.Syntax.Ast
+import SudoersSpec.Settings.Properties
 
 /-! Axiom audit: every main result depends on at most `propext`, `Classical.choice` and
 `Quot.sound`. `lake build` prints the lists. -/
@@ -150,3 +151,8 @@ open SudoersSpec
 #print axioms SudoersSpec.Syntax.parseLinesBody_progressive
 #print axioms SudoersSpec.Syntax.parseLines_ok
 #print axioms SudoersSpec.Syntax.specListHostname_consumes
+#print axioms SudoersSpec.Settings.fractionalMinutesRun_eq
+#print axioms SudoersSpec.Settings.mem_applyList
+#print axioms SudoersSpec.Settings.applyList_equiv
+#print axioms SudoersSpec.Settings.settingNamed_name
+#print axioms SudoersSpec.Settings.reachable_inRange

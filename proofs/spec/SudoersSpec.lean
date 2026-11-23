@@ -23,3 +23,8 @@ import SudoersSpec.Syntax.Tokens
 import SudoersSpec.Syntax.AstNames
 import SudoersSpec.Syntax.Ast
 import SudoersSpec.Syntax.Tests
+import SudoersSpec.Settings.Values
+import SudoersSpec.Settings.Model
+import SudoersSpec.Settings.Properties
+import SudoersSpec.Settings.Dump
+import SudoersSpec.Settings.Tests
