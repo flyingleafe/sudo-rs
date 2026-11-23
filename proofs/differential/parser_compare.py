@@ -407,11 +407,13 @@ C_RULES = [
      "alias: checked by C at parse time (sudo-rs: in analysis)"),
     (r"^values for|no value specified|^empty string|value .* is invalid|invalid value|out of range|must be|is deprecated|invalid \w+ value",
      "Defaults or option: value check stricter in C"),
-    (r"No such file or directory|unable to open|unable to read|Not a directory", "include: target does not exist or has the wrong type"),
+    (r"No such file or directory|unable to open|unable to read|Not a directory|is not a regular file$",
+     "include: target does not exist or has the wrong type"),
     (r"expected a fully-qualified path name", "path check stricter in C"),
     (r"invalid sudoedit file name", "command: sudoedit argument check in C"),
     (r"unknown defaults entry", "Defaults: setting unknown to C"),
     (r"empty group", "user: '%' without a group name"),
+    (r"^empty netgroup$", "user: empty netgroup rejected by C"),
     (r"unexpected line break in string|invalid line continuation", "continuation: inside a quoted string (C)"),
 ]
 

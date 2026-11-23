@@ -264,10 +264,17 @@ evidence. A difference is a reported line or content difference, not a distinct 
 | 8 | 29,024 | 18,386 | 21 |
 | **Total** | **232,192** | **146,539** | **201** |
 
-The Rust observer recorded no panic. For the unexplained content differences, knowing
-*which field* differs is not an explanation of *why* it differs. Counts from another host
-or a later comparator cannot retrospectively reclassify this run. P0's requirement to
-explain every C discrepancy remains open for this corpus.
+The Rust observer recorded no panic. The table gives the **original classifier's** counts.
+Message-only review of its 201 rows identifies a specific check in 29: 24 file-type
+diagnostics without a source line and 5 empty-netgroup diagnostics. These are counts of
+records, not necessarily distinct behaviors. The comparator now recognizes both messages.
+
+**172 rows still lack a demonstrated cause of disagreement.** Of those, 2 report only an
+errno, 37 give a bare success status, 8 are generic syntax diagnostics, and 125 show only
+which parsed field differs. A status string is not an explanation of a parser decision.
+The archive has no source text or full dumps; the content rows retain at most two unmatched
+entries per side. Neither a structural label nor results from a different host explain
+these rows. P0's requirement to explain every C discrepancy remains open for this corpus.
 
 ## 5. Running
 
