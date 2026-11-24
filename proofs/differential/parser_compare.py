@@ -261,6 +261,11 @@ def rs_iterations(records, text):
             continue
         if it["kind"] == "comment":
             cur += 1
+        elif i < len(records) and records[i].startswith("fatal "):
+            # a following error gives its own position: a comment inside the item can end it
+            # before the logical line does
+            m = FATAL.match(records[i])
+            cur = max(cur, int(m.group(1)))
         else:
             last = cur
             while last < nlines and is_continued(lines[last - 1], strict=True):
