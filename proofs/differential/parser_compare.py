@@ -756,7 +756,8 @@ def rs_quoted_all(part):
 
 def rs_nonunix_gid(part):
     neg, x = part
-    if isinstance(x, tuple) and x[0] in ("nonunixgid", "nonunixgroup"):
+    if isinstance(x, tuple) and (x[0] in ("nonunixgid", "nonunixgroup") or
+                                 (x[0] == "usergroup" and str(x[1]).startswith(":"))):
         return (neg, ("nonunixgid", None))
     return part
 
