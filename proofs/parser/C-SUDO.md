@@ -247,12 +247,14 @@ Fixed inputs (category `known`), run with both implementations:
 Further categories in section 3 not described in PLAN.md are recorded neutrally; details are in
 the local findings file of this stage.
 
-## Larger corpus: limits of the classification
+## 5. Larger corpus: dump v1 history (superseded)
 
-The 0-unclassified result above does **not** hold on the larger corpus. On `uni-cpu`,
-job `parser-p0-e3e4b7` ran the same observer at `d84ff98a` with C sudo 1.9.18
-(`d58e85d8`), eight seeds, and 1,000 cases per category per seed. Counts are **test**
-evidence. A difference is a reported line or content difference, not a distinct bug.
+*Superseded by section 6; kept as history.* Sections 3 and 4 are the local seed-1 run at dump
+version 1. At `d84ff98a` (dump v1) job `parser-p0-e3e4b7` on `uni-cpu` ran eight seeds of 1,000
+cases per category: 232,192 cases, 146,539 differences and 201 rows without a named cause, of
+which a review of the messages alone attributed 29. That version had no model of C's word
+splitting and no rule for the constructs listed in section 6, so its counts are not comparable
+with the current ones.
 
 | Seed | Cases | Differences | Without an explanation |
 |---:|---:|---:|---:|
@@ -266,51 +268,10 @@ evidence. A difference is a reported line or content difference, not a distinct 
 | 8 | 29,024 | 18,386 | 21 |
 | **Total** | **232,192** | **146,539** | **201** |
 
-The Rust observer recorded no panic. The table gives the **original classifier's** counts.
-Message-only review of its 201 rows identifies a specific check in 29: 24 file-type
-diagnostics without a source line and 5 empty-netgroup diagnostics. These are counts of
-records, not necessarily distinct behaviors. The comparator now recognizes both messages.
+Dump version 2 (`059c08cf`) prints a settings modifier as a typed `(setting name payload)`
+record, so the version-1 category "Defaults: list removal without effect on either settings
+base" no longer exists: a removal is named, not inferred from two base values.
 
-**172 rows still lack a demonstrated cause of disagreement.** Of those, 2 report only an
-errno, 37 give a bare success status, 8 are generic syntax diagnostics, and 125 show only
-which parsed field differs. A status string is not an explanation of a parser decision.
-The archive has no source text or full dumps; the content rows retain at most two unmatched
-entries per side. Neither a structural label nor results from a different host explain
-these rows. P0's requirement to explain every C discrepancy remains open for this corpus.
-
-## 5. Running
-## 5. Cluster run
-
-`parser-run.sh 1000 SEED` for seeds 1 to 8 (232,192 cases) at `d84ff98a`, on a Red Hat host
-where some command paths of the corpus exist (`/usr/bin/su`), so C sudo canonicalizes them and
-the per-case C verdicts differ from the laptop: 0 panic records, 146,539 differences, 201
-unclassified (26, 33, 25, 22, 15, 24, 35, 21 per seed).
-
-Reading those 201 cases (their texts, the cluster C messages and the local reproduction of the
-same labelled texts) named these causes, now rules in `parser_compare.py`:
-
-| New category | Cause it names |
-|---|---|
-| quoted "ALL": the ALL keyword for C, a user name or alias reference for sudo-rs | `"ALL"` in a user list |
-| quoted name: sudo-rs keeps the part before a character its unquoted token does not accept | a quoted name whose inner re-parse stops early (`"𐐀#x"` -> `𐐀`) |
-| quoted '%:#N': an empty non-unix group name for sudo-rs, a gid for C | `"%:#5"` |
-| comment ending in a backslash: C joins the next line into the comment, sudo-rs does not | `#\` at the end of a comment line |
-| Defaults! scope: a second '!' with no item after it | `Defaults!! ...` |
-| Defaults keyword glued to a word: a user name for C, a Defaults line for sudo-rs | `DefaultsALL ...` |
-| netgroup: empty netgroup name (C reports it at the '+') | `+` with an empty name |
-| include: target is a directory / include: empty path after the directive | `@include <dir>`, `@include:` |
-| negation: '!' separated by whitespace rejected by C (before any character) | `Defaults:u1,! #0` |
-| quoting: sudo-rs requires the closing quote before the next token | an unclosed quote |
-| runas: an error inside the user list is discarded and the list ends early (F-P3) | `(#<11 digits>, ...)` |
-| C messages that are the text of the current `errno` rather than a diagnostic | `Success`, `File exists` on the cluster: C reports an error without a message; the construct is named by C's column |
-
-Not resolved by a rule: differences of entry *lists* whose entries match only after modelling
-how C splits a command path at `=` or at an escape and how it prints the `""` marker. A change
-of the C command normalizer was tried and reverted: it moved the local seed-1 remainder from 0
-to 7 unclassified, so the classification stays as it is until the cluster re-run shows whether
-these remain. On the local reproduction of the 201 cases, 92 of 361 differences stay
-unclassified, all of this kind (`rule commands differ` 46, `rule users differ` 26, alias members
-9, `Defaults` 7, and 4 single cases).
 
 ## 6. Running
 
@@ -329,9 +290,9 @@ for seed in 1 2 3 4 5 6 7 8; do
 done
 ```
 
-With `PARSER_KEEP=1` the run also writes `corpus.txt.gz`, `sudo-rs.dump.gz`, `c-sudo.out.gz`
-and `sudo-rs.dump.bases.gz`; after `gzip -d`, `python3 parser_compare.py corpus.txt
-sudo-rs.dump c-sudo.out differences.tsv` re-classifies them without C sudo.
+With `PARSER_KEEP=1` the run also writes `corpus.txt.gz`, `sudo-rs.dump.gz` and
+`c-sudo.out.gz`; after `gzip -d`, `python3 parser_compare.py corpus.txt sudo-rs.dump
+c-sudo.out differences.tsv` re-classifies them without C sudo.
 
 Each run writes `report.md` (these tables) and `differences.tsv` (one line per difference:
 label, line, category, messages) to `$PARSER_SCRATCH`. A run whose report shows unclassified

@@ -205,7 +205,13 @@ def rs_iterations(records, text):
     consistent = True
 
     def after_stop(el, ec):
-        """Next start line after the stream stopped at (el, ec); may consume an artifact."""
+        """Next start line after the stream stopped at (el, ec); may consume an artifact.
+
+        parse_lines consumes a comment at the stopping point (`#`) or a newline there, and
+        otherwise skips to the end of the physical line, whose newline the next iteration then
+        reads as a comment. A reported position can lie before the actual stopping point (an
+        error created with the position of the construct), so an artifact comment is required
+        only when the position itself holds a `#` that no record explains."""
         nonlocal i, consistent
         line = lines[el - 1] if el - 1 < nlines else ""
         ch = line[ec - 1] if ec - 1 < len(line) else ("\n" if el < nlines else None)
@@ -214,8 +220,6 @@ def rs_iterations(records, text):
         if i < len(records) and records[i] == "ok comment":
             its.append({"line": el, "kind": "comment", "garbage": None, "artifact": True})
             i += 1
-        else:
-            consistent = False
         return el + 1
 
     while i < len(records):
@@ -421,6 +425,8 @@ C_RULES = [
     (r"empty group", "user: '%' without a group name"),
     (r"^empty netgroup$", "user: empty netgroup rejected by C"),
     (r"^: ", "include: empty path after the directive (C reports the open failure)"),
+    (r"is (world|group) writable$|not owned by|is not owned|wrong owner|wrong mode",
+     "include: C checks the include target's owner and mode, sudo-rs leaves it to the open"),
     (r"unexpected line break in string|invalid line continuation", "continuation: inside a quoted string (C)"),
 ]
 
@@ -491,36 +497,49 @@ ERRNO_TEXT = {"Success", "No such file or directory", "File exists", "Is a direc
 ALIAS = re.compile(r"^[A-Z][A-Z0-9_]*$")
 
 
-def args_key(kind, args):
-    return (kind, tuple(args))
+def canon_marker(kind, args):
+    """The argument mode that the kind and the argument list already imply: `""` (no further
+    arguments) for an exact command with no argument, `*` (further arguments allowed) for a
+    prefix with arguments, nothing otherwise. Both readers print one of these markers; keeping
+    the canonical form only lets the two sides meet without carrying the printing convention."""
+    if kind == "exact" and not args:
+        return '""'
+    if kind == "prefix" and args:
+        return "*"
+    return ""
 
 
 def rs_cmd(c):
     path = S(c[1])
-    return ("cmd", path, args_key(c[2][0], [S(a) for a in c[2][1]]))
+    kind, args = c[2][0], tuple(S(a) for a in c[2][1])
+    return ("cmd", path, (kind, args, canon_marker(kind, args)))
 
 
 def c_cmd(s):
-    """C JSON command string -> the key of rs_cmd (C and sudo-rs argument semantics)."""
+    """C JSON command string -> the key of rs_cmd. C prints the command word and its arguments
+    as it lexed them, a final `*` (further arguments allowed) or `""` (none) as a marker, and a
+    path ending in `/` (any command in that directory). The marker is kept so that the modelling
+    of C's word splitting (`c_word_join`) can recompute the argument mode."""
     parts = s.split()
-    path, args = parts[0], parts[1:]
+    path, rest = parts[0], parts[1:]
+    marker = args_marker = ""
+    if rest and rest[-1] in ('""', "*"):
+        marker, rest = rest[-1], rest[:-1]
+        args_marker = marker
+    kind = "prefix" if marker == "*" else ("exact" if rest or marker == '""' else "prefix")
+    marker = canon_marker(kind, rest)
+    if marker == "" and args_marker == '""' and rest and rest[0].startswith(("=", "\\")):
+        marker = '""'  # a piece that c_word_join merges back: the marker then matters
     if path.endswith("/") and path != "/":
-        path += "*"
-    if not args:
-        return ("cmd", path, ("prefix", ()))
-    if args == ['""']:
-        return ("cmd", path, ("exact", ()))
-    if args[-1] == "*":
-        return ("cmd", path, ("prefix", tuple(args[:-1])))
-    if args[-1] == '""':
-        return ("cmd", path, ("exact", tuple(args[:-1])))
-    return ("cmd", path, ("exact", tuple(args)))
+        path += "*"  # any command in that directory
+    return ("cmd", path, (kind, tuple(rest), marker))
 
 
 def rs_user(t):
     kind, ident = t[0], t[1]
     if ident[0] == "name":
-        return ({"user": "username", "group": "usergroup", "nonunix": "nonunixgroup"}[kind], S(ident[1]))
+        return ({"user": "username", "group": "usergroup",
+                 "nonunix": "nonunixgroup"}[kind], S(ident[1]))
     return ({"user": "userid", "group": "usergid", "nonunix": "nonunixgid"}[kind], int(ident[1]))
 
 
@@ -682,12 +701,54 @@ def rs_colon_group(part):
     return part
 
 
-def c_equals_path(part):
+def c_word_join(part):
+    """C's lexer splits a word at an unescaped `=` and after an escape: it prints the pieces as
+    separate words (`/a`, `=b`, `c`, `\\d`). sudo-rs keeps them in one path or argument. Join a
+    piece that starts with `=` or a backslash onto the piece before it and recompute whether
+    further arguments are allowed."""
     neg, x = part
-    if isinstance(x, tuple) and x[0] == "cmd" and x[2][1] and x[2][1][0].startswith("="):
-        rest = x[2][1][1:]
-        kind = x[2][0] if rest else "prefix"
-        return (neg, ("cmd", x[1] + x[2][1][0], (kind, rest)))
+    if not (isinstance(x, tuple) and x[0] == "cmd"):
+        return part
+    kind, args, marker = x[2]
+    words = [x[1]] + list(args)
+    merged = [words[0]]
+    for w in words[1:]:
+        if w.startswith(("=", "\\")):
+            merged[-1] += w
+        else:
+            merged.append(w)
+    path, args = merged[0], tuple(merged[1:])
+    kind = "prefix" if marker == "*" else ("exact" if args or marker == '""' else "prefix")
+    return (neg, ("cmd", path, (kind, args, canon_marker(kind, args))))
+
+
+def rs_colon_group(part):
+    """A quoted `"%:Name"` never reaches sudo-rs's non-unix branch: it re-parses the text with
+    `:` escaped, so the `%` is read as a Unix group whose name starts with `:`."""
+    neg, x = part
+    if isinstance(x, tuple) and x[0] == "usergroup" and str(x[1]).startswith(":"):
+        return (neg, ("nonunixgroup", x[1][1:]))
+    return part
+
+
+def rs_quoted_all(part):
+    neg, x = part
+    if x == ("username", "ALL"):
+        return (neg, "ALL")
+    return part
+
+
+def rs_nonunix_gid(part):
+    neg, x = part
+    if isinstance(x, tuple) and x[0] in ("nonunixgid", "nonunixgroup"):
+        return (neg, ("nonunixgid", None))
+    return part
+
+
+def c_nonunix_gid(part):
+    neg, x = part
+    if isinstance(x, tuple) and x[0] == "nonunixgid":
+        return (neg, ("nonunixgid", None))
     return part
 
 
@@ -715,10 +776,20 @@ EXPLANATIONS = [
     ("F-P4: '#' line read as a comment by sudo-rs, a rule for C", None, c_hash_rule),
     ("quoted '%:' group: sudo-rs reads a Unix group whose name starts with ':'",
      lambda e: map_parts(e, rs_colon_group), None),
-    ("command: '=' inside a path (C ends the path there)", None, lambda e: map_parts(e, c_equals_path)),
+    ("command: C splits a word at '=' or after an escape, sudo-rs keeps it whole",
+     None, lambda e: map_parts(e, c_word_join)),
+    ('quoted "ALL": the ALL keyword for C, a name for sudo-rs',
+     lambda e: map_parts(e, rs_quoted_all), None),
+    ("quoted '%:#N': sudo-rs and C read the non-unix group name differently",
+     lambda e: map_parts(e, rs_nonunix_gid), lambda e: map_parts(e, c_nonunix_gid)),
     ("quoted upper-case word: a user name for sudo-rs, an alias for C",
      lambda e: map_parts(e, rs_quoted_alias), None),
 ]
+
+
+# Explanations that replace a name by a placeholder; used only when no explanation that keeps
+# the form of an entry explains the difference.
+LOSSY = {"quoted '%:#N': sudo-rs and C read the non-unix group name differently"}
 
 
 def apply(f, entries):
@@ -737,9 +808,10 @@ def part_cause(x, y):
     if isinstance(xs, tuple) and isinstance(ys, tuple) and len(xs) == 2 == len(ys):
         if (xs[0] == "alias" and ys == "ALL") or (xs == "ALL" and ys[0] == "alias"):
             return 'quoted "ALL": the ALL keyword for C, an alias reference for sudo-rs'
-        if (xs[0] == "nonunixgroup" and xs[1] == "" and ys[0] == "nonunixgid") or \
-                (ys[0] == "nonunixgroup" and ys[1] == "" and xs[0] == "nonunixgid"):
-            return "quoted '%:#N': an empty non-unix group name for sudo-rs, a gid for C"
+        if {xs[0], ys[0]} == {"nonunixgid", "nonunixgroup"} and \
+                ((xs[0] == "nonunixgid" and xs[1] is None) or (ys[0] == "nonunixgid" and ys[1] is None)):
+            return ("quoted '%:' group: sudo-rs reads no non-unix group name, C reads the name "
+                    "(or a gid)")
         if xs[0] == ys[0] and xs[0] in ("username", "usergroup", "nonunixgroup", "hostname") \
                 and isinstance(xs[1], str) and isinstance(ys[1], str):
             short, long = (xs[1], ys[1]) if len(xs[1]) < len(ys[1]) else (ys[1], xs[1])
@@ -776,11 +848,16 @@ def content_category(mine, theirs, text):
     for name, frs, fc in EXPLANATIONS:
         if apply(frs, mine) == apply(fc, theirs):
             return name
-    a, b = mine, theirs
-    for _, frs, fc in EXPLANATIONS:
-        a, b = apply(frs, a), apply(fc, b)
-    if a == b:
-        return "content: several of the causes above"
+    # Several causes in one text: first the explanations that keep the form of an entry (the
+    # '%:' ones replace a name by a placeholder and are only used when nothing else fits).
+    for keep in (False, True):
+        a, b = mine, theirs
+        for name, frs, fc in EXPLANATIONS:
+            if keep and name in LOSSY:
+                continue
+            a, b = apply(frs, a), apply(fc, b)
+        if a == b:
+            return "content: several of the causes above"
     only_rs, only_c = list(a - b), list(b - a)
     cat = member_cause(only_rs, only_c)
     if cat:
