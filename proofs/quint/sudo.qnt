@@ -138,6 +138,48 @@ module sudo {
   }
 
   // ---- adversary starts an invocation ----------------------------------
+  // Every nondeterministic action below is a thin wrapper that picks its
+  // choices and passes them to a `...With` action. A replay of an observed
+  // run (`replay.qnt`) calls the `...With` actions with the observed or
+  // fixture-declared values instead, and each `...With` action only accepts
+  // values the nondeterministic wrapper could have picked.
+  type StartArgs = {
+    invoker: int, session: int, mode: str, runasKind: str, runasArg: int,
+    hasGroup: bool, groupArg: int, cmd: str, file: str, hostArg: str, chroot: bool,
+    askpass: bool, tzOffset: int, editorExtra: Set[str], statSession: int,
+  }
+
+  def startAdmissible(a: StartArgs): bool = and {
+    INVOKERS.contains(a.invoker),
+    SESSIONS.contains(a.session),
+    modes.contains(a.mode),
+    Set("default", "name", "num").contains(a.runasKind),
+    NUMERIC_UIDS.contains(a.runasArg),
+    GIDS.contains(a.groupArg),
+    COMMANDS.contains(a.cmd),
+    FILES.contains(a.file),
+    (if (IMPL.hostOpt) Set("", "h1", "h2") else Set("")).contains(a.hostArg),
+    IMPL.chrootOpt or not(a.chroot),
+    IMPL.askpass or not(a.askpass),
+    TZ_OFFSETS.contains(a.tzOffset),
+    a.editorExtra.subseteq(FILES),
+    SESSIONS.contains(a.statSession),
+  }
+
+  action startWith(p: int, a: StartArgs): bool = all {
+    TERMINAL.contains(procs.get(p).phase),
+    startAdmissible(a),
+    setProc(p, {
+      ...IDLE,
+      phase: "parse", invoker: a.invoker, session: a.session,
+      mode: a.mode, runasKind: a.runasKind, runasArg: a.runasArg, hasGroup: a.hasGroup,
+      groupArg: a.groupArg, cmd: a.cmd, file: a.file, hostArg: a.hostArg, chroot: a.chroot,
+      askpass: a.askpass, tzOffset: a.tzOffset, editorExtra: a.editorExtra,
+      statSession: a.statSession,
+      creds: setuidRootExec(a.invoker, primaryGid(a.invoker), suppGroups(a.invoker)),
+    }),
+  }
+
   action start(p: int): bool = {
     nondet invoker = INVOKERS.oneOf()
     nondet session = SESSIONS.oneOf()
@@ -154,18 +196,12 @@ module sudo {
     nondet tzOffset = TZ_OFFSETS.oneOf()
     nondet editorExtra = FILES.powerset().oneOf()
     nondet statSession = SESSIONS.oneOf()
-    all {
-      TERMINAL.contains(procs.get(p).phase),
-      setProc(p, {
-        ...IDLE,
-        phase: "parse", invoker: invoker, session: session,
-        mode: mode, runasKind: runasKind, runasArg: runasArg, hasGroup: hasGroup,
-        groupArg: groupArg, cmd: cmd, file: file, hostArg: hostArg, chroot: chroot,
-        askpass: askpass, tzOffset: tzOffset, editorExtra: editorExtra,
-        statSession: statSession,
-        creds: setuidRootExec(invoker, primaryGid(invoker), suppGroups(invoker)),
-      }),
-    }
+    startWith(p, {
+      invoker: invoker, session: session, mode: mode, runasKind: runasKind,
+      runasArg: runasArg, hasGroup: hasGroup, groupArg: groupArg, cmd: cmd, file: file,
+      hostArg: hostArg, chroot: chroot, askpass: askpass, tzOffset: tzOffset,
+      editorExtra: editorExtra, statSession: statSession,
+    })
   }
 
   // ---- parse the command line ------------------------------------------
@@ -205,11 +241,11 @@ module sudo {
   }
 
   // ---- policy decision ---------------------------------------------------
-  action decide(p: int): bool = {
+  // `fresh` is the verdict the policy oracle gives the request if it has not
+  // been looked up before; `nssAnswer` is whatever an attacker-provided NSS
+  // module answers for the invoker (used only with CVE-2025-32463).
+  action decideWith(p: int, fresh: str, nssAnswer: int): bool = {
     val s = procs.get(p)
-    nondet fresh = VERDICTS.oneOf()
-    // Whatever an attacker-provided NSS module answers for the invoker.
-    nondet nssAnswer = USERS.oneOf()
     val user = if (s.nssFromChroot) nssAnswer else s.invoker
     val host = if (s.hostArg != "" and (s.mode == "list" or bug(CVE_2025_32462))) s.hostArg else REAL_HOST
     val tz = if (bug(CVE_2026_96512)) s.tzOffset else 0
@@ -223,6 +259,8 @@ module sudo {
     val decided = { ...s, verdict: v, principal: authPrincipal(v, s.invoker, s.target), decideNow: now }
     all {
       s.phase == "decide",
+      VERDICTS.contains(fresh),
+      USERS.contains(nssAnswer),
       procs' = procs.set(p,
         if (s.mode == "list") { ...decided, phase: "done" }
         else if (v == "deny") failPath(decided)
@@ -239,6 +277,12 @@ module sudo {
         })),
       },
     }
+  }
+
+  action decide(p: int): bool = {
+    nondet fresh = VERDICTS.oneOf()
+    nondet nssAnswer = USERS.oneOf()
+    decideWith(p, fresh, nssAnswer)
   }
 
   // ---- authentication ---------------------------------------------------
@@ -290,37 +334,54 @@ module sudo {
     }
   }
 
-  // One credential step of the command path: failures always abort.
-  action credStep(p: int, phase: str, nextPhase: str, call: (Creds, bool) => Result): bool = {
+  // One credential step of the command path: failures always abort. `roll`
+  // selects a fault (see `isFault`).
+  action credStep(p: int, phase: str, nextPhase: str, call: (Creds, bool) => Result, roll: int): bool = {
     val s = procs.get(p)
-    nondet roll = FAULT_ROLLS.oneOf()
     val r = call(s.creds, isFault(roll))
     all {
       s.phase == phase,
+      FAULT_ROLLS.contains(roll),
       setProc(p,
         if (r.ok) { ...s, phase: nextPhase, creds: r.creds }
         else { ...s, phase: "aborted", credFail: true }),
     }
   }
 
-  action setGroups(p: int): bool = {
+  action setGroupsWith(p: int, roll: int): bool = {
     val s = procs.get(p)
-    credStep(p, "set_groups", "set_gid", (c, f) => setgroups(c, targetGroups(s), f))
+    credStep(p, "set_groups", "set_gid", (c, f) => setgroups(c, targetGroups(s), f), roll)
+  }
+
+  action setGroups(p: int): bool = {
+    nondet roll = FAULT_ROLLS.oneOf()
+    setGroupsWith(p, roll)
+  }
+
+  action setGidWith(p: int, roll: int): bool = {
+    val s = procs.get(p)
+    credStep(p, "set_gid", "set_uid", (c, f) => setresgid(c, s.targetGid, s.targetGid, s.targetGid, f), roll)
   }
 
   action setGid(p: int): bool = {
+    nondet roll = FAULT_ROLLS.oneOf()
+    setGidWith(p, roll)
+  }
+
+  action setUidWith(p: int, roll: int): bool = {
     val s = procs.get(p)
-    credStep(p, "set_gid", "set_uid", (c, f) => setresgid(c, s.targetGid, s.targetGid, s.targetGid, f))
+    credStep(p, "set_uid", "exec", (c, f) => setresuid(c, s.target, s.target, s.target, f), roll)
   }
 
   action setUid(p: int): bool = {
-    val s = procs.get(p)
-    credStep(p, "set_uid", "exec", (c, f) => setresuid(c, s.target, s.target, s.target, f))
+    nondet roll = FAULT_ROLLS.oneOf()
+    setUidWith(p, roll)
   }
 
-  action exec(p: int): bool = {
+  // `fresh` is the verdict of the request actually carried out if the
+  // policy has not seen it (a ghost lookup).
+  action execWith(p: int, fresh: str): bool = {
     val s = procs.get(p)
-    nondet fresh = VERDICTS.oneOf()
     // What actually runs: the effective identity and the real invoker, host
     // and decision time.
     val real = {
@@ -334,12 +395,18 @@ module sudo {
     }
     all {
       s.phase == "exec",
+      VERDICTS.contains(fresh),
       procs' = procs.set(p, { ...s, phase: "done" }),
       tickets' = tickets,
       policy' = remember(policy, real, fresh),
       now' = now,
       log' = { ...log, acts: log.acts.union(Set(ev)) },
     }
+  }
+
+  action exec(p: int): bool = {
+    nondet fresh = VERDICTS.oneOf()
+    execWith(p, fresh)
   }
 
   // ---- sudoedit ----------------------------------------------------------

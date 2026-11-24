@@ -1,0 +1,4 @@
+# LifecycleTrace fixture (installed as /etc/sudoers-rs in a disposable guest).
+# One rule: the test user ferris may run one harmless command as the
+# unprivileged account another_user, without a password. Nothing runs as root.
+ferris ALL=(another_user) NOPASSWD: /usr/bin/cat /proc/self/status

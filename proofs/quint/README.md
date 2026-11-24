@@ -18,8 +18,10 @@ Here the policy is an arbitrary relation, so the model's results hold whatever t
 | `policy.qnt` | The policy as a lazily fixed nondeterministic oracle `Request -> Verdict` |
 | `sudo.qnt` | Lifecycle state machine, parameterised by `IMPL` (features) and `BUGS` (mutants); invariants; coverage witnesses |
 | `instances.qnt` | `ogsudo`, `sudors`, and one `mut_*` module per mutant |
-| `check.sh` | Typecheck, clean-model checks, mutant checks |
+| `check.sh` | Typecheck, clean-model checks, mutant checks, observed-trace replay |
 | `traces/` | ITF counterexample of every mutant, written by `check.sh` |
+| `replay.qnt` | Replay of one observed sudo-rs run through the clean sudo-rs model (see [Observed traces](#observed-traces)) |
+| `observe/` | Guest capture script, fixture, recorder and replay driver for observed runs of the real binary |
 
 ## Model
 
@@ -135,9 +137,11 @@ The output has:
 - one `PASS <impl> <invariant> (simulation)` line per invariant and implementation;
 - witness counts;
 - with `VERIFY_STEPS=N`, one `PASS ... (apalache, N steps)` line per invariant and implementation;
-- one `VIOLATED <invariant> by <mutant> (<bug>)` line per mutant.
+- one `VIOLATED <invariant> by <mutant> (<bug>)` line per mutant;
+- the observed-trace stage: `PASS harness expectation …` and `CONTROL harness rejected as required: …` lines, then per recorded observation `ACCEPTED <file> <scenario>` and `CONTROL raw|model rejected as required: …` lines (or `SKIP no recorded observation`).
 
-The script exits non-zero on any unexpected outcome. That includes a mutant that is not caught, a clean-model violation, an unreached witness, and a typecheck error.
+The script exits non-zero on any unexpected outcome. That includes a mutant that is not caught, a clean-model violation, an unreached witness, a typecheck error, a rejected observation and an accepted negative control.
+It needs `python3` (3.9 or later) for the observed-trace stage.
 
 Budgets (environment variables):
 
@@ -196,3 +200,83 @@ quint verify --main=ogsudo instances.qnt --invariant=allInvariants --max-steps=8
   - The editor runs as a helper with the invoker's credentials.
 - **Helpers.** The mailer drops to the invoker's credentials (the task's specification). Real C sudo releases may run the mailer as a configured user; any unprivileged identity gives the same result.
 - **Clean model = fixed behaviour.** `-u#-1` is rejected. `-h` outside `-l` is rejected. The chroot happens after the decision. TZ is ignored for time windows. `EDITOR` extra files are dropped. Tickets record the authenticated uid. Ticket files are named by uid. The session comes from a correct parse.
+
+## Observed traces
+
+The model is checked against runs of the real sudo-rs binary: one ordinary permitted command and one ordinary refusal.
+An observation is replayed through the clean `sudors` model step by step (`replay.qnt`); the replay rejects it if the model cannot take a step or ends in a state that differs from what was observed.
+The policy verdict of each request is pinned by the committed fixture before any run, so the replay cannot fit an arbitrary trace by choosing the verdict afterwards.
+Evidence kind: test, for the two recorded runs only.
+
+No observation is committed yet: the capture needs the disposable guest described below, which the coordinator runs. Until then `check.sh` runs only the harness self-test (fixture expectations, labelled as such, never stored as observations).
+
+### What runs
+
+| Item | Value |
+|---|---|
+| Fixture | `observe/fixture/`: `sudoers` with the single rule `ferris ALL=(another_user) NOPASSWD: /usr/bin/cat /proc/self/status`; `pam.d-sudo` = `STOCK_PAM_D_SUDO` of `test-framework/sudo-test` (checked); `scenarios` |
+| Scenarios | `permitted`: `sudo -n -u another_user /usr/bin/cat /proc/self/status`, pinned verdict `nopasswd`. `refused`: `sudo -n -u another_user /usr/bin/id`, pinned verdict `deny`. Invoker `ferris`; no request targets root. User names follow the compliance framework (`USERNAME`, `another_user` of `flag_user::user_can_become_another_user`) |
+| Binary | `cargo build --locked --offline --bin sudo` (debug, default features) of `git archive <commit>`, built in the guest by an unprivileged account, installed `root:root 0755` without the setuid bit |
+| Launch | The guest administrator starts the binary as `env -i PATH=/usr/bin:/bin setpriv --ruid=<ferris> --euid=0 --rgid=<ferris> --egid=<ferris> --init-groups -- <sudo> <argv>`: real uid/gid ferris, effective and saved uid 0, ferris's groups, i.e. the credentials of a setuid-root exec by ferris (`setuidRootExec` in `kernel.qnt`), without a setuid file |
+| Recording | `strace -f -qq -e signal=none -e trace=execve,fork,vfork,clone,clone3,setgroups,setuid,setgid,setreuid,setregid,setresuid,setresgid` (passive, no injection); stdout, stderr, exit status; `/var/run/sudo-rs/ts` before and after; the launcher's own credentials as a control (`setpriv … -- cat /proc/self/status`) |
+| Guest | Disposable Debian 13 VM under KVM, no network, no sudo package; the script refuses (exit 3, `out/REFUSED`) on a host without the hypervisor CPU flag, with an existing sudoers, a setuid sudo, or existing fixture accounts |
+
+### Pipeline
+
+```
+observe/prepare-input.sh <commit> <in>      # host, unprivileged: src.tar, crates checked against Cargo.lock, fixture
+guest-run <in> <out> 900 -- sh /fixture/guest-run.sh /fixture /out    # inside the disposable guest
+observe/observe.py record <out>/out <file>.obs.json                    # host, unprivileged, read-only on the capture
+observe/observe.py replay <file>.obs.json                              # quint test per scenario
+observe/observe.py controls <file>.obs.json                            # negative controls
+```
+
+`observe/cluster-job.sh` runs all of it as one `omnirun` job on `uni-cpu` (needs `GUEST_RUN`, `/dev/kvm`, `npm` for quint 0.33.0).
+Recorded observations go to `observe/observations/<name>.obs.json`; `check.sh` replays each one and runs its controls.
+
+An observation file holds the raw capture verbatim (except the binary, kept as its hash), the provenance and the derived facts.
+`replay` derives the facts again from the raw capture and rejects the file if they differ from the stored ones; the model only ever sees the re-derived facts and the committed fixture.
+
+### Observed, pinned, unobserved
+
+| Model element | Status | Source |
+|---|---|---|
+| `start`: invoker, argv | observed | strace `execve` of sudo; launcher control |
+| `start`: credentials | observed | the launcher's set*id calls traced up to the exec of sudo, equal to the launcher control |
+| `start`: `TZ`, `EDITOR` | observed | fixed environment `env -i PATH=/usr/bin:/bin` |
+| `start`: session, `/proc/self/stat` session | fixed (1) | not observable here; neither run reads or writes a ticket |
+| `parse`, `load`, `setup` | unobserved | internal to sudo |
+| `decide`: verdict | pinned | `observe/fixture/scenarios`, before the run; derived by hand from the one sudoers rule, not by `text_to_authorization` |
+| `decide`: user, host, time of the request | unobserved | internal to sudo |
+| `auth`: no password check | follows from the pinned verdict | with `-n`, a required password ends the run with "interactive authentication is required"; observed: exit 0, empty stderr |
+| PAM (`pam_start`, account management, session open/close, setcred) | unobserved, not modelled | no PAM event is synthesised; in the refusal sudo-rs stops before PAM (code reading: `src/sudo/pipeline.rs`, `run`) |
+| `set_groups`, `set_gid`, `set_uid` | observed | strace: arguments and results in the command process; must be exactly `setgroups`, `setgid`, `setuid`, all successful, from the launch credentials |
+| `exec`: program and arguments | observed | strace `execve`; `Name` in the command's `/proc/self/status` |
+| `exec`: credentials | observed | the command's `/proc/self/status`, equal to the credentials traced at its exec |
+| refusal | observed | exit 1, `sudo: I'm sorry ferris. I'm afraid I can't do that`, no `execve` after sudo, no lasting credential change |
+| helpers | observed | no other program executed |
+| tickets | observed | timestamp directory empty before the run (the model starts without tickets) and listed after it |
+| temporary credential switches of sudo itself | observed, not modelled | `sudo_call` switches to the target to resolve the command; accepted only if every sudo process ends at its launch credentials |
+| fsuid/fsgid, `CapEff`, `NoNewPrivs` of the command | observed, not modelled | recorded in the observation |
+
+Concrete ids map to `types.qnt` by account: root → `ROOT`, ferris → `ALICE`, another_user → `BOB`.
+The recorder rejects a capture whose accounts do not fit the model's convention (gid = own group, no other groups) or that contains an id outside the three accounts.
+
+### Rejection
+
+The recorder and `replay` reject, before the model runs: a guest refusal or incomplete capture; fixture or guest script different from the committed ones; installed sudoers or PAM file different from the fixture; a binary with setuid/setgid bits, other owner or mode, or a guest hash different from the copied binary; `src.tar` different from `git archive` of the recorded commit (checked when the clone has the commit); a launcher, environment or argv other than the declared ones; strace output that cannot be parsed or a failed credential call; more than one program executed after sudo; a command process whose credential calls differ from `setgroups`, `setgid`, `setuid`; command credentials that differ from the traced ones; an outcome that is neither a completed exec nor the policy refusal; a timestamp record before the run.
+The model rejects: a permitted run whose pinned verdict requires a password (`setup` is not enabled), a refusal under a permitting verdict, an exec after a denial, launch credentials other than `setuidRootExec(invoker)`, credential calls or command credentials other than the model's, a command other than the decided one, a ticket the model does not create, and any invariant violation.
+
+`observe.py controls` shows on each real observation that the replay is not vacuous. It first requires both scenarios to be accepted, then requires every control to be rejected.
+Raw controls (edited captures): command output, binary hash, installed sudoers hash, the stored verdict, the provenance kind.
+Model controls (edited facts, never written as observations): the command ran with the invoker's credentials; kept the invoker's group; another command ran; a timestamp record appeared; the fixture pins a password rule; sudo started without setuid-root credentials; the denied request executed; the permitted request was refused.
+
+### Boundary
+
+- Two runs of one fixture. The replay shows that these runs are runs of the model and satisfy its invariants; it says nothing about other requests, policies or attackers.
+- The binary does not run setuid. `setpriv` reproduces the credentials of a setuid-root exec, but not the kernel's secure-exec handling (`AT_SECURE`, dumpability, dynamic-loader environment filtering). sudo-rs's own check (`self_check`) only tests the effective uid (code reading: `src/sudo/mod.rs`).
+- strace (a tracer is attached, `TracerPid` is set) changes timing, not results; nothing is injected.
+- PAM is neither observed nor modelled. The model's only authentication event, the password check, does not occur in either run.
+- The verdicts are pinned by reading the fixture rule, not by the kernel-checked `text_to_authorization`.
+- The model's `setresgid(g,g,g)`/`setresuid(u,u,u)` stands for sudo-rs's `setgid`/`setuid` as root, which set all three ids on Linux (`kernel.qnt` semantics).
+- Debug build with default features; the compliance image builds with other features.

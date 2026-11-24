@@ -6,7 +6,9 @@
 #    plus coverage witnesses; opt-in bounded `quint verify` (Apalache), see
 #    VERIFY_STEPS;
 # 3. every mutant: the expected invariant must be violated; the counterexample
-#    is saved as ITF under traces/.
+#    is saved as ITF under traces/;
+# 4. observed traces: harness self-test of observe/observe.py, then replay and
+#    negative controls of every recorded observation (observe/observations/).
 # Exit status is non-zero on any unexpected outcome.
 # Budgets can be overridden through the environment variables below.
 set -uo pipefail
@@ -41,7 +43,7 @@ fail() { echo "FAIL $*"; failures=$((failures + 1)); }
 command -v quint >/dev/null || { echo "quint not on PATH"; exit 2; }
 
 echo "== typecheck"
-for f in types.qnt kernel.qnt policy.qnt sudo.qnt instances.qnt; do
+for f in types.qnt kernel.qnt policy.qnt sudo.qnt instances.qnt replay.qnt; do
   if out=$(quint typecheck "$f" 2>&1); then echo "PASS typecheck $f"
   else echo "$out"; fail "typecheck $f"; fi
 done
@@ -108,6 +110,29 @@ for m in "${MUTANTS[@]}"; do
   fi
   rm -f "$raw"
 done
+
+# Runs of the real binary replayed through the model (README "Observed traces").
+# The harness self-test uses fixture expectations, not observations; observations
+# are only the recorded captures under observe/observations/.
+echo "== observed traces"
+if ! command -v python3 >/dev/null; then
+  fail "python3 not on PATH (observe/observe.py)"
+else
+  if out=$(python3 observe/observe.py selftest 2>&1); then echo "$out"
+  else echo "$out"; fail "observe.py selftest"; fi
+  shopt -s nullglob
+  observations=(observe/observations/*.obs.json)
+  shopt -u nullglob
+  if [[ ${#observations[@]} -eq 0 ]]; then
+    echo "SKIP no recorded observation under observe/observations/"
+  fi
+  for o in "${observations[@]}"; do
+    if out=$(python3 observe/observe.py replay "$o" 2>&1); then echo "$out"
+    else echo "$out"; fail "replay $o"; fi
+    if out=$(python3 observe/observe.py controls "$o" 2>&1); then echo "$out"
+    else echo "$out"; fail "negative controls on $o"; fi
+  done
+fi
 
 # Scratch directories quint/Apalache leave behind.
 rm -rf _apalache-out

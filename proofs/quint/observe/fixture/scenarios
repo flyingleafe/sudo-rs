@@ -1,0 +1,11 @@
+# LifecycleTrace scenarios. One per line, whitespace-separated:
+#   name  verdict  model-command  sudo argv (tokens without spaces or quotes)
+# `verdict` is pinned here, before any run, from the single rule in `sudoers`
+# (sudoers(5) matching as implemented by sudo-rs; not taken from the run):
+#   permitted: ferris, runas another_user, command `/usr/bin/cat /proc/self/status`
+#              matches the rule exactly; tag NOPASSWD -> "nopasswd".
+#   refused:   `/usr/bin/id` matches no rule -> "deny".
+# The model command names map the two distinct requests onto COMMANDS of
+# types.qnt. The invoker is ferris for every scenario.
+permitted nopasswd c1 -n -u another_user /usr/bin/cat /proc/self/status
+refused deny c2 -n -u another_user /usr/bin/id
