@@ -36,7 +36,8 @@ line is *kept* by C if `visudo` reports no error on it; an iteration of sudo-rs 
 an accepted item. Agreement: both keep the line, or both report an error on it. Every other
 logical line is one difference.
 
-**Content.** Where both accept the whole file, the entries are compared as multisets: rules as
+**Content.** Where both accept the whole file (and since the head run, as a subset, where only C
+does: section 6), the entries are compared as multisets: rules as
 (users, hosts, commands with their argument semantics), the members of each alias, and each
 `Defaults` line as (binding, setting names). With dump v2, the comparator takes each name
 directly from the parsed modifier (`DUMP.md` section 3); the historical v1 run inferred names
@@ -272,13 +273,17 @@ Dump version 2 (`059c08cf`) prints a settings modifier as a typed `(setting name
 record, so the version-1 category "Defaults: list removal without effect on either settings
 base" no longer exists: a removal is named, not inferred from two base values.
 
+## 6. Head run: eight seeds, dump v2
 
-## 6. Head run: eight seeds, dump v2 (superseded numbers in section 5)
-
-Input commit `58a225fe`, dump v2, C sudo 1.9.18 (`d58e85d8`), job `parser-p0-head-593602` on the
-cluster (Red Hat, GCC 11.5, where some command paths of the corpus exist) and the same inputs
-re-classified offline with `parser_compare.py`. Counts are **test** evidence: a difference is a
-reported line or content difference, not a distinct bug.
+Dump v2, C sudo 1.9.18 (`d58e85d8`), eight seeds of 1,000 cases per category, on two nodes of
+the cluster (Red Hat, GCC 11.5, where some command paths of the corpus exist). Job
+`parser-p0-head-593602` at `58a225fe` produced the inputs that were classified offline with
+`parser_compare.py` while the rules below were written. Job `parser-p0-final-0573f5` at
+`da386e56` then regenerated the corpus, both parsers' outputs and the classification on another
+node: the same 162,332 rows (label, line and category) and accounting 0/0 on every seed. The
+two row files differ only in the node's host name inside 322 C messages (an include path with
+`%h`). Counts are **test** evidence: a difference is a reported line or content difference, not
+a distinct bug. The numbers of section 5 are superseded.
 
 ### Method
 

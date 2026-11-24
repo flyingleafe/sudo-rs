@@ -129,6 +129,14 @@ found no text on which the rewritten parser and the legacy parser differ. Every 
 6,981 saved `timestamp` inputs was replayed against the same build: 6,678 reproduce one of the
 two corrupt-file defects described above and 303 the other; no other cause appeared.
 
+The three targets that read sudoers text executed fewer inputs than at `f20cfeb7`
+(`sudoers_parse` 741,639 against 8,802,978), mostly because the inputs are longer: the seed
+corpus grew with the tests added since (544 seeds, the largest 6,294 bytes, against 443
+seeds, the largest 1,498), and libFuzzer derives its length limit from the largest seed. On
+identical inputs the `sudoers_parse` build of `58a225fe` took 1.06 to 1.16 times as long as
+the build of `f20cfeb7` (job `fuzz-rate-644487`: both builds replayed both seed corpora and
+the two corpora that each build evolved in 300 seconds).
+
 ## Commands
 
 From the repository root, inside the dev shell (`nix develop`, or `/tmp/sudo-rs-wt/dev` on the

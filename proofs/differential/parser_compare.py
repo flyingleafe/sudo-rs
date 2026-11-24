@@ -20,7 +20,11 @@ Method, per case:
    item.
 4. Every logical line on which the two differ is one difference, classified by the first
    matching rule (rule tables below, in order). A difference no rule matches is "unclassified".
-5. Where both accept the whole file, the entries are compared with `cvtsudoers -f json`.
+5. Where C accepts the whole file, the entries are compared with `cvtsudoers -f json`: as equal
+   multisets if sudo-rs accepts it too, otherwise the whole-line readings of sudo-rs must each
+   have a C entry.
+6. Accounting: a case or a logical line with a diagnostic on one side only must have a row;
+   a violation is printed and makes the exit status nonzero.
 """
 
 import collections

@@ -3,8 +3,9 @@
 Status: the P1–P5 Lean chain is checked for the **stable, include-free text entry point**, from
 [`parse_sudoers_refines`](../lean/SudoRsProofs/Parser/Directives/Main.lean) to
 [`text_to_authorization`](../lean/SudoRsProofs/Parser/EndToEnd.lean), including Defaults and clean-file uniqueness.
-This is not a claim that all plan gates passed: the [larger C comparison](C-SUDO.md#larger-corpus-limits-of-the-classification)
-has unexplained differences. The [result index](README.md) separates theorems, assumptions and tests.
+The [C sudo comparison](C-SUDO.md#6-head-run-eight-seeds-dump-v2) names a cause for every difference
+it observes on 232,192 cases and states what it does not observe. The [result index](README.md)
+separates theorems, assumptions and tests.
 Feasibility measurements below are from `9c30990f` (Charon 0.1.321, Aeneas `8f4466db`).
 
 ## 1. Goal
@@ -212,8 +213,9 @@ opening files, native identity resolution and executing a permitted command are 
 
 **Test boundary.** [P0](P0.md) records which dump format was compared; the original
 two-settings-base observer could miss differences between modifiers. The
-[C comparison](C-SUDO.md#larger-corpus-limits-of-the-classification) records unexplained
-differences separately. Neither test establishes the full-file Rust refinement PR.
+[C comparison](C-SUDO.md#6-head-run-eight-seeds-dump-v2) names a cause for every difference it
+observes; it does not compare the content of files C rejects, nor the reasons of a line both
+parsers reject. Neither test establishes the full-file Rust refinement PR.
 
 ## 5. Specification design
 
@@ -338,8 +340,7 @@ Decisions for the project owner:
 ## 9. Findings to confirm in P0
 
 The table records the original observations. [C-SUDO.md](C-SUDO.md) records the comparison
-and corrections for all six; the separately counted residuals on the larger corpus are not
-evidence for or against those six findings.
+and corrections for all six, and the counts of the head run by category.
 
 | Id | Observation | Basis |
 |---|---|---|
