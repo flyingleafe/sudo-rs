@@ -273,7 +273,64 @@ record, so the version-1 category "Defaults: list removal without effect on eith
 base" no longer exists: a removal is named, not inferred from two base values.
 
 
-## 6. Running
+## 6. Head run: eight seeds, dump v2 (superseded numbers in section 5)
+
+Input commit `58a225fe`, dump v2, C sudo 1.9.18 (`d58e85d8`), job `parser-p0-head-593602` on the
+cluster (Red Hat, GCC 11.5, where some command paths of the corpus exist) and the same inputs
+re-classified offline with `parser_compare.py`. Counts are **test** evidence: a difference is a
+reported line or content difference, not a distinct bug.
+
+### Method changes since section 5
+
+The comparator now models the two printing conventions that hid the remaining differences
+instead of leaving them unattributed:
+
+- **Argument mode.** C prints a final `*` (further arguments allowed) or `""` (none) as a
+  separate word; the comparator folds either into `(kind, args, marker)`, where the marker is
+  canonical (`""` for an exact command with no argument, `*` for a prefix with arguments) so
+  that both readers produce the same key.
+- **Word splitting.** C's lexer ends a command word at an unescaped `=` and after an escape,
+  and at an escaped space, printing the pieces as separate words; sudo-rs keeps them in one
+  path or argument. Two explanations (`c_word_join`, `split_path_space`) rejoin the pieces and
+  the difference is counted under the named transform.
+- **Command bindings.** A `Defaults!` binding is a command pattern for sudo-rs, which carries no
+  arguments, and a path with an argument list for C (`binding_path_join`).
+- **Settings.** Dump v2 prints a typed `(setting name payload)` record, so a setting is compared
+  by name; the version-1 two-base inference and its category are gone.
+- **Iterations.** A reported error position can precede the actual stopping point, so a missing
+  artifact comment is no longer treated as a reconstruction failure; the record sequence alone
+  decides, and no seed has a reconstruction failure.
+
+### Categories added for the head run
+
+Each names the textual construct or the C diagnostic that causes the difference:
+
+| Category | One sentence |
+|---|---|
+| quoted "ALL": the ALL keyword for C, a name for sudo-rs | `"ALL"` is a quoted user name for sudo-rs and the ALL keyword for C. |
+| quoted name: sudo-rs keeps the part before a character its unquoted token does not accept | the text inside a quoted user is re-parsed as an unquoted token and the rest is dropped. |
+| quoted '%:' group: sudo-rs reads a Unix group whose name starts with ':' | a quoted `"%:Name"` becomes a Unix group named `:Name` for sudo-rs and a non-unix group for C. |
+| quoted '%:#N': sudo-rs and C read the non-unix group name differently | the numeric non-unix group of a quoted `"%:#N"` is a gid for one reader and no name for the other. |
+| comment ending in a backslash: C joins the next line into the comment, sudo-rs does not | a comment whose line ends in a backslash extends over the next line in C only. |
+| Defaults! scope: a second '!' with no item after it | `Defaults!!` starts a command negation that has no item, which sudo-rs rejects and C accepts. |
+| Defaults keyword glued to a word: a user name for C, a Defaults line for sudo-rs | `Defaults<word>` without a separator is a user name for C and a Defaults line for sudo-rs. |
+| user: empty netgroup rejected by C | `+` with no name is an empty netgroup for C. |
+| include: target is a directory | an include of a directory is reported by C and left to the open by sudo-rs. |
+| include: empty path after the directive | a bare `@include` followed by `:` gives C an empty path to open. |
+| include: C checks the include target's owner and mode, sudo-rs leaves it to the open | C reports a world-writable or foreign include target; sudo-rs does not look. |
+| negation: '!' separated by whitespace rejected by C | a `!` separated from its item by blanks is a syntax error in C. |
+| quoting: sudo-rs requires the closing quote before the next token | sudo-rs wants the closing quote where C reads on. |
+| runas: an error inside the user list is discarded and the list ends early (F-P3) | an over-long id in a runas list is discarded and sudo-rs then requires `)`. |
+| command: C splits a word at '=' or after an escape, sudo-rs keeps it whole | the same command word: one for sudo-rs, several for C. |
+| command: the same words, C splits at an escaped space and sudo-rs keeps the space in the path | an escaped space ends a command word in C only. |
+| Defaults! binding: sudo-rs reads a command pattern, C a path with an argument list | a command binding has no arguments for sudo-rs and may have them for C. |
+| C messages that are the text of the current `errno` | C reports an error without a message; the construct is named from C's column. |
+
+### Results
+
+PLACEHOLDER-TOTALS
+
+## 7. Running
 
 Local (about 35 s wall, 1.6 CPU-minutes):
 
