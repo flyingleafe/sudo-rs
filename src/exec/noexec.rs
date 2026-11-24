@@ -361,6 +361,69 @@ const GUEST_SYSCALL: (i64, i64) = if cfg!(target_arch = "aarch64") {
 // Bit that is set on syscalls when using the X32 ABI; see man seccomp.
 const __X32_SYSCALL_BIT: u32 = 0x40000000;
 
+/// Number of instructions in [`noexec_filter`]; x86-64 has three more for the x32 ABI.
+#[cfg(target_arch = "x86_64")]
+const NOEXEC_FILTER_LEN: usize = 17;
+#[cfg(not(target_arch = "x86_64"))]
+const NOEXEC_FILTER_LEN: usize = 14;
+
+/// The seccomp filter that [`add_noexec_filter`] installs.
+///
+/// Dispatch on `seccomp_data.arch`: `HOST_ARCH` goes to the host section, `GUEST_ARCH` to the
+/// guest section, every other value is answered with `SECCOMP_RET_KILL_PROCESS`. Each section
+/// answers execve/execveat of its architecture (on x86-64 the host section also recognises the
+/// x32 numbers and ignores the x32 bit) with `SECCOMP_RET_USER_NOTIF` and every other syscall
+/// with `SECCOMP_RET_ALLOW`. Checked against this contract in `filter_tests.rs` and
+/// `kani_proofs.rs`.
+#[rustfmt::skip]
+fn noexec_filter() -> [sock_filter; NOEXEC_FILTER_LEN] {
+    let nr_offset = offset_of!(seccomp_data, nr);
+    let arch_offset = offset_of!(seccomp_data, arch);
+
+    // SAFETY: libc unnecessarily marks these functions as unsafe
+    unsafe {
+        [
+            // Load architecture number into the accumulator
+            BPF_STMT((BPF_LD | BPF_ABS) as _, arch_offset as _),
+            // Check if we are any of the recognized architectures
+            BPF_JUMP((BPF_JMP | BPF_JEQ | BPF_K) as _, HOST_ARCH as _, 7, 0),
+            BPF_JUMP((BPF_JMP | BPF_JEQ | BPF_K) as _, GUEST_ARCH as _, 1, 0),
+            // Not a recognized architecture, forbid all syscalls
+            BPF_STMT((BPF_RET | BPF_K) as _, SECCOMP_RET_KILL_PROCESS as _),
+
+            // Guest architecture section
+            // Load syscall number into the accumulator
+            BPF_STMT((BPF_LD | BPF_W | BPF_ABS) as _, nr_offset as _),
+            // Jump to user notify for execve/execveat
+            BPF_JUMP((BPF_JMP | BPF_JEQ | BPF_K) as _, GUEST_SYSCALL.0 as _, 2, 0),
+            BPF_JUMP((BPF_JMP | BPF_JEQ | BPF_K) as _, GUEST_SYSCALL.1 as _, 1, 0),
+            // Allow non-matching syscalls
+            BPF_STMT((BPF_RET | BPF_K) as _, SECCOMP_RET_ALLOW),
+            // Notify sudo about execve/execveat syscall
+            BPF_STMT((BPF_RET | BPF_K) as _, SECCOMP_RET_USER_NOTIF as _),
+
+            // Host architecture section
+            // Load syscall number into the accumulator
+            BPF_STMT((BPF_LD | BPF_W | BPF_ABS) as _, nr_offset as _),
+            // Unset the X32_SYSCALL bit (only necessary on x86_64)
+            #[cfg(target_arch = "x86_64")]
+            BPF_STMT((BPF_ALU | BPF_AND | BPF_K) as _, !__X32_SYSCALL_BIT),
+            // On x86-64 only: check the x32 "design error" syscall numbers
+            #[cfg(target_arch = "x86_64")]
+            BPF_JUMP((BPF_JMP | BPF_JEQ | BPF_K) as _, SYS_execve_x32 as _, 4, 0),
+            #[cfg(target_arch = "x86_64")]
+            BPF_JUMP((BPF_JMP | BPF_JEQ | BPF_K) as _, SYS_execveat_x32 as _, 3, 0),
+            // Jump to user notify for execve/execveat
+            BPF_JUMP((BPF_JMP | BPF_JEQ | BPF_K) as _, SYS_execve as _, 2, 0),
+            BPF_JUMP((BPF_JMP | BPF_JEQ | BPF_K) as _, SYS_execveat as _, 1, 0),
+            // Allow non-matching syscalls
+            BPF_STMT((BPF_RET | BPF_K) as _, SECCOMP_RET_ALLOW),
+            // Notify sudo about execve/execveat syscall
+            BPF_STMT((BPF_RET | BPF_K) as _, SECCOMP_RET_USER_NOTIF as _),
+        ]
+    }
+}
+
 pub(crate) fn add_noexec_filter(command: &mut Command) -> io::Result<SpawnNoexecHandler> {
     let (tx_fd, rx_fd) = UnixStream::pair()?;
 
@@ -373,54 +436,7 @@ pub(crate) fn add_noexec_filter(command: &mut Command) -> io::Result<SpawnNoexec
         command.pre_exec(move || {
             let tx_fd = tx_fd.take().unwrap();
 
-            let nr_offset = offset_of!(seccomp_data, nr);
-            let arch_offset = offset_of!(seccomp_data, arch);
-
-            // SAFETY: libc unnecessarily marks these functions as unsafe
-            #[rustfmt::skip]
-            let exec_filter = [
-                // Load architecture number into the accumulator
-                BPF_STMT((BPF_LD | BPF_ABS) as _, arch_offset as _),
-                // Check if we are any of the recognized architectures
-                BPF_JUMP((BPF_JMP | BPF_JEQ | BPF_K) as _, HOST_ARCH as _, 7, 0),
-                BPF_JUMP((BPF_JMP | BPF_JEQ | BPF_K) as _, GUEST_ARCH as _, 1, 0),
-                // Not a recognized architecture, forbid all syscalls
-                BPF_STMT((BPF_RET | BPF_K) as _, SECCOMP_RET_KILL_PROCESS as _),
-
-                // Guest architecture section
-                // Load syscall number into the accumulator
-                BPF_STMT((BPF_LD | BPF_W | BPF_ABS) as _, nr_offset as _),
-                // Jump to user notify for execve/execveat
-                BPF_JUMP((BPF_JMP | BPF_JEQ | BPF_K) as _, GUEST_SYSCALL.0 as _, 2, 0),
-                BPF_JUMP((BPF_JMP | BPF_JEQ | BPF_K) as _, GUEST_SYSCALL.1 as _, 1, 0),
-                // Allow non-matching syscalls
-                BPF_STMT((BPF_RET | BPF_K) as _, SECCOMP_RET_ALLOW),
-                // Notify sudo about execve/execveat syscall
-                BPF_STMT((BPF_RET | BPF_K) as _, SECCOMP_RET_USER_NOTIF as _),
-
-                // Host architecture section
-                // Load syscall number into the accumulator
-                BPF_STMT((BPF_LD | BPF_W | BPF_ABS) as _, nr_offset as _),
-                // Unset the X32_SYSCALL bit (only necessary on x86_64)
-                #[cfg(target_arch = "x86_64")]
-                BPF_STMT((BPF_ALU | BPF_AND | BPF_K) as _, !__X32_SYSCALL_BIT),
-                // On x86-64 only: check the x32 "design error" syscall numbers
-                #[cfg(target_arch = "x86_64")]
-                BPF_JUMP((BPF_JMP | BPF_JEQ | BPF_K) as _, SYS_execve_x32 as _, 4, 0),
-                #[cfg(target_arch = "x86_64")]
-                BPF_JUMP((BPF_JMP | BPF_JEQ | BPF_K) as _, SYS_execveat_x32 as _, 3, 0),
-                // Jump to user notify for execve/execveat
-                BPF_JUMP((BPF_JMP | BPF_JEQ | BPF_K) as _, SYS_execve as _, 2, 0),
-                BPF_JUMP((BPF_JMP | BPF_JEQ | BPF_K) as _, SYS_execveat as _, 1, 0),
-                // Allow non-matching syscalls
-                BPF_STMT((BPF_RET | BPF_K) as _, SECCOMP_RET_ALLOW),
-                // Notify sudo about execve/execveat syscall
-                BPF_STMT((BPF_RET | BPF_K) as _, SECCOMP_RET_USER_NOTIF as _),
-            ];
-
-            // this is used since we can't yet use "let exec_filter: [sock_filter; _] above"
-            const fn check_type<const N: usize>(_arr: &[sock_filter; N]) {}
-            check_type(&exec_filter);
+            let exec_filter = noexec_filter();
 
             let exec_fprog = sock_fprog {
                 len: exec_filter.len() as u16,
@@ -457,5 +473,9 @@ pub(crate) fn add_noexec_filter(command: &mut Command) -> io::Result<SpawnNoexec
     Ok(SpawnNoexecHandler(rx_fd))
 }
 
+#[cfg(any(test, kani))]
+mod filter_model;
+#[cfg(test)]
+mod filter_tests;
 #[cfg(kani)]
 mod kani_proofs;
