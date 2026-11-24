@@ -63,3 +63,4 @@ import SudoRsProofs.Parser.Analysis.ReferenceFit
 import SudoRsProofs.Parser.EndToEnd
 import SudoRsProofs.Parser.NoDefaults
 import SudoRsProofs.Parser.TextExample
+import SudoRsProofs.Parser.Scoping.ListValidate
