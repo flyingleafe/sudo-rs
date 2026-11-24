@@ -323,6 +323,25 @@ def c_messages(case, text):
     return out
 
 
+def msg_shape(msg):
+    """A message with its variable parts replaced: names in double quotes and numbers."""
+    shape = re.sub(r'"[^"]*"', '"…"', msg)
+    return re.sub(r"\b\d+\b", "N", shape)
+
+
+def advisory_shapes(cases):
+    """The message shapes that occur when `visudo -c` accepted the file: an advisory is not a
+    rejection. Derived from the data of the run, so that a new shape shows up in the report."""
+    shapes = collections.Counter()
+    for c in cases:
+        if c["visudo"][0] != 0:
+            continue
+        for _, _, msg, sev in c_messages(c, ""):
+            if sev == "error":
+                shapes[msg_shape(msg)] += 1
+    return shapes
+
+
 # --------------------------------------------------------------------------- classification
 
 def char_class(c):
@@ -968,6 +987,7 @@ def main():
     dump = read_dump(sys.argv[2])
     cres = read_c(sys.argv[3])
     hostdep = read_hostdep(sys.argv[2] + ".hostdep")
+    advisories = advisory_shapes(list(cres.values()))
     details = open(sys.argv[4], "w", encoding="utf-8") if len(sys.argv) > 4 else None
 
     accept = collections.Counter()
@@ -977,10 +997,15 @@ def main():
     content = collections.Counter()
     inconsistent = []
     by_cat = collections.Counter()
+    acct = collections.Counter()
+    acct_cases = collections.defaultdict(list)
+    rows = collections.Counter()
 
-    def note(label, cat, line, info):
+    def note(label, cat, line, info, ll=None):
         diff[cat] += 1
         diff_cases[cat].add(label)
+        if ll is not None:
+            rows[ll] += 1
         if details:
             info = str(info).replace("\t", " ").replace("\n", " ")
             details.write(f"{label}\t{line}\t{cat}\t{info}\n")
@@ -999,13 +1024,24 @@ def main():
         its, ok = rs_iterations(recs, text)
         if not ok:
             inconsistent.append(label)
+        rows = collections.Counter()
+        rs_diag = collections.Counter()      # logical lines where sudo-rs reports something
+        agreed_lines = set()                 # both sides report something on the line
+        handled_lines = set()
+        skipped = collections.Counter()      # named reason why no row is needed on a line
         c_err = collections.defaultdict(list)
+        c_adv = collections.defaultdict(list)
         c_unplaced = []
         for line, col, msg, sev in c_messages(c, text):
-            if sev != "error":
+            if sev == "error" and msg_shape(msg) in advisories:
+                sev = "advisory"  # the shape occurs in files visudo accepted: not a rejection
+            if sev == "warning":
                 continue
             if line is None:
-                c_unplaced.append((line, col, msg))
+                if sev == "error":
+                    c_unplaced.append((line, col, msg))
+            elif sev == "advisory":
+                c_adv[start.get(line, line)].append((line, col, msg))
             else:
                 c_err[start.get(line, line)].append((line, col, msg))
 
@@ -1016,7 +1052,6 @@ def main():
                     return cat
             return None
 
-        handled = set()
         for it in its:
             if it.get("artifact"):
                 continue
@@ -1027,32 +1062,36 @@ def main():
             logical = logical_text(lines, start, LL)
             kind = it["kind"]
             if kind == "error":
-                if mid:
-                    continue  # rest of a logical line that failed earlier
+                rs_diag[LL] += 1
+                if mid and (rows[LL] or LL in agreed_lines):
+                    # the rest of a logical line that already produced a row or an agreement
+                    skipped["F-P2: rest of a logical line that already has a row"] += 1
+                    continue
                 if cerr:
-                    handled.add(LL)
                     agree["both reject the line"] += 1
+                    agreed_lines.add(LL)
                     continue
                 cat = classify_rs(it["msg"], text, it["span"], logical, L)
-                note(label, cat or "unclassified: sudo-rs rejects, C accepts", L, it["msg"])
+                note(label, cat or "unclassified: sudo-rs rejects, C accepts", LL, it["msg"], LL)
             elif kind == "item":
                 ek = sexp(it["item"])[0]
                 ek = "rule" if ek == "spec" else ek
                 if mid:
-                    handled.add(LL)
-                    note(label, "F-P2: sudo-rs reads the continuation of a failed line as a line of its own", L, it["item"][:80])
+                    note(label, "F-P2: sudo-rs reads the continuation of a failed line as a line of its own", LL, it["item"][:80], LL)
                     continue
                 g = it["garbage"]
+                if g:
+                    rs_diag[LL] += 1
                 if g and g[1].startswith("missing line terminator"):
                     if cerr:
-                        handled.add(LL)
                         agree["both reject the line"] += 1
+                        agreed_lines.add(LL)
                     else:
-                        note(label, "end of file: last line without newline", L, "")
+                        note(label, "end of file: last line without newline", LL, "", LL)
                     continue
                 if g:
                     if cerr:
-                        handled.add(LL)
+                        agreed_lines.add(LL)
                         if ek.endswith("_alias"):
                             # testsudoers -d prints the definitions C kept
                             name = S(sexp(it["item"])[1][0][1])
@@ -1060,47 +1099,64 @@ def main():
                             how = "C keeps the prefix too" if kept else "C keeps nothing"
                         else:
                             how = "C reports an error"
-                        note(label, f"F-P1: prefix acceptance ({ek}; {how})", L, cjoin(cerr))
+                        note(label, f"F-P1: prefix acceptance ({ek}; {how})", LL, cjoin(cerr), LL)
                     else:
                         cat = classify_rs("", text, g[0], logical, L)
-                        note(label, cat or "unclassified: sudo-rs stops early, C accepts", L, g[1])
+                        note(label, cat or "unclassified: sudo-rs stops early, C accepts", LL, g[1], LL)
                     continue
                 if cerr:
-                    handled.add(LL)
-                    note(label, first_c(cerr, logical) or "unclassified: C rejects, sudo-rs accepts", L, cjoin(cerr))
+                    note(label, first_c(cerr, logical) or "unclassified: C rejects, sudo-rs accepts", LL, cjoin(cerr), LL)
                 else:
                     agree[f"both accept ({ek})"] += 1
             elif kind == "comment":
                 g = it["garbage"]
                 if g:
+                    rs_diag[LL] += 1
                     if cerr:
-                        handled.add(LL)
                         agree["both reject the line"] += 1
+                        agreed_lines.add(LL)
                         continue
                     if g[1].startswith("missing line terminator"):
+                        note(label, "end of file: last line without newline", LL, "", LL)
                         continue
                     cat = classify_rs("", text, g[0], logical, L)
-                    note(label, cat or "unclassified: sudo-rs reads nothing, C accepts", L, g[1])
+                    note(label, cat or "unclassified: sudo-rs reads nothing, C accepts", LL, g[1], LL)
                 elif cerr and not mid:
-                    handled.add(LL)
+                    agreed_lines.add(LL)
                     lt = lines[L - 1] if L - 1 < len(lines) else ""
                     if lt.lstrip().startswith("#"):
-                        note(label, "F-P4: '#' line read as a comment by sudo-rs, rejected by C", L, cjoin(cerr))
+                        note(label, "F-P4: '#' line read as a comment by sudo-rs, rejected by C", LL, cjoin(cerr), LL)
                     else:
                         note(label, first_c(cerr, logical) or "unclassified: C rejects a line sudo-rs reads as empty",
-                             L, cjoin(cerr))
+                             LL, cjoin(cerr), LL)
             elif kind == "panic":
                 note(label, "sudo-rs panics", L, it["msg"])
-        for LL, cerr in c_err.items():
-            if LL in handled:
-                continue
-            if any(it["kind"] == "error" and start.get(it["line"], it["line"]) == LL for it in its):
+        for LL, cadv in c_adv.items():
+            if LL in c_err or LL in agreed_lines or rows[LL]:
                 continue
             logical = logical_text(lines, start, LL)
-            note(label, first_c(cerr, logical) or "unclassified: C rejects a line without sudo-rs item", LL, cjoin(cerr))
+            note(label, first_c(cadv, logical) or "unclassified: C advisory without a category",
+                 LL, cjoin(cadv), LL)
+        for LL, cerr in c_err.items():
+            if LL in agreed_lines or rows[LL]:
+                continue
+            logical = logical_text(lines, start, LL)
+            note(label, first_c(cerr, logical) or "unclassified: C rejects a line without sudo-rs item",
+                 LL, cjoin(cerr), LL)
         for cm in c_unplaced:
-            note(label, classify_c(cm, text, "") or "unclassified: C error without a line", 0, cm[2])
+            note(label, classify_c(cm, text, "") or "unclassified: C error without a line", 0, cm[2], 0)
 
+        # Accounting: the case and line invariants of the comparator itself.
+        fatal = any(r.startswith("fatal ") for r in recs)
+        c_reject = c["visudo"][0] != 0
+        if fatal != c_reject and sum(rows.values()) == 0:
+            acct["cases: diagnostics on one side only, no row"] += 1
+            acct_cases["case: no row"].append(label)
+        for LL in sorted(set(rs_diag) ^ set(c_err)):
+            if rows[LL] or skipped[LL]:
+                continue
+            acct["lines: one side reports, the other does not, no row"] += 1
+            acct_cases["line: no row"].append(f"{label}:{LL}")
         if rs_clean and c_clean and c.get("cvt") and c["cvt"][0] == 0:
             items = [r[3:] for r in recs if r.startswith("ok ")]
             mine = collections.Counter(rs_entries(items))
@@ -1116,7 +1172,7 @@ def main():
                     cat = ("comparison limit: the case names an existing host path, so the "
                            "pattern can be canonicalized on one host only (hostdep)")
                 note(label, cat, 0,
-                     f"sudo-rs only: {only_rs[:2]} C only: {only_c[:2]}")
+                     f"sudo-rs only: {only_rs[:2]} C only: {only_c[:2]}", 0)
 
     n = len(corpus)
     print(f"cases: {n}; iteration reconstruction inconsistent: {len(inconsistent)} {inconsistent[:5]}\n")
@@ -1136,6 +1192,14 @@ def main():
         print(f"| {k} | {v} | {len(diff_cases[k])} |")
     unclassified = sum(v for k, v in diff.items() if k.startswith("unclassified"))
     print(f"\ndifferences: {sum(diff.values())}; unclassified: {unclassified}")
+    print(f"\naccounting: case violations {acct['cases: diagnostics on one side only, no row']}, "
+          f"line violations {acct['lines: one side reports, the other does not, no row']}")
+    for k in ("case: no row", "line: no row"):
+        if acct_cases[k]:
+            print(f"  {k}: {', '.join(sorted(set(acct_cases[k]))[:10])}")
+    print(f"\nadvisory message shapes (occur in files `visudo -c` accepted, so never a rejection):")
+    for shape, n in sorted(advisories.items()):
+        print(f"  {n:6d}  {shape}")
     print("\n## Fixed inputs (PLAN.md section 3.3, F-P1 to F-P6)\n")
     for label, text in corpus:
         if not label.startswith("known:"):

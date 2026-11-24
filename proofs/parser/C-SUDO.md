@@ -280,171 +280,169 @@ cluster (Red Hat, GCC 11.5, where some command paths of the corpus exist) and th
 re-classified offline with `parser_compare.py`. Counts are **test** evidence: a difference is a
 reported line or content difference, not a distinct bug.
 
-### Method changes since section 5
+### Method
 
-The comparator now models the two printing conventions that hid the remaining differences
-instead of leaving them unattributed:
+The comparator also reports the two accounting values of the checks below and exits nonzero when
+either is not zero. An earlier revision of this section (commit `47b937a9`) reported 145,913 rows
+with 0 unclassified; it treated the advisory shapes as rejections and dropped the
+missing-final-newline rows, so its per-seed numbers are superseded by the tables here.
 
-- **Argument mode.** C prints a final `*` (further arguments allowed) or `""` (none) as a
-  separate word; the comparator folds either into `(kind, args, marker)`, where the marker is
-  canonical (`""` for an exact command with no argument, `*` for a prefix with arguments) so
-  that both readers produce the same key.
-- **Word splitting.** C's lexer ends a command word at an unescaped `=` and after an escape,
-  and at an escaped space, printing the pieces as separate words; sudo-rs keeps them in one
-  path or argument. Two explanations (`c_word_join`, `split_path_space`) rejoin the pieces and
-  the difference is counted under the named transform.
-- **Command bindings.** A `Defaults!` binding is a command pattern for sudo-rs, which carries no
-  arguments, and a path with an argument list for C (`binding_path_join`).
-- **Settings.** Dump v2 prints a typed `(setting name payload)` record, so a setting is compared
-  by name; the version-1 two-base inference and its category are gone.
-- **Iterations.** A reported error position can precede the actual stopping point, so a missing
-  artifact comment is no longer treated as a reconstruction failure; the record sequence alone
-  decides, and no seed has a reconstruction failure.
+**Severities.** `visudo -c` writes three kinds of message: errors (the file is rejected),
+`Warning: …` lines, and messages that name no severity but occur in files it *accepts* — alias
+notes and deprecations. The comparator derives the last group from the data of the run (every
+message shape that occurs where the exit status is 0) and calls it an advisory. The shapes are
+printed in every report; a new shape shows up there and, being unknown, would count as an error
+until classified.
 
-### Categories added for the head run
+| Advisory message shape (occurs where `visudo -c` exits 0, so never a rejection) | Occurrences |
+|---|---:|
+| `"…" is deprecated` | 592 |
+| `Cmnd_Alias "…" referenced but not defined` | 13,485 |
+| `Host_Alias "…" referenced but not defined` | 12,389 |
+| `Runas_Alias "…" referenced but not defined` | 10,782 |
+| `User_Alias "…" referenced but not defined` | 7,249 |
+| `cycle in Cmnd_Alias "…"` | 14 |
+| `cycle in Host_Alias "…"` | 10 |
+| `cycle in Runas_Alias "…"` | 20 |
+| `cycle in User_Alias "…"` | 7 |
+An advisory keeps its named row when sudo-rs accepts the line (that is the "alias: checked by C"
+category). It never makes C reject a line: on a logical line where C has only advisories, a
+sudo-rs error or garbage is a difference, named by the sudo-rs cause, one row per logical line.
 
-Each names the textual construct or the C diagnostic that causes the difference:
+**Two accounting checks** are part of the comparator and printed in every report; a nonzero
+result makes it exit 1.
 
-| Category | One sentence |
+1. Case level: (some `fatal` record) differs from (`visudo -c` exit status nonzero) implies at
+   least one row for the case.
+2. Line level: for every logical line, (a sudo-rs diagnostic attributed to it) xor (a C error on
+   it) implies a row on that line, or a counted reason why not (F-P2: the rest of a logical line
+   that already has a row).
+
+**Iteration attribution.** An error names the line of the construct, so it starts the next
+iteration there; an accepted item ends no later than the line of the next error record (a
+comment inside the item can end it before its logical line does). A `mid` error is skipped only
+when its logical line already has a row or an agreed rejection.
+
+**What is normalized before the comparison, and why it cannot make two different readings
+equal.**
+
+| Normalization | Why not a source of false equality |
 |---|---|
-| quoted "ALL": the ALL keyword for C, a name for sudo-rs | `"ALL"` is a quoted user name for sudo-rs and the ALL keyword for C. |
-| quoted name: sudo-rs keeps the part before a character its unquoted token does not accept | the text inside a quoted user is re-parsed as an unquoted token and the rest is dropped. |
-| quoted '%:' group: sudo-rs reads a Unix group whose name starts with ':' | a quoted `"%:Name"` becomes a Unix group named `:Name` for sudo-rs and a non-unix group for C. |
-| quoted '%:#N': sudo-rs and C read the non-unix group name differently | the numeric non-unix group of a quoted `"%:#N"` is a gid for one reader and no name for the other. |
-| comment ending in a backslash: sudo-rs loses the next line, C keeps it | a comment whose last character is a backslash makes sudo-rs read the following line as part of it, while C reads that line as a line of its own. |
-| Defaults! scope: a second '!' with no item after it | `Defaults!!` starts a command negation that has no item, which sudo-rs rejects and C accepts. |
-| Defaults keyword glued to a word: a user name for C, a Defaults line for sudo-rs | `Defaults<word>` without a separator is a user name for C and a Defaults line for sudo-rs. |
-| user: empty netgroup rejected by C | `+` with no name is an empty netgroup for C. |
-| include: target is a directory | an include of a directory is reported by C and left to the open by sudo-rs. |
-| include: empty path after the directive | a bare `@include` followed by `:` gives C an empty path to open. |
-| include: C checks the include target's owner and mode, sudo-rs leaves it to the open | C reports a world-writable or foreign include target; sudo-rs does not look. |
-| negation: '!' separated by whitespace rejected by C | a `!` separated from its item by blanks is a syntax error in C. |
-| quoting: sudo-rs requires the closing quote before the next token | sudo-rs wants the closing quote where C reads on. |
-| runas: an error inside the user list is discarded and the list ends early (F-P3) | an over-long id in a runas list is discarded and sudo-rs then requires `)`. |
-| command: C splits a word at '=' or after an escape, sudo-rs keeps it whole | the same command word: one for sudo-rs, several for C. |
-| command: the same words, C splits at an escaped space and sudo-rs keeps the space in the path | an escaped space ends a command word in C only. |
-| Defaults! binding: sudo-rs reads a command pattern, C a path with an argument list | a command binding has no arguments for sudo-rs and may have them for C. |
-| C messages that are the text of the current `errno` | C reports an error without a message; the construct is named from C's column. |
-| comparison limit: the case names an existing host path | the harness lists such cases in `hostdep`; a content difference left unexplained in one of them can come from canonicalization on the other host and is counted as a limit of comparing across hosts. |
+| Argument marker (`*`, `""`) folded into `(kind, args)` and re-derived canonically for both sides | it is a function of `(kind, args)` computed by the same code for both readers: it only drops the printing of a distinction the kind and argument list already carry |
+| C's marker words removed from the argument list | `*` without a required argument and no marker mean the same thing for C (`any arguments allowed`); every other combination stays distinguishable by kind and arguments |
+| Lists compared as multisets (`sorted` keys) | the comparison is deliberately order-insensitive: a difference only in the order of a list's members is not counted. Both readers preserve file order, so this hides nothing that was measured; it is stated as a limit |
+| `Commands`/`runasusers` read by `c_spec`; a `username`/`hostname` shaped like an alias name read as an alias reference | `cvtsudoers` prints alias references in the member's own kind. A C user literally named `ADMINS` and an alias reference `ADMINS` become the same key: stated as a limit |
+| Defaults binding kinds `:` and `>` merged into `user|runas` | the JSON does not record which of the two it is; stated as a limit |
+| Explanations (`c_word_join`, `split_path_space`, `binding_path_join`, quoted forms, `#N` ids, F-P4, F-P5) | each is applied to one side, tested for full equality, and counted under its own category: they are reported causes, not silent equality |
 
-### Head run: the eight retained seeds, classified offline
+### Results
 
-Input commit `58a225fe`, dump version 2, C sudo 1.9.18 (`d58e85d8`), job
-`parser-p0-head-593602` on host `ddy28` (Red Hat, GCC 11.5, rustc 1.102.0-nightly). The inputs
-(`corpus.txt`, `sudo-rs.dump`, `c-sudo.out`, `chartable.txt`, `sudo-rs.dump.hostdep` per seed)
-were classified on the laptop with
+Job `parser-p0-head-593602`, input commit `58a225fe`, host `ddy28`, dump v2, C sudo 1.9.18
+(`d58e85d8`); the eight seeds classified offline with `parser_compare.py` on the laptop.
+29,024 cases per seed, no panic record, no reconstruction failure. The two accounting columns
+are the checks above.
 
-```
-python3 parser_compare.py corpus.txt sudo-rs.dump c-sudo.out differences.tsv
-```
+| Seed | Cases | Differences | Unclassified | Reconstruction | Host-dependent | Accounting: cases | Accounting: lines |
+|---:|---:|---:|---:|---:|---:|---:|---:|
+| 1 | 29,024 | 19,400 | 0 | 0 | 6 | 0 | 0 |
+| 2 | 29,024 | 19,618 | 0 | 0 | 7 | 0 | 0 |
+| 3 | 29,024 | 19,165 | 0 | 0 | 6 | 0 | 0 |
+| 4 | 29,024 | 19,037 | 0 | 0 | 4 | 0 | 0 |
+| 5 | 29,024 | 19,180 | 0 | 0 | 6 | 0 | 0 |
+| 6 | 29,024 | 18,973 | 0 | 0 | 6 | 0 | 0 |
+| 7 | 29,024 | 19,458 | 0 | 0 | 7 | 0 | 0 |
+| 8 | 29,024 | 19,310 | 0 | 0 | 5 | 0 | 0 |
+| **Total** | **232,192** | **154,141** | **0** | | | **0** | **0** |
 
-the cluster's own reports from the version-1 classifier are quoted in section 5. Counts are
-**test** evidence: a difference is a reported line or content difference, not a distinct bug. 29,024 cases per seed, 232,192 in all,
-no panic record, and no case where the iteration reconstruction disagreed with the records.
-
-| Seed | Cases | Differences | Unclassified | Reconstruction | Host-dependent cases |
-|---:|---:|---:|---:|---:|---:|
-| 1 | 29,024 | 18,346 | 0 | 0 | 6 |
-| 2 | 29,024 | 18,600 | 0 | 0 | 7 |
-| 3 | 29,024 | 18,095 | 0 | 0 | 6 |
-| 4 | 29,024 | 17,993 | 0 | 0 | 4 |
-| 5 | 29,024 | 18,158 | 0 | 0 | 6 |
-| 6 | 29,024 | 17,982 | 0 | 0 | 6 |
-| 7 | 29,024 | 18,444 | 0 | 0 | 7 |
-| 8 | 29,024 | 18,295 | 0 | 0 | 5 |
-| **Total** | **232,192** | **145,913** | **0** | | |
-
-
-**Host dependence.** The comparator's `canonicalize` runs on the laptop while the dump was
-produced on `ddy28`, where some command paths of the corpus exist. The `hostdep` files name 47
-such cases over the eight seeds, and they hold 43 of the 145,913 differences (145,870 without
-them). None of those 43 needs the canonicalization model to be classified: they sit on other
-lines of the same text, so the totals do not depend on the host. No rule is written for a
-difference that would depend on it; such a row would be counted under "comparison limit: the
-case names an existing host path" (0 rows here).
+**Host dependence.** `canonicalize` runs on the laptop, the dump was produced on `ddy28`. The
+`hostdep` files name 47 cases over the eight seeds; no row of them needed the canonicalization
+model, and none fell into the comparison-limit category, so the totals do not depend on the host
+for these seeds.
 
 ### Totals per category (all eight seeds)
 
 | Category | Differences | Cases |
 |---|---:|---:|
-| alias: checked by C at parse time (sudo-rs: in analysis) | 37,257 | 30,108 |
+| alias: checked by C at parse time (sudo-rs: in analysis) | 37,265 | 30,113 |
 | negation: '!' separated by whitespace rejected by C | 25,817 | 22,018 |
+| end of file: last line without newline | 7,716 | 7,716 |
 | command: directory with arguments rejected by C | 6,254 | 6,042 |
-| escape: sequence rejected by sudo-rs | 5,357 | 5,308 |
+| escape: sequence rejected by sudo-rs | 5,622 | 5,560 |
+| host: IPv4 address rejected by sudo-rs | 4,092 | 3,813 |
 | include: target does not exist or has the wrong type | 4,072 | 3,802 |
-| F-P1: prefix acceptance (rule; C reports an error) | 3,941 | 3,818 |
-| Defaults or option: value check stricter in C | 3,798 | 3,686 |
-| end of file: last line without newline | 3,717 | 3,717 |
+| F-P1: prefix acceptance (rule; C reports an error) | 3,920 | 3,797 |
+| Defaults or option: value check stricter in C | 3,799 | 3,687 |
 | F-P5: command path canonicalized by sudo-rs at parse time | 3,494 | 3,494 |
-| host: IPv4 address rejected by sudo-rs | 3,491 | 3,299 |
 | limit: list length (sudo-rs 127) | 3,154 | 3,154 |
 | negation: '!' followed by whitespace in a Defaults binding rejected by C | 2,875 | 2,796 |
-| limit: token length (sudo-rs MAX_LEN) | 2,517 | 2,516 |
-| unsupported by sudo-rs: netgroup | 2,485 | 2,439 |
+| unsupported by sudo-rs: netgroup | 2,759 | 2,701 |
+| limit: token length (sudo-rs MAX_LEN) | 2,725 | 2,724 |
 | Defaults: value or kind check stricter in sudo-rs | 2,448 | 2,353 |
-| token class: non-ASCII character (sudo-rs stops) | 2,093 | 2,007 |
+| token class: non-ASCII character (sudo-rs stops) | 2,263 | 2,172 |
+| continuation: inside a token (C joins or splits differently) | 1,991 | 1,769 |
 | keyword as a name: reserved by C, a name or alias for sudo-rs | 1,803 | 1,780 |
-| continuation: inside a token (C joins or splits differently) | 1,779 | 1,593 |
 | user id: '#N' that C reads as a name, sudo-rs as an id | 1,772 | 1,772 |
-| continuation: backslash after whitespace not followed by newline | 1,578 | 1,571 |
+| continuation: backslash after whitespace not followed by newline | 1,748 | 1,739 |
+| include: path or directive syntax | 1,511 | 1,493 |
 | token class: end of line (C stops) | 1,508 | 1,506 |
-| include: path or directive syntax | 1,506 | 1,488 |
 | runas: trailing ',' accepted by sudo-rs | 1,479 | 1,434 |
 | path check stricter in C | 1,473 | 1,464 |
 | F-P1: prefix acceptance (defaults; C reports an error) | 1,422 | 1,408 |
-| Defaults: setting unknown to sudo-rs | 1,395 | 1,374 |
-| F-P4: '#' line read as a comment by sudo-rs, rejected by C | 1,296 | 1,286 |
-| unsupported by sudo-rs: ROLE/TYPE option | 1,067 | 1,054 |
+| Defaults: setting unknown to sudo-rs | 1,407 | 1,386 |
+| F-P4: '#' line read as a comment by sudo-rs, rejected by C | 1,284 | 1,274 |
+| unsupported by sudo-rs: ROLE/TYPE option | 1,245 | 1,226 |
+| unsupported by sudo-rs: CHROOT option | 1,144 | 1,126 |
 | runas: empty list after ':' accepted by sudo-rs | 1,001 | 979 |
+| option: quoted value rejected by sudo-rs | 757 | 748 |
+| F-P3: quoted user whose content is not a user name | 745 | 700 |
+| token class: control character (sudo-rs stops) | 708 | 688 |
 | F-P1: prefix acceptance (user_alias; C keeps the prefix too) | 683 | 682 |
-| F-P3: quoted user whose content is not a user name | 683 | 639 |
-| token class: control character (sudo-rs stops) | 661 | 641 |
-| option: quoted value rejected by sudo-rs | 650 | 642 |
+| host: wildcard host name rejected by sudo-rs | 653 | 645 |
 | F-P1: prefix acceptance (host_alias; C keeps the prefix too) | 628 | 627 |
 | F-P2: sudo-rs reads the continuation of a failed line as a line of its own | 624 | 617 |
 | F-P1: prefix acceptance (runas_alias; C keeps the prefix too) | 591 | 589 |
-| host: wildcard host name rejected by sudo-rs | 538 | 532 |
-| command: wildcard in arguments rejected by sudo-rs | 490 | 489 |
-| token class: '$' inside a user name | 477 | 474 |
+| command: wildcard in arguments rejected by sudo-rs | 539 | 536 |
+| token class: '$' inside a user name | 536 | 532 |
+| host: IPv6 address rejected by sudo-rs | 517 | 508 |
 | option after tag rejected by C | 474 | 470 |
 | quoted '%:' group: sudo-rs reads a Unix group whose name starts with ':' | 453 | 453 |
 | quoted upper-case word: a user name for sudo-rs, an alias for C | 444 | 444 |
 | Defaults: quoted list item rejected by sudo-rs | 441 | 436 |
-| host: IPv6 address rejected by sudo-rs | 434 | 428 |
-| unsupported by sudo-rs: INTERCEPT option | 364 | 361 |
+| unsupported by sudo-rs: INTERCEPT option | 411 | 404 |
 | command: sudoedit argument check in C | 362 | 361 |
+| user id: '#-N' rejected by sudo-rs | 350 | 350 |
 | Defaults: value syntax rejected by sudo-rs | 328 | 326 |
-| user id: '#-N' rejected by sudo-rs | 305 | 305 |
-| token class: carriage return (sudo-rs stops) | 296 | 294 |
-| limit: numeric id does not fit u32 | 260 | 259 |
+| token class: carriage return (sudo-rs stops) | 299 | 297 |
+| limit: numeric id does not fit u32 | 285 | 284 |
+| unsupported by sudo-rs: TIMEOUT option | 269 | 268 |
 | F-P4: '#' line read as a comment by sudo-rs, a rule for C | 258 | 258 |
+| unsupported by sudo-rs: regular expression | 256 | 255 |
 | command: C splits a word at '=' or after an escape, sudo-rs keeps it whole | 252 | 252 |
-| unsupported by sudo-rs: regular expression | 240 | 240 |
+| token class: end of line (sudo-rs stops) | 238 | 238 |
+| runas: an error inside the user list is discarded and the list ends early (F-P3) | 237 | 237 |
 | content: several of the causes above | 234 | 234 |
-| unsupported by sudo-rs: TIMEOUT option | 226 | 226 |
 | token class: C stops at 's' where sudo-rs continues | 189 | 189 |
-| runas: an error inside the user list is discarded and the list ends early (F-P3) | 187 | 187 |
-| command: glob syntax rejected by sudo-rs | 172 | 172 |
-| token class: end of line (sudo-rs stops) | 150 | 150 |
-| quoted user: escaped '"' inside quotes rejected by sudo-rs | 136 | 136 |
-| unsupported by sudo-rs: NOTBEFORE option | 129 | 129 |
+| command: glob syntax rejected by sudo-rs | 186 | 186 |
+| unsupported by sudo-rs: NOTBEFORE option | 150 | 150 |
+| quoted user: escaped '"' inside quotes rejected by sudo-rs | 138 | 138 |
+| unsupported by sudo-rs: NOTAFTER option | 138 | 138 |
+| option: CWD path rejected by sudo-rs | 129 | 129 |
+| token class: sudo-rs stops at '%' where C continues | 127 | 126 |
 | F-P1: prefix acceptance (cmnd_alias; C keeps the prefix too) | 126 | 124 |
-| unsupported by sudo-rs: NOTAFTER option | 118 | 118 |
-| option: CWD path rejected by sudo-rs | 104 | 104 |
-| token class: sudo-rs stops at '%' where C continues | 102 | 101 |
 | continuation: inside a quoted string (C) | 94 | 93 |
+| quoting: sudo-rs requires the closing quote before the next token | 80 | 80 |
 | F-P1: prefix acceptance (cmnd_alias; C keeps nothing) | 75 | 75 |
 | F-P1: prefix acceptance (include; C reports an error) | 74 | 74 |
-| quoting: sudo-rs requires the closing quote before the next token | 74 | 74 |
-| token class: sudo-rs stops at '/' where C continues | 64 | 64 |
+| token class: sudo-rs stops at '/' where C continues | 69 | 69 |
 | Defaults keyword glued to a word: a user name for C, a Defaults line for sudo-rs | 62 | 62 |
+| token class: sudo-rs stops at '+' where C continues | 58 | 58 |
+| token class: sudo-rs stops at ',' where C continues | 54 | 54 |
+| token class: sudo-rs stops at '@' where C continues | 52 | 52 |
 | command: '=' inside a path (C ends the path there) | 51 | 51 |
 | token class: C stops at '=' where sudo-rs continues | 51 | 51 |
-| token class: sudo-rs stops at '+' where C continues | 49 | 49 |
 | F-P1: prefix acceptance (host_alias; C keeps nothing) | 45 | 45 |
-| token class: sudo-rs stops at ',' where C continues | 44 | 44 |
 | token class: C stops at '#' where sudo-rs continues | 41 | 41 |
-| token class: sudo-rs stops at '@' where C continues | 41 | 41 |
+| token class: sudo-rs stops at '#' where C continues | 38 | 38 |
 | token class: sudo-rs stops at '!' where C continues | 35 | 35 |
 | F-P1: prefix acceptance (user_alias; C keeps nothing) | 33 | 33 |
 | F-P1: prefix acceptance (runas_alias; C keeps nothing) | 31 | 31 |
@@ -452,31 +450,32 @@ case names an existing host path" (0 rows here).
 | token class: C stops at ',' where sudo-rs continues | 27 | 27 |
 | F-P1: prefix acceptance (includedir; C reports an error) | 26 | 26 |
 | token class: C stops at ':' where sudo-rs continues | 26 | 26 |
-| token class: sudo-rs stops at '#' where C continues | 22 | 22 |
 | quoted "ALL": the ALL keyword for C, a name for sudo-rs | 21 | 21 |
 | quoted '%:#N': sudo-rs and C read the non-unix group name differently | 20 | 20 |
+| token class: sudo-rs stops at '$' where C continues | 18 | 18 |
 | token class: sudo-rs stops at '=' where C continues | 18 | 18 |
-| token class: sudo-rs stops at '$' where C continues | 15 | 15 |
 | user: '%' without a group name | 15 | 15 |
 | token class: sudo-rs stops at '"' where C continues | 11 | 11 |
 | token class: C stops at '(' where sudo-rs continues | 10 | 10 |
+| unsupported by sudo-rs: command digest | 9 | 9 |
 | token class: C stops at ' ' where sudo-rs continues | 8 | 8 |
+| token class: sudo-rs stops at '(' where C continues | 8 | 8 |
 | quoted name: sudo-rs keeps the part before a character its unquoted token does not accept | 7 | 7 |
 | token class: C stops at 'N' where sudo-rs continues | 7 | 7 |
 | token class: C stops at 'a' where sudo-rs continues | 7 | 7 |
-| token class: sudo-rs stops at '(' where C continues | 7 | 7 |
-| unsupported by sudo-rs: command digest | 7 | 7 |
+| token class: sudo-rs stops at ''' where C continues | 7 | 7 |
 | quoted '%:' group: sudo-rs reads no non-unix group name, C reads the name (or a gid) | 6 | 6 |
 | token class: sudo-rs stops at ' ' where C continues | 6 | 6 |
-| token class: sudo-rs stops at ''' where C continues | 6 | 6 |
 | Defaults! scope: a second '!' with no item after it | 5 | 5 |
 | token class: C stops at '-' where sudo-rs continues | 5 | 5 |
+| token class: sudo-rs stops at ':' where C continues | 5 | 5 |
 | user: empty netgroup rejected by C | 5 | 5 |
 | command path: C ends the path at the escape or '=', sudo-rs keeps it | 4 | 4 |
 | token class: C stops at 'A' where sudo-rs continues | 4 | 4 |
 | token class: C stops at 'L' where sudo-rs continues | 4 | 4 |
-| token class: sudo-rs stops at ':' where C continues | 4 | 4 |
 | Defaults! binding: sudo-rs reads a command pattern, C a path with an argument list | 3 | 3 |
+| command: path form rejected by sudo-rs | 3 | 3 |
+| host: network/mask rejected by sudo-rs | 3 | 3 |
 | include: empty path after the directive (C reports the open failure) | 3 | 3 |
 | token class: C stops at ')' where sudo-rs continues | 3 | 3 |
 | token class: C stops at '1' where sudo-rs continues | 3 | 3 |
@@ -485,7 +484,6 @@ case names an existing host path" (0 rows here).
 | token class: C stops at '\' where sudo-rs continues | 3 | 3 |
 | token class: sudo-rs stops at ')' where C continues | 3 | 3 |
 | token class: sudo-rs stops at ']' where C continues | 3 | 3 |
-| host: network/mask rejected by sudo-rs | 2 | 2 |
 | token class: C stops at ''' where sudo-rs continues | 2 | 2 |
 | token class: C stops at '/' where sudo-rs continues | 2 | 2 |
 | token class: C stops at '>' where sudo-rs continues | 2 | 2 |
@@ -493,7 +491,6 @@ case names an existing host path" (0 rows here).
 | token class: C stops at 'e' where sudo-rs continues | 2 | 2 |
 | token class: C stops at 'w' where sudo-rs continues | 2 | 2 |
 | token class: control character (C stops) | 2 | 2 |
-| command: path form rejected by sudo-rs | 1 | 1 |
 | comment ending in a backslash: sudo-rs loses the next line, C keeps it | 1 | 1 |
 | directive: keyword in a user list | 1 | 1 |
 | quoted user id: sudo-rs keeps the leading '#N', C keeps the rest of the text | 1 | 1 |
@@ -509,31 +506,39 @@ case names an existing host path" (0 rows here).
 | token class: C stops at 'u' where sudo-rs continues | 1 | 1 |
 | token class: C stops at 'x' where sudo-rs continues | 1 | 1 |
 | token class: non-ASCII character (C stops) | 1 | 1 |
+### Regression against the version-1 classifier
 
-### What changed from the version-1 classifier
+The version-1 classifier (commit `58a225fe`) reported 146,026 rows for these seeds and left 172
+without a cause; this one reports 154,141 rows and leaves 0. Every one of the old rows is
+accounted for:
 
-The version-1 classifier left 172 rows without a cause (15 to 29 per seed) and reported 146,026
-differences; this one leaves 0 and reports 145,913. Of the 172, 171 are now named (categories of
-section 6 that section 5 does not have; chief among them 44 "C splits a word at '='", 34 "!
-followed by whitespace in a Defaults binding", 21 quoted "ALL", 20 quoted '%:#N', 15
-combined-cause); the rest sat on lines that the corrected iteration reconstruction merges with
-another row of the same text.
+| Regression group (rows of the earlier classifier) | Rows |
+|---|---:|
+| kept at its logical line | 146,000 |
+| same case, cause now named differently | 13 |
+| attribution moved to the logical line of the line the error names | 8 |
+| genuine double count: both sides report on that logical line | 5 |
 
-Rows that changed from one named category to another, and why:
+Examples, moved: seed 2 continuation:419 line 3 -> rows at [2, 5] (same category); seed 3 continuation:225 line 7 -> rows at [1] (same category); seed 3 mut.swap-char.continuation:286 line 7 -> rows at [1, 5, 11] (same category); seed 4 continuation:763 line 7 -> rows at [1, 5, 9] (same category); seed 4 continuation:979 line 3 -> rows at [1, 5] (same category)
 
-| Old category | New category | Rows | Why the new one is the cause |
-|---|---|---:|---|
-| command: '=' inside a path (C ends the path there) | command: C splits a word at '=' or after an escape, sudo-rs keeps it whole | 208 | same construct; the new name covers the escape case the old one missed |
-| token class: sudo-rs stops at `"`, end of line | quoting: sudo-rs requires the closing quote before the next token | 73 | the message says the closing quote is missing; the old rule named the character at the stop |
-| token class: sudo-rs stops at ` `, `%`, `,`, `@`, `+`, `/`, a control character, end of line | runas: an error inside the user list is discarded and the list ends early (F-P3) | 184 | the message is `expecting ')'` and the text is a runas list whose first item failed; the old rule only named the stop character |
-| token class: end of line (C stops), C stops at `#`, `-`, `c` | Defaults keyword glued to a word: a user name for C, a Defaults line for sudo-rs | 63 | the line begins `Defaults<word>` without a separator, so C reads a rule; checked on samples |
-| token class: C stops at `s`, `:`, `)`, `a`, `w`, `"`, a control character; continuation inside a token | negation: '!' separated by whitespace rejected by C | 38 | the text before C's column ends in `!` followed by blanks; checked on samples |
-| content: several of the causes above | F-P4: '#' line read as a comment by sudo-rs, a rule for C | 1 | the text has a line starting with `#`; that cause subsumes the combination |
+Examples, other: seed 1 continuation:340 line 3: `continuation: inside a token (C joins or splits differently)` -> rows at [1, 7]; seed 1 continuation:340 line 5: `continuation: inside a token (C joins or splits differently)` -> rows at [1, 7]; seed 2 mut.insert-char.continuation:812 line 5: `token class: sudo-rs stops at '/' where C continues` -> rows at [1]; seed 3 continuation:755 line 3: `continuation: backslash after whitespace not followed by newline` -> rows at [1]; seed 3 mut.splice-lines.rule:711 line 4: `unclassified: sudo-rs stops early, C accepts` -> rows at [1, 2]
 
-Rows that had a named category and have none now: 130 keys fewer, all from the changed
-iteration reconstruction (an item's end is now taken from the next record's position, so two
-rows of one text can fall on the same line and merge). No row was dropped for lack of a cause:
-the unclassified count is 0.
+Examples, lost: seed 5 mut.insert-char.continuation:401 line 3 `continuation: inside a token (C joins or splits differently)`: the case's logical line has a sudo-rs error and a C error, so it is an agreement; seed 5 mut.splice-lines.mixed:248 line 3 `continuation: inside a token (C joins or splits differently)`: the case's logical line has a sudo-rs error and a C error, so it is an agreement; seed 5 mut.splice-lines.mixed:248 line 5 `token class: end of line (C stops)`: the case's logical line has a sudo-rs error and a C error, so it is an agreement; seed 5 mut.splice-lines.continuation:436 line 3 `continuation: inside a token (C joins or splits differently)`: the case's logical line has a sudo-rs error and a C error, so it is an agreement; seed 5 mut.splice-lines.continuation:436 line 5 `token class: C stops at ':' where sudo-rs continues`: the case's logical line has a sudo-rs error and a C error, so it is an agreement
+
+
+The 5 "genuine double count" rows are two old rows of one logical line where both sides report
+an error (the old model attributed the sudo-rs error to one physical line and the C error to
+another of the same logical line); the corrected attribution puts both on the logical line, which
+is then an agreement and needs no row. The 8 moved rows keep their category and are recorded at
+the logical line of the line the error names. The 13 "cause now named differently" rows are
+lines where a message-based rule now wins over a character-class fallback (examples:
+`continuation:340` twice, `mut.insert-char.continuation:812`, `continuation:755`,
+`mut.splice-lines.rule:711`).
+
+The rise from 146,026 to 154,141 rows has three causes, each verified above: 7,716 rows for a
+missing final newline after a comment or blank last line (previously dropped), advisory-only
+lines keep their row while no longer making a line an agreement (so a sudo-rs error on such a
+line now has a row), and the corrected attribution of `mid` errors.
 
 ## 7. Running
 
