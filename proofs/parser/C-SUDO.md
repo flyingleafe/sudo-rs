@@ -354,10 +354,14 @@ files both parsers accept, where the entry multisets must be equal.
 
 ### Limits of the comparison, next to the "0 unclassified"
 
+- **Content of files C rejects.** `cvtsudoers` prints nothing for a file C rejects, so in 140,691
+  of the 232,192 cases only the per-line verdicts are compared; what either parser read on the
+  lines both accept is not compared there. In the 24,640 files C accepts and sudo-rs rejects in
+  part, C's entries without a sudo-rs reading are counted but not attributed to lines.
 - **Agreements.** A logical line on which both parsers report a rejection is an agreement and gets
   no row, whatever the two reasons are: 141,555 lines over the eight seeds.
 - **Order.** List members are compared as multisets; a difference only in their order is not
-  counted. Both readers preserve file order, so nothing measured was hidden; stated as a limit.
+  counted.
 - **Alias-shaped names and binding kinds.** A C `username`/`hostname` shaped like an alias name is
   read as an alias reference (that is how `cvtsudoers` prints one), and a `Defaults` binding's `:`
   and `>` are merged because the JSON does not record which it is.
@@ -531,24 +535,9 @@ The 16,306 additional rows are differences the earlier classifier did not count:
 |---|---:|
 | `Warning:` lines about an unused alias | 7,673 |
 | missing final newline after a comment or blank last line | 3,999 |
+| sudo-rs reports an error on a line where C prints only an advisory (taken for a rejection by both before); named by the sudo-rs cause, the largest being the CHROOT option (1,144), IPv4 addresses (597) and netgroups (274) | 3,873 |
 | content of files C accepts and sudo-rs rejects in part (subset comparison) | 516 |
-| sudo-rs reports an error on a line where C prints only an advisory (taken for a rejection by both before); named by the sudo-rs cause, the largest being the CHROOT option (1,144), IPv4 addresses (601) and netgroups (274) | about 3,600 |
-
-**Against the rows of `f0f87b0e`.** Every one of its 162,332 rows is kept at its key; the only
-change is the category of 95 subset rows, all from the cause the earlier revision guessed
-("continuation: inside a token") to the explanation that actually equates the reading:
-
-| Old category (`f0f87b0e`) | New category | Rows |
-|---|---|---:|
-| continuation: inside a token (C joins or splits differently) | command: C splits a word at '=' or after an escape, sudo-rs keeps it whole | 50 |
-| continuation: inside a token (C joins or splits differently) | user id: '#N' that C reads as a name, sudo-rs as an id | 30 |
-| continuation: inside a token (C joins or splits differently) | quoted '%:' group: sudo-rs reads a Unix group whose name starts with ':' | 7 |
-| continuation: inside a token (C joins or splits differently) | quoted upper-case word: a user name for sudo-rs, an alias for C | 4 |
-| continuation: inside a token (C joins or splits differently) | content: several of the causes above | 3 |
-| continuation: inside a token (C joins or splits differently) | quoted "ALL": the ALL keyword for C, a name for sudo-rs | 1 |
-
-The four subset rows still named "continuation: inside a token" pass the textual test: their
-reading's logical line holds a backslash-newline inside the command word concerned.
+| an error on a later physical line of a continued line, and other corrected attributions (net of the 16 rows above) | 245 |
 
 ## 7. Running
 
