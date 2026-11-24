@@ -34,6 +34,7 @@ import SudoRsProofs.Parser.Scoping.Clone
 import SudoRsProofs.Parser.Scoping.Check
 import SudoRsProofs.Parser.Directives.Main
 import SudoRsProofs.Parser.Analysis.ReferenceFit
+import SudoRsProofs.Parser.TextExample
 
 /-!
 # Axiom audit
@@ -255,3 +256,9 @@ of `SudoRs/{Types,Funs}External.lean` are definitions or `opaque` constants, nev
 #print axioms SudoRsProofs.Parser.TextAgreement.clean_unique
 #print axioms SudoRsProofs.Parser.TextAgreement.clean_expanded_flags
 #print axioms SudoRsProofs.Parser.TextAgreement.no_defaults
+#print axioms SudoRsProofs.Parser.TextExample.text_allows
+#print axioms SudoRsProofs.Parser.TextExample.text_refuses
+#print axioms SudoRsProofs.Parser.TextExample.textRun
+#print axioms SudoRsProofs.Parser.TextExample.allowed_eval
+#print axioms SudoRsProofs.Parser.TextExample.refused_eval
+#print axioms SudoRsProofs.Parser.TextExample.domain_eval
