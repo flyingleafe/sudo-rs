@@ -6,8 +6,9 @@
 #     -- bash proofs/quint/observe/cluster-job.sh
 # Runs unprivileged in a clean checkout of the commit under test. Needs git, curl,
 # python3 >= 3.9, npm (for quint 0.33.0, cached under $OMNIRUN_ROOT/cache/quint-0.33.0),
-# /dev/kvm and the guest launcher `guest-run <input_dir> <output_dir> <timeout_s> -- <cmd>`
-# (disposable Debian 13 guest, no network, input read-only at /fixture, /out copied back).
+# /dev/kvm, SLURM_JOB_ID (set in uni-cpu jobs) and the guest launcher
+# `guest-run <input_dir> <output_dir> <timeout_s> -- <cmd>` (disposable Debian 13 guest,
+# no network, input read-only at /fixture, /out copied back).
 # Results in $OMNIRUN_OUTPUT: lifecycle-<commit>.obs.json, guest/ (capture without the
 # binary, launcher metadata), summary.
 # observe.py runs `quint test --backend=typescript`: the npm Rust evaluator v0.7.0 needs
