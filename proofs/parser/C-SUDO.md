@@ -315,8 +315,9 @@ result makes it exit 1.
 1. Case level: (some `fatal` record) differs from (`visudo -c` exit status nonzero) implies at
    least one row for the case.
 2. Line level: for every logical line, (a sudo-rs diagnostic attributed to it) xor (a C error on
-   it) implies a row on that line, or a counted reason why not (F-P2: the rest of a logical line
-   that already has a row).
+   it) implies a row on that line, or a counted reason why not. One reason exists: "F-P2: rest of
+   a logical line that already has a row", counted per run (0 on these seeds, since a `mid` error
+   is only skipped when its line already has a row or an agreed rejection).
 
 **Iteration attribution.** An error names the line of the construct, so it starts the next
 iteration there; an accepted item ends no later than the line of the next error record (a

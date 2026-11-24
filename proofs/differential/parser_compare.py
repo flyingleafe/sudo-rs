@@ -1194,9 +1194,15 @@ def main():
     print(f"\ndifferences: {sum(diff.values())}; unclassified: {unclassified}")
     print(f"\naccounting: case violations {acct['cases: diagnostics on one side only, no row']}, "
           f"line violations {acct['lines: one side reports, the other does not, no row']}")
+    for reason, n in sorted(skipped.items()):
+        print(f"  counted reason for a line without a row: {n}  {reason}")
+    violations = acct["cases: diagnostics on one side only, no row"] + \
+        acct["lines: one side reports, the other does not, no row"]
     for k in ("case: no row", "line: no row"):
         if acct_cases[k]:
             print(f"  {k}: {', '.join(sorted(set(acct_cases[k]))[:10])}")
+    if violations:
+        sys.exit(1)
     print(f"\nadvisory message shapes (occur in files `visudo -c` accepted, so never a rejection):")
     for shape, n in sorted(advisories.items()):
         print(f"  {n:6d}  {shape}")
