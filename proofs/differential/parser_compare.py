@@ -244,6 +244,7 @@ def rs_iterations(records, text):
             m = FATAL.match(r)
             span = tuple(int(m.group(k)) for k in range(1, 5))
             it.update(kind="error", msg=unquote(m.group(5))[0], span=span)
+            cur = span[0]  # the error names the line of the construct
             its.append(it)
             if span[2] < cur:
                 consistent = False
@@ -282,6 +283,12 @@ def rs_iterations(records, text):
             while last < nlines and is_continued(lines[last - 1], strict=True):
                 last += 1
             cur = last + 1
+            # a comment inside the item can end it earlier than its logical line: the next
+            # error record starts no later than the line it names
+            for later in records[i:]:
+                if later.startswith("fatal "):
+                    cur = min(cur, int(FATAL.match(later).group(1)))
+                    break
     return its, consistent
 
 
@@ -363,7 +370,7 @@ RS_RULES = [
 # sudo-rs syntax errors: (text before the error start, text from it) -> category
 RS_CONTEXT_RULES = [
     (r"\+$", r"", "unsupported by sudo-rs: netgroup"),
-    (r"^Defaults!+\s*$", r"", "Defaults! scope: a second '!' with no item after it"),
+    (r"^Defaults!!+\s*!*\s*$", r"", "Defaults! scope: a second '!' with no item after it"),
     (r"#$", r"^-", "user id: '#-N' rejected by sudo-rs"),
     (r"", r"^#-", "user id: '#-N' rejected by sudo-rs"),
     (r"\\$", r"^[^\n]", "escape: sequence rejected by sudo-rs"),
@@ -472,15 +479,15 @@ C_CONTEXT_RULES = [
 def classify_c(cm, text, logical):
     """A line where C reports cm = (line, col, msg) and sudo-rs accepts."""
     line, col, msg = cm
-    if line is not None:
-        ltext0 = text.split("\n")[line - 1] if line - 1 < len(text.split("\n")) else ""
-        if re.match(r"\s*Defaults[A-Za-z0-9_]", ltext0):
-            return "Defaults keyword glued to a word: a user name for C, a Defaults line for sudo-rs"
     errno_only = msg.strip() in ERRNO_TEXT
     if not errno_only:
         for pat, cat in C_RULES:
             if re.search(pat, msg):
                 return cat
+    if line is not None:
+        ltext0 = text.split("\n")[line - 1] if line - 1 < len(text.split("\n")) else ""
+        if re.match(r"\s*Defaults[A-Za-z0-9_]", ltext0):
+            return "Defaults keyword glued to a word: a user name for C, a Defaults line for sudo-rs"
     if (msg != "syntax error" and not errno_only) or line is None:
         return None
     lines = text.split("\n")
@@ -793,11 +800,16 @@ def rs_quoted_alias(part):
 
 
 def c_hash_rule(e):
-    """C rules whose user list holds a '#' word that is not a u32: sudo-rs reads the line as a
+    """A rule C keeps whose first user is a `#` id of more than ten digits or above `u32::MAX`:
+    after `#` sudo-rs reports the token as too large or too long and then reads the line as a
     comment (F-P4)."""
-    if e[0] == "rule" and any(isinstance(x, tuple) and x[0] in ("username", "usergroup") and
-                              str(x[1]).startswith("#") for _, x in e[1]):
-        return None
+    if e[0] != "rule" or not e[1]:
+        return e
+    _, part = e[1][0]
+    if isinstance(part, tuple) and part[0] in ("username", "usergroup"):
+        name = str(part[1])
+        if re.fullmatch(r"#\d+", name) and (len(name) - 1 > 10 or int(name[1:]) > 0xFFFFFFFF):
+            return None
     return e
 
 
@@ -853,6 +865,11 @@ def part_cause(x, y):
                 or (ys[0] == "nonunixgroup" and ys[1] == "")):
             return ("quoted '%:' group: sudo-rs reads no non-unix group name, C reads the name "
                     "(or a gid)")
+        if {xs[0], ys[0]} == {"userid", "username"}:
+            n, name = (xs[1], ys[1]) if xs[0] == "userid" else (ys[1], xs[1])
+            if isinstance(name, str) and name.startswith("#" + str(n)):
+                return ("quoted user id: sudo-rs keeps the leading '#N', C keeps the rest of "
+                        "the text")
         if xs[0] == ys[0] and xs[0] in ("username", "usergroup", "nonunixgroup", "hostname") \
                 and isinstance(xs[1], str) and isinstance(ys[1], str):
             short, long = (xs[1], ys[1]) if len(xs[1]) < len(ys[1]) else (ys[1], xs[1])
@@ -915,6 +932,9 @@ def content_category(mine, theirs, text):
     if cat:
         return cat
     if [e for e in only_c if e[0] == "rule"] and not [e for e in only_rs if e[0] == "rule"] and \
+            re.search(r"(^|[\n])[ \t]*#(?!include|includedir)", text):
+        return "F-P4: '#' line read as a comment by sudo-rs, a rule for C"
+    if only_c and not only_rs and \
             re.search(r"(^|[\n])[ \t]*#[^\n]*\\[\n]", text):
         return ("comment ending in a backslash: sudo-rs loses the next line, C keeps it")
     for e in only_rs:
