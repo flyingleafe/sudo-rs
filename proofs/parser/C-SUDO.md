@@ -328,7 +328,158 @@ Each names the textual construct or the C diagnostic that causes the difference:
 
 ### Results
 
-PLACEHOLDER-TOTALS
+The head-run inputs (`/tmp/parser-p0-head/seed-N`) are classified offline with
+
+```
+python3 parser_compare.py corpus.txt sudo-rs.dump c-sudo.out differences.tsv
+```
+
+### Offline prediction (this host, current comparator)
+
+The corpus generator is deterministic, so the same cases can be produced locally; the C verdicts
+differ where a command path of the corpus exists on the host (`hostdep` lists them, 9 cases
+over these runs). This is the shape the head run is expected to have. Seeds 1 and 2 were run
+with 1,000 cases per category here (29,024), seeds 3 to 8 with 200 (5,824), because a local
+29,024-case generation costs about 1.6 minutes of CPU (97 s wall) and the local budget is two
+minutes; the offline pass itself takes about 1.5 s per 29,024-case seed.
+
+| Seed | Cases | Differences | Unclassified | Reconstruction | Host-dependent cases |
+|---:|---:|---:|---:|---:|---:|
+| 1 | 29,024 | 18,346 | 0 | 0 | 4 |
+| 2 | 29,024 | 18,601 | 0 | 0 | 1 |
+| 3 | 5,824 | 3,511 | 0 | 0 | 0 |
+| 4 | 5,824 | 3,608 | 0 | 0 | 1 |
+| 5 | 5,824 | 3,562 | 0 | 0 | 0 |
+| 6 | 5,824 | 3,632 | 0 | 0 | 1 |
+| 7 | 5,824 | 3,627 | 0 | 0 | 1 |
+| 8 | 5,824 | 3,599 | 0 | 0 | 2 |
+| **Total** | **92,992** | **58,486** | **0** | | |
+
+
+| Category | Differences | Cases |
+|---|---:|---:|
+| alias: checked by C at parse time (sudo-rs: in analysis) | 14,924 | 12,054 |
+| negation: '!' separated by whitespace rejected by C | 10,371 | 8,828 |
+| command: directory with arguments rejected by C | 2,516 | 2,434 |
+| escape: sequence rejected by sudo-rs | 2,144 | 2,123 |
+| include: target does not exist or has the wrong type | 1,597 | 1,493 |
+| F-P1: prefix acceptance (rule; C reports an error) | 1,548 | 1,501 |
+| end of file: last line without newline | 1,513 | 1,513 |
+| Defaults or option: value check stricter in C | 1,502 | 1,454 |
+| host: IPv4 address rejected by sudo-rs | 1,421 | 1,340 |
+| F-P5: command path canonicalized by sudo-rs at parse time | 1,395 | 1,395 |
+| limit: list length (sudo-rs 127) | 1,261 | 1,261 |
+| negation: '!' followed by whitespace in a Defaults binding rejected by C | 1,191 | 1,157 |
+| limit: token length (sudo-rs MAX_LEN) | 1,007 | 1,006 |
+| Defaults: value or kind check stricter in sudo-rs | 980 | 947 |
+| unsupported by sudo-rs: netgroup | 965 | 947 |
+| token class: non-ASCII character (sudo-rs stops) | 835 | 798 |
+| keyword as a name: reserved by C, a name or alias for sudo-rs | 739 | 728 |
+| continuation: inside a token (C joins or splits differently) | 738 | 659 |
+| user id: '#N' that C reads as a name, sudo-rs as an id | 721 | 721 |
+| continuation: backslash after whitespace not followed by newline | 647 | 643 |
+| token class: end of line (C stops) | 615 | 613 |
+| runas: trailing ',' accepted by sudo-rs | 596 | 576 |
+| Defaults: setting unknown to sudo-rs | 581 | 574 |
+| F-P1: prefix acceptance (defaults; C reports an error) | 569 | 564 |
+| include: path or directive syntax | 561 | 553 |
+| path check stricter in C | 560 | 558 |
+| F-P4: '#' line read as a comment by sudo-rs, rejected by C | 522 | 519 |
+| unsupported by sudo-rs: ROLE/TYPE option | 425 | 421 |
+| runas: empty list after ':' accepted by sudo-rs | 407 | 397 |
+| F-P1: prefix acceptance (user_alias; C keeps the prefix too) | 284 | 284 |
+| F-P3: quoted user whose content is not a user name | 264 | 251 |
+| token class: control character (sudo-rs stops) | 263 | 257 |
+| F-P1: prefix acceptance (host_alias; C keeps the prefix too) | 259 | 258 |
+| F-P2: sudo-rs reads the continuation of a failed line as a line of its own | 256 | 252 |
+| F-P1: prefix acceptance (runas_alias; C keeps the prefix too) | 253 | 253 |
+| option: quoted value rejected by sudo-rs | 252 | 250 |
+| host: wildcard host name rejected by sudo-rs | 212 | 209 |
+| command: wildcard in arguments rejected by sudo-rs | 190 | 189 |
+| token class: '$' inside a user name | 190 | 187 |
+| option after tag rejected by C | 182 | 180 |
+| Defaults: quoted list item rejected by sudo-rs | 180 | 179 |
+| host: IPv6 address rejected by sudo-rs | 175 | 174 |
+| quoted upper-case word: a user name for sudo-rs, an alias for C | 171 | 171 |
+| quoted '%:' group: sudo-rs reads a Unix group whose name starts with ':' | 163 | 163 |
+| unsupported by sudo-rs: INTERCEPT option | 150 | 150 |
+| command: sudoedit argument check in C | 148 | 148 |
+| user id: '#-N' rejected by sudo-rs | 131 | 131 |
+| Defaults: value syntax rejected by sudo-rs | 125 | 125 |
+| F-P4: '#' line read as a comment by sudo-rs, a rule for C | 122 | 122 |
+| token class: carriage return (sudo-rs stops) | 119 | 118 |
+| command: C splits a word at '=' or after an escape, sudo-rs keeps it whole | 98 | 98 |
+| limit: numeric id does not fit u32 | 93 | 92 |
+| unsupported by sudo-rs: TIMEOUT option | 93 | 93 |
+| content: several of the causes above | 90 | 90 |
+| unsupported by sudo-rs: regular expression | 88 | 88 |
+| command: glob syntax rejected by sudo-rs | 74 | 74 |
+| runas: an error inside the user list is discarded and the list ends early (F-P3) | 69 | 69 |
+| token class: C stops at 's' where sudo-rs continues | 66 | 66 |
+| unsupported by sudo-rs: NOTBEFORE option | 59 | 59 |
+| Defaults keyword glued to a word: a user name for C, a Defaults line for sudo-rs | 58 | 58 |
+| F-P1: prefix acceptance (cmnd_alias; C keeps the prefix too) | 54 | 54 |
+| quoted user: escaped '"' inside quotes rejected by sudo-rs | 53 | 53 |
+| token class: end of line (sudo-rs stops) | 49 | 49 |
+| token class: sudo-rs stops at '%' where C continues | 44 | 44 |
+| unsupported by sudo-rs: NOTAFTER option | 44 | 44 |
+| continuation: inside a quoted string (C) | 38 | 38 |
+| F-P1: prefix acceptance (include; C reports an error) | 36 | 36 |
+| option: CWD path rejected by sudo-rs | 36 | 36 |
+| F-P1: prefix acceptance (cmnd_alias; C keeps nothing) | 32 | 32 |
+| quoting: sudo-rs requires the closing quote before the next token | 29 | 29 |
+| token class: sudo-rs stops at '/' where C continues | 28 | 28 |
+| command: '=' inside a path (C ends the path there) | 25 | 25 |
+| token class: C stops at '=' where sudo-rs continues | 19 | 19 |
+| token class: sudo-rs stops at '@' where C continues | 19 | 19 |
+| token class: sudo-rs stops at '+' where C continues | 18 | 18 |
+| F-P1: prefix acceptance (host_alias; C keeps nothing) | 17 | 17 |
+| token class: sudo-rs stops at ',' where C continues | 17 | 17 |
+| command: 'list' with arguments rejected by C | 15 | 15 |
+| token class: C stops at '#' where sudo-rs continues | 15 | 15 |
+| F-P1: prefix acceptance (user_alias; C keeps nothing) | 12 | 12 |
+| token class: C stops at ',' where sudo-rs continues | 12 | 12 |
+| token class: sudo-rs stops at '!' where C continues | 11 | 11 |
+| F-P1: prefix acceptance (includedir; C reports an error) | 10 | 10 |
+| quoted "ALL": the ALL keyword for C, a name for sudo-rs | 10 | 10 |
+| token class: C stops at ':' where sudo-rs continues | 9 | 9 |
+| token class: sudo-rs stops at '#' where C continues | 9 | 9 |
+| F-P1: prefix acceptance (runas_alias; C keeps nothing) | 8 | 8 |
+| token class: sudo-rs stops at '"' where C continues | 8 | 8 |
+| token class: sudo-rs stops at '=' where C continues | 8 | 8 |
+| quoted '%:#N': sudo-rs and C read the non-unix group name differently | 6 | 6 |
+| token class: sudo-rs stops at '$' where C continues | 6 | 6 |
+| user: '%' without a group name | 6 | 6 |
+| Defaults! scope: a second '!' with no item after it | 5 | 5 |
+| include: C checks the include target's owner and mode, sudo-rs leaves it to the open | 4 | 4 |
+| token class: C stops at '(' where sudo-rs continues | 4 | 4 |
+| token class: C stops at 'N' where sudo-rs continues | 4 | 4 |
+| token class: C stops at '-' where sudo-rs continues | 3 | 3 |
+| token class: C stops at 'E' where sudo-rs continues | 3 | 3 |
+| token class: sudo-rs stops at ''' where C continues | 3 | 3 |
+| unsupported by sudo-rs: command digest | 3 | 3 |
+| host: network/mask rejected by sudo-rs | 2 | 2 |
+| quoted '%:' group: sudo-rs reads no non-unix group name, C reads the name (or a gid) | 2 | 2 |
+| quoted name: sudo-rs keeps the part before a character its unquoted token does not accept | 2 | 2 |
+| token class: C stops at 'P' where sudo-rs continues | 2 | 2 |
+| token class: C stops at '\' where sudo-rs continues | 2 | 2 |
+| Defaults! binding: sudo-rs reads a command pattern, C a path with an argument list | 1 | 1 |
+| command path: C ends the path at the escape or '=', sudo-rs keeps it | 1 | 1 |
+| comment ending in a backslash: sudo-rs loses the next line, C keeps it | 1 | 1 |
+| token class: C stops at ' ' where sudo-rs continues | 1 | 1 |
+| token class: C stops at '*' where sudo-rs continues | 1 | 1 |
+| token class: C stops at 'L' where sudo-rs continues | 1 | 1 |
+| token class: C stops at 'R' where sudo-rs continues | 1 | 1 |
+| token class: C stops at 'a' where sudo-rs continues | 1 | 1 |
+| token class: C stops at 'b' where sudo-rs continues | 1 | 1 |
+| token class: C stops at 'e' where sudo-rs continues | 1 | 1 |
+| token class: C stops at 'x' where sudo-rs continues | 1 | 1 |
+| token class: sudo-rs stops at '(' where C continues | 1 | 1 |
+| token class: sudo-rs stops at ')' where C continues | 1 | 1 |
+| token class: sudo-rs stops at ':' where C continues | 1 | 1 |
+| token class: sudo-rs stops at ']' where C continues | 1 | 1 |
+| user: empty netgroup rejected by C | 1 | 1 |
+
 
 ## 7. Running
 
