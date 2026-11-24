@@ -694,13 +694,6 @@ def c_id_names(part):
     return part
 
 
-def rs_colon_group(part):
-    neg, x = part
-    if isinstance(x, tuple) and x[0] == "usergroup" and str(x[1]).startswith(":"):
-        return (neg, ("nonunixgroup", x[1][1:]))
-    return part
-
-
 def c_word_join(part):
     """C's lexer splits a word at an unescaped `=` and after an escape: it prints the pieces as
     separate words (`/a`, `=b`, `c`, `\\d`). sudo-rs keeps them in one path or argument. Join a
@@ -728,6 +721,29 @@ def rs_colon_group(part):
     neg, x = part
     if isinstance(x, tuple) and x[0] == "usergroup" and str(x[1]).startswith(":"):
         return (neg, ("nonunixgroup", x[1][1:]))
+    return part
+
+
+def split_path_space(part):
+    """C's lexer ends a command word at an escaped space: `a\\ b` is printed as two words. Model
+    both readings in one form by moving a path's first space and what follows into the argument
+    list."""
+    neg, x = part
+    if isinstance(x, tuple) and x[0] == "cmd" and " " in x[1]:
+        head, rest = x[1].split(" ", 1)
+        kind, args, marker = x[2]
+        return (neg, ("cmd", head, (kind, (rest,) + args, marker)))
+    return part
+
+
+def binding_path_join(part):
+    """A `Defaults!` binding is a command pattern for sudo-rs, which carries no arguments; C
+    reads the same text as a path with an argument list. Put both readings in one form: the
+    words joined by single spaces, no arguments."""
+    neg, x = part
+    if isinstance(x, tuple) and x[0] == "cmd":
+        words = [x[1]] + list(x[2][1])
+        return (neg, ("cmd", " ".join(words), ("prefix", (), "")))
     return part
 
 
@@ -778,6 +794,10 @@ EXPLANATIONS = [
      lambda e: map_parts(e, rs_colon_group), None),
     ("command: C splits a word at '=' or after an escape, sudo-rs keeps it whole",
      None, lambda e: map_parts(e, c_word_join)),
+    ("command: C ends a command word at an escaped space, sudo-rs keeps it in the path",
+     lambda e: map_parts(e, split_path_space), lambda e: map_parts(e, split_path_space)),
+    ("Defaults! binding: sudo-rs reads a command pattern, C a path with an argument list",
+     lambda e: map_parts(e, binding_path_join), lambda e: map_parts(e, binding_path_join)),
     ('quoted "ALL": the ALL keyword for C, a name for sudo-rs',
      lambda e: map_parts(e, rs_quoted_all), None),
     ("quoted '%:#N': sudo-rs and C read the non-unix group name differently",
@@ -789,7 +809,9 @@ EXPLANATIONS = [
 
 # Explanations that replace a name by a placeholder; used only when no explanation that keeps
 # the form of an entry explains the difference.
-LOSSY = {"quoted '%:#N': sudo-rs and C read the non-unix group name differently"}
+LOSSY = {"quoted '%:#N': sudo-rs and C read the non-unix group name differently",
+         "command: C ends a command word at an escaped space, sudo-rs keeps it in the path",
+         "Defaults! binding: sudo-rs reads a command pattern, C a path with an argument list"}
 
 
 def apply(f, entries):
@@ -805,11 +827,13 @@ def part_cause(x, y):
     xs, ys = x[1], y[1]
     if (xs, ys) in ((("username", "ALL"), "ALL"), ("ALL", ("username", "ALL"))):
         return 'quoted "ALL": the ALL keyword for C, a user name for sudo-rs'
-    if isinstance(xs, tuple) and isinstance(ys, tuple) and len(xs) == 2 == len(ys):
+    if isinstance(xs, tuple) and isinstance(ys, tuple) and len(xs) >= 2 and len(ys) >= 2:
         if (xs[0] == "alias" and ys == "ALL") or (xs == "ALL" and ys[0] == "alias"):
             return 'quoted "ALL": the ALL keyword for C, an alias reference for sudo-rs'
-        if {xs[0], ys[0]} == {"nonunixgid", "nonunixgroup"} and \
-                ((xs[0] == "nonunixgid" and xs[1] is None) or (ys[0] == "nonunixgid" and ys[1] is None)):
+        if {xs[0], ys[0]} == {"nonunixgid", "nonunixgroup"} and (
+                (xs[0] == "nonunixgid" and xs[1] is None) or (ys[0] == "nonunixgid" and ys[1] is None)
+                or (xs[0] == "nonunixgroup" and xs[1] == "")
+                or (ys[0] == "nonunixgroup" and ys[1] == "")):
             return ("quoted '%:' group: sudo-rs reads no non-unix group name, C reads the name "
                     "(or a gid)")
         if xs[0] == ys[0] and xs[0] in ("username", "usergroup", "nonunixgroup", "hostname") \
@@ -821,6 +845,10 @@ def part_cause(x, y):
         if xs[0] == ys[0] == "cmd" and xs[1] != ys[1] and \
                 (ys[1].startswith(xs[1]) or xs[1].startswith(ys[1])):
             return "command path: C ends the path at the escape or '=', sudo-rs keeps it"
+        if xs[0] == ys[0] == "cmd" and xs[1] != ys[1] and \
+                xs[1].split(" ") + list(xs[2][1]) == ys[1].split(" ") + list(ys[2][1]):
+            return ("command: the same words, C splits at an escaped space and sudo-rs keeps "
+                    "the space in the path")
     return None
 
 
@@ -828,6 +856,13 @@ def member_cause(only_rs, only_c):
     """Name the first differing member of unmatched entries of the same kind."""
     for e in only_rs:
         for f in only_c:
+            if e[0] == f[0] == "defaults" and e[1][0] == f[1][0]:
+                for u in e[1][1]:
+                    for v in f[1][1]:
+                        cat = part_cause(u, v)
+                        if cat:
+                            return cat
+                continue
             if e[0] != f[0] or len(e) != len(f):
                 continue
             for i in range(1, len(e)):
