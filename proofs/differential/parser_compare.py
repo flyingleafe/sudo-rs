@@ -85,6 +85,17 @@ def read_dump(path):
     return out
 
 
+def read_hostdep(path):
+    """Labels of the cases whose command patterns name existing host paths (the harness writes
+    them next to the dump). Such a case can be canonicalized here and not there, or the other
+    way round: a difference in it is a limit of comparing across hosts, not a parser cause."""
+    try:
+        with open(path, encoding="ascii") as f:
+            return {line.split(" ")[0] for line in f if line.strip()}
+    except FileNotFoundError:
+        return set()
+
+
 def read_c(path):
     out = {}
     cur = None
@@ -936,6 +947,7 @@ def main():
         raise SystemExit(f"{sys.argv[1]}: no cases")
     dump = read_dump(sys.argv[2])
     cres = read_c(sys.argv[3])
+    hostdep = read_hostdep(sys.argv[2] + ".hostdep")
     details = open(sys.argv[4], "w", encoding="utf-8") if len(sys.argv) > 4 else None
 
     accept = collections.Counter()
@@ -1079,7 +1091,11 @@ def main():
                 content["equal"] += 1
             else:
                 only_rs, only_c = list(mine - theirs), list(theirs - mine)
-                note(label, content_category(mine, theirs, text), 0,
+                cat = content_category(mine, theirs, text)
+                if label in hostdep and cat.startswith(("unclassified", "content: several")):
+                    cat = ("comparison limit: the case names an existing host path, so the "
+                           "pattern can be canonicalized on one host only (hostdep)")
+                note(label, cat, 0,
                      f"sudo-rs only: {only_rs[:2]} C only: {only_c[:2]}")
 
     n = len(corpus)

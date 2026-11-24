@@ -325,6 +325,7 @@ Each names the textual construct or the C diagnostic that causes the difference:
 | command: the same words, C splits at an escaped space and sudo-rs keeps the space in the path | an escaped space ends a command word in C only. |
 | Defaults! binding: sudo-rs reads a command pattern, C a path with an argument list | a command binding has no arguments for sudo-rs and may have them for C. |
 | C messages that are the text of the current `errno` | C reports an error without a message; the construct is named from C's column. |
+| comparison limit: the case names an existing host path | the harness lists such cases in `hostdep`; a content difference left unexplained in one of them can come from canonicalization on the other host and is counted as a limit of comparing across hosts. |
 
 ### Results
 
