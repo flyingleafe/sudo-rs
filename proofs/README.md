@@ -168,14 +168,14 @@ Each item says what kind of evidence it is. A test covers only the inputs it ran
   undefined behaviour on the paths it ran. The results include host-dependent failures,
   four unsupported-clock failures and 30 Miri skips; they are not 191 clean passes. The
   eight tests added since then pass in all three modes at `f20cfeb7`.
-- **Fuzzing** ([`../fuzz/`](../fuzz/README.md), test): eight libFuzzer targets on the real
+- **Fuzzing** ([`../fuzz/`](../fuzz/README.md), test): nine libFuzzer targets on the real
   code (sudoers parser, decision, Defaults, sudo/su/visudo command lines, timestamp records,
-  `NameOrId` and shell-mode argument escaping) through the `cfg(fuzzing)`-only
-  `src/fuzz_api.rs`, with AddressSanitizer, debug assertions and property assertions. All
-  runs total 475,017,869 executions. A cluster campaign ran every target for at least
-  2,700 seconds at `f20cfeb7`; seven targets reported no crash, timeout or out-of-memory
-  input. Every `timestamp` crash replayed from a 900-second rerun comes from the two
-  corrupt-file defects in the fuzz README; both fail closed.
+  `NameOrId` and shell-mode argument escaping, and the rewritten sudoers parser against the
+  legacy one) through the `cfg(fuzzing)`-only `src/fuzz_api.rs`, with AddressSanitizer, debug
+  assertions and property assertions. All runs total 648,651,049 executions. A cluster
+  campaign at `58a225fe` ran every target for at least 2,700 seconds (173,633,180
+  executions): eight targets saved no failing input, and all 6,981 saved `timestamp` inputs
+  reproduce the two corrupt-file defects in the fuzz README; both fail closed.
 - **Kani** ([`kani/`](kani/README.md), bounded proof): 36 harnesses on the real functions
   (`#[cfg(kani)]` modules), all passing in one run at `f20cfeb7`. They cover shell-mode
   escaping (exact output up to one 5-byte argument or two 2-byte arguments; injectivity for

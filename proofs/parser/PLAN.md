@@ -306,9 +306,11 @@ passed tokens, spec, Lean, axioms, Quint and the sudoers Rust unit tests. A sepa
 - The same job passed six parser tests in each of debug, AddressSanitizer and Miri,
   and the [positive-only v2 differential corpus](P0.md#format-v2-check). The Rust source,
   Cargo manifest and lockfile, and Kani and fuzz harnesses match `c0f8b8bc` exactly.
-- At `73db0a38`, all nine libFuzzer harnesses executed a fixed ordinary file each,
-  with mutation disabled. This is a replay smoke test, not a new coverage-guided
-  campaign on the final parser.
+- `uni-cpu` job `fuzz-parser-final-07263c` at `58a225fe` fuzzed all nine
+  [libFuzzer targets](../../fuzz/README.md#campaign-on-the-rewritten-parser) for at least
+  2,700 seconds each (173,633,180 executions). Eight saved no failing input; `parser_equiv`
+  found no text on which the rewritten and the legacy parser differ (364,997 executions).
+  All 6,981 saved `timestamp` inputs reproduce the two known corrupt-file defects.
 - The 863-test A/B compliance suite **did not run**: the `uni-cpu` preflight
   `parser-conformance-safe-fce65f` at `c0f8b8bc` found no Docker executable. The
   [older complete test logs](../compliance/README.md) predate the parser rewrite;

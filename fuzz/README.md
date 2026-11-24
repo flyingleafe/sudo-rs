@@ -105,6 +105,30 @@ that campaign were not replayed. A second 900-second `timestamp` run at `f20cfeb
 of them reproduce one of the two corrupt-file defects described above (3,630 one defect, 108
 the other); no other cause appeared. Executions are not distinct inputs.
 
+### Campaign on the rewritten parser
+
+At `58a225fe` (the sources and fuzz targets of the rewritten parser) all nine targets ran
+concurrently for 2,700-2,757 seconds each, from seed corpora, on one 10-CPU Slurm node (job
+`fuzz-parser-final-07263c`, GCC 11.5, cargo-fuzz 0.13.2):
+
+| Target | Seconds | Executions | Edges | Corpus | Crashes |
+|---|---:|---:|---:|---:|---:|
+| `sudoers_parse` | 2748 | 741,639 | 4183 | 2187 | 0 |
+| `sudoers_decide` | 2706 | 276,021 | 5437 | 2242 | 0 |
+| `sudoers_defaults` | 2757 | 426,081 | 4594 | 1903 | 0 |
+| `sudo_cli` | 2732 | 25,364,021 | 1107 | 811 | 0 |
+| `su_cli` | 2726 | 25,471,943 | 663 | 387 | 0 |
+| `visudo_cli` | 2726 | 39,452,238 | 388 | 423 | 0 |
+| `timestamp` | 2700 | 18,440,602 | 453 | 204 | 7346 crashes, 6981 saved inputs |
+| `name_escape` | 2721 | 63,095,638 | 320 | 185 | 0 |
+| `parser_equiv` | 2703 | 364,997 | 6761 | 2275 | 0 |
+
+This campaign contributed 173,633,180 executions, for 648,651,049 across all runs. Eight
+targets saved no failing input (no crash, timeout or out-of-memory input); `parser_equiv`
+found no text on which the rewritten parser and the legacy parser differ. Every one of the
+6,981 saved `timestamp` inputs was replayed against the same build: 6,678 reproduce one of the
+two corrupt-file defects described above and 303 the other; no other cause appeared.
+
 ## Commands
 
 From the repository root, inside the dev shell (`nix develop`, or `/tmp/sudo-rs-wt/dev` on the
