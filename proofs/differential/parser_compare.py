@@ -1071,6 +1071,7 @@ def main():
     acct_cases = collections.defaultdict(list)
     rows = collections.Counter()
     shapes = collections.Counter()
+    row_cats = collections.defaultdict(set)
     advisories_without_item = collections.Counter()
 
     def note(label, cat, line, info, ll=None):
@@ -1078,6 +1079,7 @@ def main():
         diff_cases[cat].add(label)
         if ll is not None:
             rows[ll] += 1
+            row_cats[ll].add(cat)
         if details:
             info = str(info).replace("\t", " ").replace("\n", " ")
             details.write(f"{label}\t{line}\t{cat}\t{info}\n")
@@ -1097,6 +1099,7 @@ def main():
         if not ok:
             inconsistent.append(label)
         rows = collections.Counter()
+        row_cats = collections.defaultdict(set)
         rs_diag = collections.Counter()      # logical lines where sudo-rs reports something
         agreed_lines = set()                 # both sides report something on the line
         handled_lines = set()
@@ -1280,21 +1283,19 @@ def main():
                     continue
                 EXTENDS = ("command list: C's entry extends the sudo-rs reading (the rest of "
                            "the line was read only by C)")
-                later_row = bool(rows)  # the extension must be on a line that has a row
+                # The logical line of the reading the unmatched entry comes from, for the only
+                # causes that need the text: a token split by a continuation, or an extension on
+                # a line that already has a continuation/F-P2 row.
+                missing = mine - theirs
+                res_lines = {start.get(it["line"], it["line"]) for it in readings
+                             if any(e in missing for e in rs_entries([it["item"]]))}
+                split_in_text = any("\\\n" in logical_text(lines, start, LL) for LL in res_lines)
+                cont_row = any(any(c.startswith(("continuation", "F-P2"))
+                                   for c in row_cats[LL]) for LL in res_lines)
                 cat = None
                 for name, frs, fc in EXPLANATIONS:
-                    a, b = apply(frs, mine), apply(fc, theirs)
-                    if not (a - b):
+                    if not (apply(frs, mine) - apply(fc, theirs)):
                         cat = name
-                        content["subsets satisfied under an explanation"] += 1
-                        break
-                    if later_row and token_split_cause(a - b, b):
-                        cat = "continuation: inside a token (C joins or splits differently)"
-                        content["subsets satisfied under an explanation"] += 1
-                        break
-                    if later_row and extends_cause(a - b, b):
-                        cat = EXTENDS
-                        content["subsets satisfied under an explanation"] += 1
                         break
                 if cat is None:
                     for keep in (True, False):
@@ -1305,11 +1306,17 @@ def main():
                             a, b = apply(frs, a), apply(fc, b)
                         if not (a - b):
                             cat = "content: several of the causes above"
-                            content["subsets satisfied under an explanation"] += 1
                             break
-                        if later_row and extends_cause(a - b, b):
-                            cat = EXTENDS
-                            break
+                if cat is None:
+                    a, b = mine, theirs
+                    for name, frs, fc in EXPLANATIONS:
+                        if name in LOSSY:
+                            continue
+                        a, b = apply(frs, a), apply(fc, b)
+                    if split_in_text and token_split_cause(a - b, b):
+                        cat = "continuation: inside a token (C joins or splits differently)"
+                    elif cont_row and extends_cause(a - b, b):
+                        cat = EXTENDS
                 if cat is None:
                     a, b = mine, theirs
                     for name, frs, fc in EXPLANATIONS:
@@ -1319,11 +1326,10 @@ def main():
                     note(label, "unclassified content: sudo-rs reading without a C entry", 0,
                          f"sudo-rs only: {list(a - b)[:2]}", 0)
                 else:
-                    content["subsets satisfied under an explanation"] += 1
-                    note(label, cat, 0, "the reading of a whole line needs the explanation to "
-                         "match a C entry", 0)
+                    content["subset rows"] += 1
+                    note(label, cat, 0, "the reading of a whole line needs this cause to match "
+                         "a C entry", 0)
 
-    n = len(corpus)
     n = len(corpus)
     print(f"cases: {n}; iteration reconstruction inconsistent: {len(inconsistent)} {inconsistent[:5]}\n")
     print("| corpus category | cases |\n|---|---|")
@@ -1335,8 +1341,7 @@ def main():
     print("\n| agreement | lines |\n|---|---|")
     for k, v in sorted(agree.items()):
         print(f"| {k} | {v} |")
-    print(f"\nEntries compared with `cvtsudoers -f json` (both accept the file): {content['compared']} "
-          f"cases, {content['equal']} equal.\n")
+    print()
     print("| difference category | differences | cases |\n|---|---|---|")
     for k, v in sorted(diff.items(), key=lambda kv: (-kv[1], kv[0])):
         print(f"| {k} | {v} | {len(diff_cases[k])} |")
@@ -1348,7 +1353,7 @@ def main():
           f"({content['no content comparison (JSON not parseable)']} of them with unparseable "
           f"JSON); "
           f"subsets satisfied directly {content['subsets satisfied directly']}, "
-          f"under an explanation {content['subsets satisfied under an explanation']}")
+          f"subset rows {content['subset rows']}")
     print(f"  full-file equal {content['files equal']}; C entries without a sudo-rs reading "
           f"{content['C entries without a sudo-rs reading']} in "
           f"{content['files compared as a subset']} files, of which "

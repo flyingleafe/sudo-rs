@@ -311,25 +311,46 @@ as the reading of a whole logical line (not prefix acceptance, not F-P2) must ha
 entry directly or under a named explanation, and a missing one is a row with that explanation's
 name; C's remaining entries are counted.
 
-| Seed | Cases | Differences | Unclassified | Reconstruction | Host-dependent | Accounting: cases | Accounting: lines | Content full | Content subset | No JSON | Subset under an explanation | C entries without a reading | Both reject (agreement) | Advisory rows without an item |
+| Seed | Cases | Differences | Unclassified | Reconstruction | Host-dependent | Accounting: cases | Accounting: lines | Content full | Content subset | No JSON | Subset rows | C entries without a reading | Both reject (agreement) | Advisory rows without an item |
 |---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| 1 | 29,024 | 20,407 | 0 | 0 | 6 | 0 | 0 | 8,342 | 3,040 | 17,642 | 124 | 10,398 | 17,812 | 1 |
-| 2 | 29,024 | 20,673 | 0 | 0 | 7 | 0 | 0 | 8,381 | 3,072 | 17,571 | 122 | 12,440 | 17,601 | 6 |
-| 3 | 29,024 | 20,192 | 0 | 0 | 6 | 0 | 0 | 8,307 | 3,093 | 17,624 | 120 | 10,954 | 17,762 | 1 |
-| 4 | 29,024 | 20,059 | 0 | 0 | 4 | 0 | 0 | 8,452 | 3,046 | 17,526 | 144 | 11,582 | 17,644 | 3 |
-| 5 | 29,024 | 20,140 | 0 | 0 | 6 | 0 | 0 | 8,301 | 3,082 | 17,641 | 136 | 11,730 | 17,792 | 2 |
-| 6 | 29,024 | 19,971 | 0 | 0 | 6 | 0 | 0 | 8,341 | 3,055 | 17,628 | 142 | 11,211 | 17,754 | 3 |
-| 7 | 29,024 | 20,562 | 0 | 0 | 7 | 0 | 0 | 8,363 | 3,153 | 17,508 | 138 | 9,213 | 17,630 | 2 |
-| 8 | 29,024 | 20,328 | 0 | 0 | 5 | 0 | 0 | 8,374 | 3,099 | 17,551 | 106 | 10,718 | 17,560 | 2 |
-| **Total** | **232,192** | **162,332** | **0** | | | **0** | **0** | **66,861** | **24,640** | **140,691** | **1,032** | **88,246** | **141,555** | **20** |
-The 1,032 "subset under an explanation" rows are readings whose C counterpart has the same entry
-only after one of the named transformations (word split at `=` or an escape, quoted forms, `#N`
-ids, escaped space, a command token cut by a continuation). 88,246 C entries have no sudo-rs
-reading; they belong to lines sudo-rs rejected or read as comments, which the line rows cover.
-**They cannot be attributed one by one to lines:** the JSON carries no line numbers and one line
-can produce several C entries (a rule split at `:`, an alias with several definitions). In 2,372
-of the 24,640 subset files (about 10%) C has more entries than there are row-bearing lines without
-a reading; that number is a coarse bound, not a defect, and no cause is claimed from it.
+| 1 | 29,024 | 20,407 | 0 | 0 | 6 | 0 | 0 | 8,342 | 3,040 | 17,642 | 62 | 10,398 | 17,812 | 1 |
+| 2 | 29,024 | 20,673 | 0 | 0 | 7 | 0 | 0 | 8,381 | 3,072 | 17,571 | 61 | 12,440 | 17,601 | 6 |
+| 3 | 29,024 | 20,192 | 0 | 0 | 6 | 0 | 0 | 8,307 | 3,093 | 17,624 | 60 | 10,954 | 17,762 | 1 |
+| 4 | 29,024 | 20,059 | 0 | 0 | 4 | 0 | 0 | 8,452 | 3,046 | 17,526 | 72 | 11,582 | 17,644 | 3 |
+| 5 | 29,024 | 20,140 | 0 | 0 | 6 | 0 | 0 | 8,301 | 3,082 | 17,641 | 68 | 11,730 | 17,792 | 2 |
+| 6 | 29,024 | 19,971 | 0 | 0 | 6 | 0 | 0 | 8,341 | 3,055 | 17,628 | 71 | 11,211 | 17,754 | 3 |
+| 7 | 29,024 | 20,562 | 0 | 0 | 7 | 0 | 0 | 8,363 | 3,153 | 17,508 | 69 | 9,213 | 17,630 | 2 |
+| 8 | 29,024 | 20,328 | 0 | 0 | 5 | 0 | 0 | 8,374 | 3,099 | 17,551 | 53 | 10,718 | 17,560 | 2 |
+| **Total** | **232,192** | **162,332** | **0** | | | **0** | **0** | **66,861** | **24,640** | **140,691** | **516** | **88,246** | **141,555** | **20** |
+
+The 516 subset rows are readings whose C counterpart has the same entry only after one of the
+named transformations. Each is named by the explanation that equates them, tried in the order:
+direct inclusion, each single explanation, the combination ("several of the causes above");
+a continuation or extension cause is considered only after those and only when the text supports
+it (a backslash-newline inside the command word, or a continuation/F-P2 row on that logical
+line). By category:
+
+| Subset row category | Rows |
+|---|---:|
+| user id: '#N' that C reads as a name, sudo-rs as an id | 289 |
+| quoted '%:' group: sudo-rs reads a Unix group whose name starts with ':' | 75 |
+| quoted upper-case word: a user name for sudo-rs, an alias for C | 64 |
+| command: C splits a word at '=' or after an escape, sudo-rs keeps it whole | 50 |
+| content: several of the causes above | 16 |
+| quoted "ALL": the ALL keyword for C, a name for sudo-rs | 7 |
+| F-P5: command path canonicalized by sudo-rs at parse time | 6 |
+| quoted '%:#N': sudo-rs and C read the non-unix group name differently | 5 |
+| continuation: inside a token (C joins or splits differently) | 4 |
+
+The four continuation rows each have a backslash-newline inside the command word concerned; no
+row is named by a cause the text does not show. 88,246 C entries have no sudo-rs
+reading. They are expected on lines sudo-rs rejected or read as comments, but the comparison
+**cannot verify that entry by entry**: the JSON carries no line numbers and one line can produce
+several C entries (a rule split at `:`, an alias with several definitions). In 2,372 of the
+24,640 subset files (about 10%) C has more entries than there are row-bearing lines without a
+reading; that number is a coarse bound, not a defect, and no cause is claimed from it. A line
+that sudo-rs skips without any diagnostic is therefore certain to be seen only in the 66,861
+files both parsers accept, where the entry multisets must be equal.
 
 ### Limits of the comparison, next to the "0 unclassified"
 
@@ -495,19 +516,39 @@ a reading; that number is a coarse bound, not a defect, and no cause is claimed 
 | token class: C stops at 'u' where sudo-rs continues | 1 | 1 |
 | token class: C stops at 'x' where sudo-rs continues | 1 | 1 |
 | token class: non-ASCII character (C stops) | 1 | 1 |
-### Regression against the rows of `93218068`
 
-All 154,141 rows of that run are kept at their logical line (the comparator's own keys):
+### Against the classifier of `58a225fe`
 
-| Regression group (rows of the earlier classifier) | Rows |
+With the classifier of `58a225fe` the same inputs gave 146,026 rows in 108,696 cases, 172 of
+them unclassified. Now there are 162,332 rows in 118,568 cases and none is unclassified; the
+172 are all named. 13 cases have fewer rows than before (16 rows in all): there the earlier
+classifier attributed an error to the wrong logical line, which gave either two rows for one
+disagreement or a row for a line that both parsers reject.
+
+The 16,306 additional rows are differences the earlier classifier did not count:
+
+| Not counted before | Rows |
 |---|---:|
-| kept at its logical line | 154,141 |
-The 8,191 new rows are: 7,673 `unused alias: C warns, sudo-rs has no counterpart` (the
-`Warning:` lines, previously dropped), 1,032 content rows for a reading that matches only under a
-named explanation, and 20 advisory rows on lines where sudo-rs read a comment or nothing (named
-F-P4), plus the redistribution of about 500 rows into the category that now names their cause
-(`user id: '#N'`, `continuation: inside a token`, `quoted '%:' group`, `quoted upper-case word`,
-`content: several of the causes above`). The old categories all keep a row: no row was dropped.
+| `Warning:` lines about an unused alias | 7,673 |
+| missing final newline after a comment or blank last line | 3,999 |
+| content of files C accepts and sudo-rs rejects in part (subset comparison) | 516 |
+| sudo-rs reports an error on a line where C prints only an advisory (taken for a rejection by both before); named by the sudo-rs cause, the largest being the CHROOT option (1,144), IPv4 addresses (601) and netgroups (274) | about 3,600 |
+
+**Against the rows of `f0f87b0e`.** Every one of its 162,332 rows is kept at its key; the only
+change is the category of 95 subset rows, all from the cause the earlier revision guessed
+("continuation: inside a token") to the explanation that actually equates the reading:
+
+| Old category (`f0f87b0e`) | New category | Rows |
+|---|---|---:|
+| continuation: inside a token (C joins or splits differently) | command: C splits a word at '=' or after an escape, sudo-rs keeps it whole | 50 |
+| continuation: inside a token (C joins or splits differently) | user id: '#N' that C reads as a name, sudo-rs as an id | 30 |
+| continuation: inside a token (C joins or splits differently) | quoted '%:' group: sudo-rs reads a Unix group whose name starts with ':' | 7 |
+| continuation: inside a token (C joins or splits differently) | quoted upper-case word: a user name for sudo-rs, an alias for C | 4 |
+| continuation: inside a token (C joins or splits differently) | content: several of the causes above | 3 |
+| continuation: inside a token (C joins or splits differently) | quoted "ALL": the ALL keyword for C, a name for sudo-rs | 1 |
+
+The four subset rows still named "continuation: inside a token" pass the textual test: their
+reading's logical line holds a backslash-newline inside the command word concerned.
 
 ## 7. Running
 
