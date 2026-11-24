@@ -28,11 +28,14 @@ log "commit $commit"
 proofs/quint/observe/prepare-input.sh "$commit" "$work/in" | tee -a "$summary"
 
 rc=0
+# Exit status of guest-run is the guest command's (124: guest timeout, 125: no result).
 "$GUEST_RUN" "$work/in" "$work/guest" 900 -- sh /fixture/guest-run.sh /fixture /out || rc=$?
-rsync -a --exclude /out/bin/ "$work/guest/" "$OMNIRUN_OUTPUT/guest/"
-guest_rc=$(cat "$work/guest/meta/rc" 2>/dev/null || echo missing)
-log "guest launcher exit $rc, guest command exit $guest_rc"
-if [ "$rc" != 0 ] || [ "$guest_rc" != 0 ]; then
+if [ -d "$work/guest" ]; then
+  cp -a "$work/guest" "$OMNIRUN_OUTPUT/guest"
+  rm -rf "$OMNIRUN_OUTPUT/guest/out/bin"   # the binary stays out; its hash is in the observation
+fi
+log "guest-run exit $rc"
+if [ "$rc" != 0 ]; then
   [ -f "$work/guest/out/REFUSED" ] && log "guest refused: $(cat "$work/guest/out/REFUSED")"
   exit 1
 fi
