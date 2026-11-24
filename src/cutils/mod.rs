@@ -150,6 +150,18 @@ pub fn pipe() -> std::io::Result<[OwnedFd; 2]> {
     Ok(pipes)
 }
 
+/// `fnmatch(3)` with `FNM_PATHNAME`: `Ok(true)` on a match, `Ok(false)` on `FNM_NOMATCH`, the
+/// return value otherwise. Test-only reference for `sudoers::test::glob_fnmatch`.
+#[cfg(test)]
+pub(crate) fn fnmatch_pathname(pattern: &CStr, path: &CStr) -> Result<bool, c_int> {
+    // SAFETY: both pointers come from live `CStr`s (NUL-terminated); `fnmatch` only reads them.
+    match unsafe { libc::fnmatch(pattern.as_ptr(), path.as_ptr(), libc::FNM_PATHNAME) } {
+        0 => Ok(true),
+        libc::FNM_NOMATCH => Ok(false),
+        other => Err(other),
+    }
+}
+
 #[cfg(kani)]
 mod kani_proofs;
 

@@ -7,6 +7,7 @@ use basic_parser::{Status, parse_eval, parse_fatal, parse_lines, parse_string};
 
 pub(super) mod analysis;
 mod differential;
+mod glob_fnmatch;
 mod legacy_analysis;
 mod legacy_defaults;
 mod parser_dump;
