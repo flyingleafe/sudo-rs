@@ -132,10 +132,13 @@ re-checks it (copied source, engine trusted files, fresh export, instruction wor
 the object file, clean build, axioms). Trusted: the Lean kernel, the engine's ISA and memory
 model and its `parseDecimalU32`, and the specification.
 
-The full path from text through analysis and Defaults scoping to authorization, real OS identity lookup,
-glob matching, credential changes, authentication, command execution, rustc, and the
-deployed binary are outside the verified boundary. The Quint lifecycle model is a
-separate abstraction, not a proof about the Rust execution path.
+For stable, include-free input, the text proof covers the decoded characters through analysis,
+Defaults scoping and the returned authorization. It does not establish that the file was
+opened securely, that real identity lookups or glob matching satisfy their contracts, or
+that the installed binary authenticates, changes credentials and executes as authorized.
+The Quint lifecycle model describes these later steps separately; it is not a refinement
+proof of the Rust execution path. The AArch64 result above concerns one compiled parser,
+not the compiler or the complete `sudo` binary.
 
 The fork changes alias-membership storage from a hash table to a linear list for
 extraction. Resolving many dependent aliases can therefore be quadratic. Treat
