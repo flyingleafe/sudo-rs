@@ -899,9 +899,8 @@ def content_category(mine, theirs, text):
     if cat:
         return cat
     if [e for e in only_c if e[0] == "rule"] and not [e for e in only_rs if e[0] == "rule"] and \
-            re.search(r"(^|[\n])[ \t]*#[^\n]*\\\\[\n]", text):
-        return ("comment ending in a backslash: C joins the next line into the comment, "
-                "sudo-rs does not")
+            re.search(r"(^|[\n])[ \t]*#[^\n]*\\[\n]", text):
+        return ("comment ending in a backslash: sudo-rs loses the next line, C keeps it")
     for e in only_rs:
         for f in only_c:
             if e[0] == f[0] == "rule" and e[1] == f[1] and e[2] == f[2]:

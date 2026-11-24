@@ -311,7 +311,7 @@ Each names the textual construct or the C diagnostic that causes the difference:
 | quoted name: sudo-rs keeps the part before a character its unquoted token does not accept | the text inside a quoted user is re-parsed as an unquoted token and the rest is dropped. |
 | quoted '%:' group: sudo-rs reads a Unix group whose name starts with ':' | a quoted `"%:Name"` becomes a Unix group named `:Name` for sudo-rs and a non-unix group for C. |
 | quoted '%:#N': sudo-rs and C read the non-unix group name differently | the numeric non-unix group of a quoted `"%:#N"` is a gid for one reader and no name for the other. |
-| comment ending in a backslash: C joins the next line into the comment, sudo-rs does not | a comment whose line ends in a backslash extends over the next line in C only. |
+| comment ending in a backslash: sudo-rs loses the next line, C keeps it | a comment whose last character is a backslash makes sudo-rs read the following line as part of it, while C reads that line as a line of its own. |
 | Defaults! scope: a second '!' with no item after it | `Defaults!!` starts a command negation that has no item, which sudo-rs rejects and C accepts. |
 | Defaults keyword glued to a word: a user name for C, a Defaults line for sudo-rs | `Defaults<word>` without a separator is a user name for C and a Defaults line for sudo-rs. |
 | user: empty netgroup rejected by C | `+` with no name is an empty netgroup for C. |
