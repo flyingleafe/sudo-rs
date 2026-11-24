@@ -282,17 +282,15 @@ reported line or content difference, not a distinct bug.
 
 ### Method
 
-The comparator also reports the two accounting values of the checks below and exits nonzero when
-either is not zero. An earlier revision of this section (commit `47b937a9`) reported 145,913 rows
-with 0 unclassified; it treated the advisory shapes as rejections and dropped the
-missing-final-newline rows, so its per-seed numbers are superseded by the tables here.
-
-**Severities.** `visudo -c` writes three kinds of message: errors (the file is rejected),
-`Warning: …` lines, and messages that name no severity but occur in files it *accepts* — alias
-notes and deprecations. The comparator derives the last group from the data of the run (every
-message shape that occurs where the exit status is 0) and calls it an advisory. The shapes are
-printed in every report; a new shape shows up there and, being unknown, would count as an error
-until classified.
+**Message severities.** `visudo -c` writes errors (the file is rejected), `Warning: …` lines, and
+messages without severity that occur in files it *accepts*. The comparator derives the last group
+from the data of the run (every shape that occurs where the exit status is 0) and calls it an
+advisory. Warnings and advisories get a named row per logical line; the comparator prints the
+complete table of shapes with treatment and count, so a new shape cannot pass unnoticed. On a
+line where sudo-rs read a comment or nothing, an advisory row is named `F-P4: '#' line read as a
+comment by sudo-rs, a rule for C` — C's advisory proves C read a line sudo-rs did not; otherwise
+the advisory's own category names it (`alias: checked by C at parse time`, `unused alias: C
+warns, sudo-rs has no counterpart`).
 
 | Advisory message shape (occurs where `visudo -c` exits 0, so never a rejection) | Occurrences |
 |---|---:|
@@ -305,84 +303,74 @@ until classified.
 | `cycle in Host_Alias "…"` | 10 |
 | `cycle in Runas_Alias "…"` | 20 |
 | `cycle in User_Alias "…"` | 7 |
-An advisory keeps its named row when sudo-rs accepts the line (that is the "alias: checked by C"
-category). It never makes C reject a line: on a logical line where C has only advisories, a
-sudo-rs error or garbage is a difference, named by the sudo-rs cause, one row per logical line.
 
-**Two accounting checks** are part of the comparator and printed in every report; a nonzero
-result makes it exit 1.
+**Content comparison scope.** `cvtsudoers -f json` exists for every file C accepts. Where both
+parsers accept the whole file the entry multisets must be equal (the categories of the full-file
+content rows). Where C accepts and sudo-rs does not, every sudo-rs item that the line pass treats
+as the reading of a whole logical line (not prefix acceptance, not F-P2) must have an equal C
+entry directly or under a named explanation, and a missing one is a row with that explanation's
+name; C's remaining entries are counted.
 
-1. Case level: (some `fatal` record) differs from (`visudo -c` exit status nonzero) implies at
-   least one row for the case.
-2. Line level: for every logical line, (a sudo-rs diagnostic attributed to it) xor (a C error on
-   it) implies a row on that line, or a counted reason why not. One reason exists: "F-P2: rest of
-   a logical line that already has a row", counted per run (0 on these seeds, since a `mid` error
-   is only skipped when its line already has a row or an agreed rejection).
+| Seed | Cases | Differences | Unclassified | Reconstruction | Host-dependent | Accounting: cases | Accounting: lines | Content full | Content subset | No JSON | Subset under an explanation | C entries without a reading | Both reject (agreement) | Advisory rows without an item |
+|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| 1 | 29,024 | 20,407 | 0 | 0 | 6 | 0 | 0 | 8,342 | 3,040 | 17,642 | 124 | 10,398 | 17,812 | 1 |
+| 2 | 29,024 | 20,673 | 0 | 0 | 7 | 0 | 0 | 8,381 | 3,072 | 17,571 | 122 | 12,440 | 17,601 | 6 |
+| 3 | 29,024 | 20,192 | 0 | 0 | 6 | 0 | 0 | 8,307 | 3,093 | 17,624 | 120 | 10,954 | 17,762 | 1 |
+| 4 | 29,024 | 20,059 | 0 | 0 | 4 | 0 | 0 | 8,452 | 3,046 | 17,526 | 144 | 11,582 | 17,644 | 3 |
+| 5 | 29,024 | 20,140 | 0 | 0 | 6 | 0 | 0 | 8,301 | 3,082 | 17,641 | 136 | 11,730 | 17,792 | 2 |
+| 6 | 29,024 | 19,971 | 0 | 0 | 6 | 0 | 0 | 8,341 | 3,055 | 17,628 | 142 | 11,211 | 17,754 | 3 |
+| 7 | 29,024 | 20,562 | 0 | 0 | 7 | 0 | 0 | 8,363 | 3,153 | 17,508 | 138 | 9,213 | 17,630 | 2 |
+| 8 | 29,024 | 20,328 | 0 | 0 | 5 | 0 | 0 | 8,374 | 3,099 | 17,551 | 106 | 10,718 | 17,560 | 2 |
+| **Total** | **232,192** | **162,332** | **0** | | | **0** | **0** | **66,861** | **24,640** | **140,691** | **1,032** | **88,246** | **141,555** | **20** |
+The 1,032 "subset under an explanation" rows are readings whose C counterpart has the same entry
+only after one of the named transformations (word split at `=` or an escape, quoted forms, `#N`
+ids, escaped space, a command token cut by a continuation). 88,246 C entries have no sudo-rs
+reading; they belong to lines sudo-rs rejected or read as comments, which the line rows cover.
+**They cannot be attributed one by one to lines:** the JSON carries no line numbers and one line
+can produce several C entries (a rule split at `:`, an alias with several definitions). In 2,372
+of the 24,640 subset files (about 10%) C has more entries than there are row-bearing lines without
+a reading; that number is a coarse bound, not a defect, and no cause is claimed from it.
 
-**Iteration attribution.** An error names the line of the construct, so it starts the next
-iteration there; an accepted item ends no later than the line of the next error record (a
-comment inside the item can end it before its logical line does). A `mid` error is skipped only
-when its logical line already has a row or an agreed rejection.
+### Limits of the comparison, next to the "0 unclassified"
 
-**What is normalized before the comparison, and why it cannot make two different readings
-equal.**
-
-| Normalization | Why not a source of false equality |
-|---|---|
-| Argument marker (`*`, `""`) folded into `(kind, args)` and re-derived canonically for both sides | it is a function of `(kind, args)` computed by the same code for both readers: it only drops the printing of a distinction the kind and argument list already carry |
-| C's marker words removed from the argument list | `*` without a required argument and no marker mean the same thing for C (`any arguments allowed`); every other combination stays distinguishable by kind and arguments |
-| Lists compared as multisets (`sorted` keys) | the comparison is deliberately order-insensitive: a difference only in the order of a list's members is not counted. Both readers preserve file order, so this hides nothing that was measured; it is stated as a limit |
-| `Commands`/`runasusers` read by `c_spec`; a `username`/`hostname` shaped like an alias name read as an alias reference | `cvtsudoers` prints alias references in the member's own kind. A C user literally named `ADMINS` and an alias reference `ADMINS` become the same key: stated as a limit |
-| Defaults binding kinds `:` and `>` merged into `user|runas` | the JSON does not record which of the two it is; stated as a limit |
-| Explanations (`c_word_join`, `split_path_space`, `binding_path_join`, quoted forms, `#N` ids, F-P4, F-P5) | each is applied to one side, tested for full equality, and counted under its own category: they are reported causes, not silent equality |
-
-### Results
-
-Job `parser-p0-head-593602`, input commit `58a225fe`, host `ddy28`, dump v2, C sudo 1.9.18
-(`d58e85d8`); the eight seeds classified offline with `parser_compare.py` on the laptop.
-29,024 cases per seed, no panic record, no reconstruction failure. The two accounting columns
-are the checks above.
-
-| Seed | Cases | Differences | Unclassified | Reconstruction | Host-dependent | Accounting: cases | Accounting: lines |
-|---:|---:|---:|---:|---:|---:|---:|---:|
-| 1 | 29,024 | 19,400 | 0 | 0 | 6 | 0 | 0 |
-| 2 | 29,024 | 19,618 | 0 | 0 | 7 | 0 | 0 |
-| 3 | 29,024 | 19,165 | 0 | 0 | 6 | 0 | 0 |
-| 4 | 29,024 | 19,037 | 0 | 0 | 4 | 0 | 0 |
-| 5 | 29,024 | 19,180 | 0 | 0 | 6 | 0 | 0 |
-| 6 | 29,024 | 18,973 | 0 | 0 | 6 | 0 | 0 |
-| 7 | 29,024 | 19,458 | 0 | 0 | 7 | 0 | 0 |
-| 8 | 29,024 | 19,310 | 0 | 0 | 5 | 0 | 0 |
-| **Total** | **232,192** | **154,141** | **0** | | | **0** | **0** |
-
-**Host dependence.** `canonicalize` runs on the laptop, the dump was produced on `ddy28`. The
-`hostdep` files name 47 cases over the eight seeds; no row of them needed the canonicalization
-model, and none fell into the comparison-limit category, so the totals do not depend on the host
-for these seeds.
+- **Agreements.** A logical line on which both parsers report a rejection is an agreement and gets
+  no row, whatever the two reasons are: 141,555 lines over the eight seeds.
+- **Order.** List members are compared as multisets; a difference only in their order is not
+  counted. Both readers preserve file order, so nothing measured was hidden; stated as a limit.
+- **Alias-shaped names and binding kinds.** A C `username`/`hostname` shaped like an alias name is
+  read as an alias reference (that is how `cvtsudoers` prints one), and a `Defaults` binding's `:`
+  and `>` are merged because the JSON does not record which it is.
+- **C messages.** Every shape is counted with its treatment (table above for the most frequent;
+  the comparator prints all of them). A `Warning:` line is a row, not an exclusion.
+- **Host dependence.** 47 `hostdep` cases hold 43 rows; none needs the canonicalization model, and
+  none falls into the comparison-limit category, so the totals do not depend on the host here.
+- **Lossy transport.** The harness decodes C's bytes lossily, so a non-UTF-8 byte in a member
+  arrives as U+FFFD; the JSON is taken from its first `{`. No file of these seeds failed to parse.
 
 ### Totals per category (all eight seeds)
 
 | Category | Differences | Cases |
 |---|---:|---:|
-| alias: checked by C at parse time (sudo-rs: in analysis) | 37,265 | 30,113 |
+| alias: checked by C at parse time (sudo-rs: in analysis) | 37,246 | 30,098 |
 | negation: '!' separated by whitespace rejected by C | 25,817 | 22,018 |
 | end of file: last line without newline | 7,716 | 7,716 |
+| unused alias: C warns, sudo-rs has no counterpart | 7,673 | 6,929 |
 | command: directory with arguments rejected by C | 6,254 | 6,042 |
 | escape: sequence rejected by sudo-rs | 5,622 | 5,560 |
 | host: IPv4 address rejected by sudo-rs | 4,092 | 3,813 |
 | include: target does not exist or has the wrong type | 4,072 | 3,802 |
 | F-P1: prefix acceptance (rule; C reports an error) | 3,920 | 3,797 |
-| Defaults or option: value check stricter in C | 3,799 | 3,687 |
-| F-P5: command path canonicalized by sudo-rs at parse time | 3,494 | 3,494 |
+| Defaults or option: value check stricter in C | 3,798 | 3,686 |
+| F-P5: command path canonicalized by sudo-rs at parse time | 3,500 | 3,500 |
 | limit: list length (sudo-rs 127) | 3,154 | 3,154 |
 | negation: '!' followed by whitespace in a Defaults binding rejected by C | 2,875 | 2,796 |
 | unsupported by sudo-rs: netgroup | 2,759 | 2,701 |
 | limit: token length (sudo-rs MAX_LEN) | 2,725 | 2,724 |
 | Defaults: value or kind check stricter in sudo-rs | 2,448 | 2,353 |
 | token class: non-ASCII character (sudo-rs stops) | 2,263 | 2,172 |
-| continuation: inside a token (C joins or splits differently) | 1,991 | 1,769 |
+| continuation: inside a token (C joins or splits differently) | 2,090 | 1,863 |
+| user id: '#N' that C reads as a name, sudo-rs as an id | 2,031 | 2,031 |
 | keyword as a name: reserved by C, a name or alias for sudo-rs | 1,803 | 1,780 |
-| user id: '#N' that C reads as a name, sudo-rs as an id | 1,772 | 1,772 |
 | continuation: backslash after whitespace not followed by newline | 1,748 | 1,739 |
 | include: path or directive syntax | 1,511 | 1,493 |
 | token class: end of line (C stops) | 1,508 | 1,506 |
@@ -404,10 +392,10 @@ for these seeds.
 | F-P1: prefix acceptance (runas_alias; C keeps the prefix too) | 591 | 589 |
 | command: wildcard in arguments rejected by sudo-rs | 539 | 536 |
 | token class: '$' inside a user name | 536 | 532 |
+| quoted '%:' group: sudo-rs reads a Unix group whose name starts with ':' | 521 | 521 |
 | host: IPv6 address rejected by sudo-rs | 517 | 508 |
+| quoted upper-case word: a user name for sudo-rs, an alias for C | 504 | 504 |
 | option after tag rejected by C | 474 | 470 |
-| quoted '%:' group: sudo-rs reads a Unix group whose name starts with ':' | 453 | 453 |
-| quoted upper-case word: a user name for sudo-rs, an alias for C | 444 | 444 |
 | Defaults: quoted list item rejected by sudo-rs | 441 | 436 |
 | unsupported by sudo-rs: INTERCEPT option | 411 | 404 |
 | command: sudoedit argument check in C | 362 | 361 |
@@ -415,13 +403,13 @@ for these seeds.
 | Defaults: value syntax rejected by sudo-rs | 328 | 326 |
 | token class: carriage return (sudo-rs stops) | 299 | 297 |
 | limit: numeric id does not fit u32 | 285 | 284 |
+| F-P4: '#' line read as a comment by sudo-rs, a rule for C | 280 | 270 |
 | unsupported by sudo-rs: TIMEOUT option | 269 | 268 |
-| F-P4: '#' line read as a comment by sudo-rs, a rule for C | 258 | 258 |
 | unsupported by sudo-rs: regular expression | 256 | 255 |
 | command: C splits a word at '=' or after an escape, sudo-rs keeps it whole | 252 | 252 |
+| content: several of the causes above | 247 | 247 |
 | token class: end of line (sudo-rs stops) | 238 | 238 |
 | runas: an error inside the user list is discarded and the list ends early (F-P3) | 237 | 237 |
-| content: several of the causes above | 234 | 234 |
 | token class: C stops at 's' where sudo-rs continues | 189 | 189 |
 | command: glob syntax rejected by sudo-rs | 186 | 186 |
 | unsupported by sudo-rs: NOTBEFORE option | 150 | 150 |
@@ -448,11 +436,11 @@ for these seeds.
 | F-P1: prefix acceptance (user_alias; C keeps nothing) | 33 | 33 |
 | F-P1: prefix acceptance (runas_alias; C keeps nothing) | 31 | 31 |
 | command: 'list' with arguments rejected by C | 29 | 29 |
+| quoted "ALL": the ALL keyword for C, a name for sudo-rs | 27 | 27 |
 | token class: C stops at ',' where sudo-rs continues | 27 | 27 |
 | F-P1: prefix acceptance (includedir; C reports an error) | 26 | 26 |
 | token class: C stops at ':' where sudo-rs continues | 26 | 26 |
-| quoted "ALL": the ALL keyword for C, a name for sudo-rs | 21 | 21 |
-| quoted '%:#N': sudo-rs and C read the non-unix group name differently | 20 | 20 |
+| quoted '%:#N': sudo-rs and C read the non-unix group name differently | 25 | 25 |
 | token class: sudo-rs stops at '$' where C continues | 18 | 18 |
 | token class: sudo-rs stops at '=' where C continues | 18 | 18 |
 | user: '%' without a group name | 15 | 15 |
@@ -507,39 +495,19 @@ for these seeds.
 | token class: C stops at 'u' where sudo-rs continues | 1 | 1 |
 | token class: C stops at 'x' where sudo-rs continues | 1 | 1 |
 | token class: non-ASCII character (C stops) | 1 | 1 |
-### Regression against the version-1 classifier
+### Regression against the rows of `93218068`
 
-The version-1 classifier (commit `58a225fe`) reported 146,026 rows for these seeds and left 172
-without a cause; this one reports 154,141 rows and leaves 0. Every one of the old rows is
-accounted for:
+All 154,141 rows of that run are kept at their logical line (the comparator's own keys):
 
 | Regression group (rows of the earlier classifier) | Rows |
 |---|---:|
-| kept at its logical line | 146,000 |
-| same case, cause now named differently | 13 |
-| attribution moved to the logical line of the line the error names | 8 |
-| genuine double count: both sides report on that logical line | 5 |
-
-Examples, moved: seed 2 continuation:419 line 3 -> rows at [2, 5] (same category); seed 3 continuation:225 line 7 -> rows at [1] (same category); seed 3 mut.swap-char.continuation:286 line 7 -> rows at [1, 5, 11] (same category); seed 4 continuation:763 line 7 -> rows at [1, 5, 9] (same category); seed 4 continuation:979 line 3 -> rows at [1, 5] (same category)
-
-Examples, other: seed 1 continuation:340 line 3: `continuation: inside a token (C joins or splits differently)` -> rows at [1, 7]; seed 1 continuation:340 line 5: `continuation: inside a token (C joins or splits differently)` -> rows at [1, 7]; seed 2 mut.insert-char.continuation:812 line 5: `token class: sudo-rs stops at '/' where C continues` -> rows at [1]; seed 3 continuation:755 line 3: `continuation: backslash after whitespace not followed by newline` -> rows at [1]; seed 3 mut.splice-lines.rule:711 line 4: `unclassified: sudo-rs stops early, C accepts` -> rows at [1, 2]
-
-Examples, lost: seed 5 mut.insert-char.continuation:401 line 3 `continuation: inside a token (C joins or splits differently)`: the case's logical line has a sudo-rs error and a C error, so it is an agreement; seed 5 mut.splice-lines.mixed:248 line 3 `continuation: inside a token (C joins or splits differently)`: the case's logical line has a sudo-rs error and a C error, so it is an agreement; seed 5 mut.splice-lines.mixed:248 line 5 `token class: end of line (C stops)`: the case's logical line has a sudo-rs error and a C error, so it is an agreement; seed 5 mut.splice-lines.continuation:436 line 3 `continuation: inside a token (C joins or splits differently)`: the case's logical line has a sudo-rs error and a C error, so it is an agreement; seed 5 mut.splice-lines.continuation:436 line 5 `token class: C stops at ':' where sudo-rs continues`: the case's logical line has a sudo-rs error and a C error, so it is an agreement
-
-
-The 5 "genuine double count" rows are two old rows of one logical line where both sides report
-an error (the old model attributed the sudo-rs error to one physical line and the C error to
-another of the same logical line); the corrected attribution puts both on the logical line, which
-is then an agreement and needs no row. The 8 moved rows keep their category and are recorded at
-the logical line of the line the error names. The 13 "cause now named differently" rows are
-lines where a message-based rule now wins over a character-class fallback (examples:
-`continuation:340` twice, `mut.insert-char.continuation:812`, `continuation:755`,
-`mut.splice-lines.rule:711`).
-
-The rise from 146,026 to 154,141 rows has three causes, each verified above: 7,716 rows for a
-missing final newline after a comment or blank last line (previously dropped), advisory-only
-lines keep their row while no longer making a line an agreement (so a sudo-rs error on such a
-line now has a row), and the corrected attribution of `mid` errors.
+| kept at its logical line | 154,141 |
+The 8,191 new rows are: 7,673 `unused alias: C warns, sudo-rs has no counterpart` (the
+`Warning:` lines, previously dropped), 1,032 content rows for a reading that matches only under a
+named explanation, and 20 advisory rows on lines where sudo-rs read a comment or nothing (named
+F-P4), plus the redistribution of about 500 rows into the category that now names their cause
+(`user id: '#N'`, `continuation: inside a token`, `quoted '%:' group`, `quoted upper-case word`,
+`content: several of the causes above`). The old categories all keep a row: no row was dropped.
 
 ## 7. Running
 

@@ -85,6 +85,18 @@ def read_dump(path):
     return out
 
 
+def json_of(raw):
+    """C's cvtsudoers output as JSON, or None. The harness decodes the tool's bytes lossily, so
+    a non-UTF-8 byte in a member leaves a replacement character before the opening brace."""
+    text = raw[raw.find("{"):] if "{" in raw else ""
+    if not text.strip():
+        return {}
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError:
+        return None
+
+
 def read_hostdep(path):
     """Labels of the cases whose command patterns name existing host paths (the harness writes
     them next to the dump). Such a case can be canonicalized here and not there, or the other
@@ -466,6 +478,7 @@ C_RULES = [
     (r"unknown defaults entry", "Defaults: setting unknown to C"),
     (r"empty group", "user: '%' without a group name"),
     (r"^empty netgroup$", "user: empty netgroup rejected by C"),
+    (r"^unused \w+_Alias\b", "unused alias: C warns, sudo-rs has no counterpart"),
     (r"^: ", "include: empty path after the directive (C reports the open failure)"),
     (r"is (world|group) writable$|not owned by|is not owned|wrong owner|wrong mode",
      "include: C checks the include target's owner and mode, sudo-rs leaves it to the open"),
@@ -905,6 +918,63 @@ def part_cause(x, y):
     return None
 
 
+def _nows(part):
+    """A command part with the spaces of its pattern removed, for the continuation relation."""
+    neg, x = part
+    if isinstance(x, tuple) and x[0] == "cmd":
+        return (neg, ("cmd", x[1].replace(" ", ""), x[2]))
+    return part
+
+
+def token_split_cause(missing, theirs):
+    """True when each unmatched entry differs from a C entry of the same kind and key only in
+    how a command token was split across a line continuation (the paths agree once the spaces
+    the continuation introduced are removed)."""
+    for e in missing:
+        hit = False
+        for f in theirs:
+            if e[0] != f[0] or len(e) != len(f):
+                continue
+            if e[0] == "rule":
+                if e[1] == f[1] and e[2] == f[2]:
+                    rs = sorted(_nows(x)[1][1] if _nows(x)[1][0] == "cmd" else repr(x) for x in e[3])
+                    cs = [_nows(x)[1][1] if _nows(x)[1][0] == "cmd" else repr(x) for x in f[3]]
+                    if all(any(c.startswith(r) or r.startswith(c) for c in cs) for r in rs):
+                        hit = True
+                        break
+            elif e[0].endswith("_alias") and e[1:2] == f[1:2]:
+                rs = [x for x in e[2]]
+                cs = [x for x in f[2]]
+                if all(any(_nows(x)[1][0] != "cmd" or _nows(y)[1][0] != "cmd" or
+                           _nows(y)[1][1].startswith(_nows(x)[1][1]) or
+                           _nows(x)[1][1].startswith(_nows(y)[1][1]) for y in cs) for x in rs):
+                    hit = True
+                    break
+        if not hit:
+            return False
+    return True
+
+
+def extends_cause(missing, theirs):
+    """True when every unmatched sudo-rs entry is matched by a C entry of the same kind and
+    key whose command (or member) list merely extends it: C read further commands of the same
+    rule, from a line sudo-rs rejected."""
+    pending = list(missing.elements())
+    if not pending:
+        return False
+    for e in pending:
+        if e[0] != "rule":
+            return False
+        hit = False
+        for f in theirs:
+            if f[0] == "rule" and f[1] == e[1] and f[2] == e[2] and set(e[3]) < set(f[3]):
+                hit = True
+                break
+        if not hit:
+            return False
+    return True
+
+
 def member_cause(only_rs, only_c):
     """Name the first differing member of unmatched entries of the same kind."""
     for e in only_rs:
@@ -1000,6 +1070,8 @@ def main():
     acct = collections.Counter()
     acct_cases = collections.defaultdict(list)
     rows = collections.Counter()
+    shapes = collections.Counter()
+    advisories_without_item = collections.Counter()
 
     def note(label, cat, line, info, ll=None):
         diff[cat] += 1
@@ -1031,19 +1103,20 @@ def main():
         skipped = collections.Counter()      # named reason why no row is needed on a line
         c_err = collections.defaultdict(list)
         c_adv = collections.defaultdict(list)
+        c_adv_kind = {}
         c_unplaced = []
         for line, col, msg, sev in c_messages(c, text):
             if sev == "error" and msg_shape(msg) in advisories:
                 sev = "advisory"  # the shape occurs in files visudo accepted: not a rejection
-            if sev == "warning":
-                continue
             if line is None:
                 if sev == "error":
                     c_unplaced.append((line, col, msg))
-            elif sev == "advisory":
+            elif sev in ("advisory", "warning"):
                 c_adv[start.get(line, line)].append((line, col, msg))
+                c_adv_kind[start.get(line, line)] = sev
             else:
                 c_err[start.get(line, line)].append((line, col, msg))
+            shapes[(sev, msg_shape(msg))] += 1
 
         def first_c(cerr, logical):
             for cm in cerr:
@@ -1131,10 +1204,18 @@ def main():
                              LL, cjoin(cerr), LL)
             elif kind == "panic":
                 note(label, "sudo-rs panics", L, it["msg"])
+        item_lines = {start.get(it["line"], it["line"]) for it in its if it["kind"] == "item"}
         for LL, cadv in c_adv.items():
             if LL in c_err or LL in agreed_lines or rows[LL]:
                 continue
             logical = logical_text(lines, start, LL)
+            if LL not in item_lines:
+                # sudo-rs read a comment or nothing here while C read a line that names an
+                # alias or deprecates a setting: the line is a comment for sudo-rs only
+                advisories_without_item[c_adv_kind.get(LL, "advisory")] += 1
+                note(label, "F-P4: '#' line read as a comment by sudo-rs, a rule for C",
+                     LL, cjoin(cadv), LL)
+                continue
             note(label, first_c(cadv, logical) or "unclassified: C advisory without a category",
                  LL, cjoin(cadv), LL)
         for LL, cerr in c_err.items():
@@ -1157,23 +1238,92 @@ def main():
                 continue
             acct["lines: one side reports, the other does not, no row"] += 1
             acct_cases["line: no row"].append(f"{label}:{LL}")
-        if rs_clean and c_clean and c.get("cvt") and c["cvt"][0] == 0:
-            items = [r[3:] for r in recs if r.startswith("ok ")]
-            mine = collections.Counter(rs_entries(items))
-            js = json.loads(c["cvt"][1]) if c["cvt"][1].strip() else {}
+        # ---- content comparison: every file C accepted (its JSON) is compared
+        js_raw = c.get("cvt")
+        js = None
+        if js_raw and js_raw[0] == 0:
+            js = json_of(js_raw[1])
+            if js is None:
+                content["no content comparison (JSON not parseable)"] += 1
+        if js is None:
+            content["no content comparison (C rejects the file)"] += 1
+        else:
             theirs = collections.Counter(c_entries(js))
-            content["compared"] += 1
-            if mine == theirs:
-                content["equal"] += 1
+            if rs_clean:
+                content["files compared in full"] += 1
+                mine = collections.Counter(rs_entries([r[3:] for r in recs if r.startswith("ok ")]))
+                if mine == theirs:
+                    content["files equal"] += 1
+                else:
+                    only_rs, only_c = list(mine - theirs), list(theirs - mine)
+                    cat = content_category(mine, theirs, text)
+                    if label in hostdep and cat.startswith(("unclassified", "content: several")):
+                        cat = ("comparison limit: the case names an existing host path, so the "
+                               "pattern can be canonicalized on one host only (hostdep)")
+                    note(label, cat, 0,
+                         f"sudo-rs only: {only_rs[:2]} C only: {only_c[:2]}", 0)
             else:
-                only_rs, only_c = list(mine - theirs), list(theirs - mine)
-                cat = content_category(mine, theirs, text)
-                if label in hostdep and cat.startswith(("unclassified", "content: several")):
-                    cat = ("comparison limit: the case names an existing host path, so the "
-                           "pattern can be canonicalized on one host only (hostdep)")
-                note(label, cat, 0,
-                     f"sudo-rs only: {only_rs[:2]} C only: {only_c[:2]}", 0)
+                # C accepted the file and sudo-rs did not: compare the items sudo-rs read as a
+                # whole logical line (not prefix acceptance, not F-P2) with C's entries.
+                content["files compared as a subset"] += 1
+                readings = [it for it in its if it["kind"] == "item" and not it.get("artifact")
+                            and start.get(it["line"], it["line"]) == it["line"]
+                            and it["garbage"] is None]
+                mine = collections.Counter(rs_entries([it["item"] for it in readings]))
+                extra = sum((theirs - mine).values())
+                content["C entries without a sudo-rs reading"] += extra
+                read_lines = {start.get(it["line"], it["line"]) for it in readings}
+                if extra > len([LL for LL in rows if LL not in read_lines]):
+                    content["cases where C has more entries than row-bearing lines"] += 1
+                if not (mine - theirs):
+                    content["subsets satisfied directly"] += 1
+                    continue
+                EXTENDS = ("command list: C's entry extends the sudo-rs reading (the rest of "
+                           "the line was read only by C)")
+                later_row = bool(rows)  # the extension must be on a line that has a row
+                cat = None
+                for name, frs, fc in EXPLANATIONS:
+                    a, b = apply(frs, mine), apply(fc, theirs)
+                    if not (a - b):
+                        cat = name
+                        content["subsets satisfied under an explanation"] += 1
+                        break
+                    if later_row and token_split_cause(a - b, b):
+                        cat = "continuation: inside a token (C joins or splits differently)"
+                        content["subsets satisfied under an explanation"] += 1
+                        break
+                    if later_row and extends_cause(a - b, b):
+                        cat = EXTENDS
+                        content["subsets satisfied under an explanation"] += 1
+                        break
+                if cat is None:
+                    for keep in (True, False):
+                        a, b = mine, theirs
+                        for name, frs, fc in EXPLANATIONS:
+                            if keep and name in LOSSY:
+                                continue
+                            a, b = apply(frs, a), apply(fc, b)
+                        if not (a - b):
+                            cat = "content: several of the causes above"
+                            content["subsets satisfied under an explanation"] += 1
+                            break
+                        if later_row and extends_cause(a - b, b):
+                            cat = EXTENDS
+                            break
+                if cat is None:
+                    a, b = mine, theirs
+                    for name, frs, fc in EXPLANATIONS:
+                        if name in LOSSY:
+                            continue
+                        a, b = apply(frs, a), apply(fc, b)
+                    note(label, "unclassified content: sudo-rs reading without a C entry", 0,
+                         f"sudo-rs only: {list(a - b)[:2]}", 0)
+                else:
+                    content["subsets satisfied under an explanation"] += 1
+                    note(label, cat, 0, "the reading of a whole line needs the explanation to "
+                         "match a C entry", 0)
 
+    n = len(corpus)
     n = len(corpus)
     print(f"cases: {n}; iteration reconstruction inconsistent: {len(inconsistent)} {inconsistent[:5]}\n")
     print("| corpus category | cases |\n|---|---|")
@@ -1192,6 +1342,24 @@ def main():
         print(f"| {k} | {v} | {len(diff_cases[k])} |")
     unclassified = sum(v for k, v in diff.items() if k.startswith("unclassified"))
     print(f"\ndifferences: {sum(diff.values())}; unclassified: {unclassified}")
+    print(f"\ncontent scope: files compared in full {content['files compared in full']}, "
+          f"as a subset {content['files compared as a subset']}, "
+          f"no comparison {content['no content comparison (C rejects the file)']} "
+          f"({content['no content comparison (JSON not parseable)']} of them with unparseable "
+          f"JSON); "
+          f"subsets satisfied directly {content['subsets satisfied directly']}, "
+          f"under an explanation {content['subsets satisfied under an explanation']}")
+    print(f"  full-file equal {content['files equal']}; C entries without a sudo-rs reading "
+          f"{content['C entries without a sudo-rs reading']} in "
+          f"{content['files compared as a subset']} files, of which "
+          f"{content['cases where C has more entries than row-bearing lines']} files hold more "
+          f"entries than row-bearing lines (no line attribution: the JSON has no line numbers)")
+    print(f"  advisory rows on lines where sudo-rs has an item {sum(diff[k] for k in diff if k.startswith(('alias:', 'unused alias')) )}, "
+          f"without an item (named F-P4) {advisories_without_item['advisory']}")
+    print("\nC message shapes and how each is treated:")
+    for (sev, shape), n in sorted(shapes.items(), key=lambda kv: (-kv[1], kv[0])):
+        treat = {"error": "rejection", "advisory": "advisory (row)", "warning": "warning (row)"}[sev]
+        print(f"  {n:6d}  {treat:14s} {shape}")
     print(f"\naccounting: case violations {acct['cases: diagnostics on one side only, no row']}, "
           f"line violations {acct['lines: one side reports, the other does not, no row']}")
     for reason, n in sorted(skipped.items()):
