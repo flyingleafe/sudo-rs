@@ -15,6 +15,10 @@ the compiled AArch64 `-u '#uid'` parser. For stable, include-free sudoers text,
 extracted parser, analyzer, Defaults passes, `check` and `Judgement::authorization` to the
 independent specification. It starts **after** the input is read and decoded, and ends at
 the returned decision and restrictions, not at OS execution. See the [text proof index](parser/README.md).
+Follow-up refinements cover request construction (target selection and the native PATH
+search), the environment-retention decision, and the credential drivers' order and
+fail-stop behavior. Each section below states its own oracle and representation
+assumptions; none of them extends to the operating system.
 
 ## Verification boundary
 
@@ -262,13 +266,18 @@ Each item says what kind of evidence it is. A test covers only the inputs it ran
   campaign at `58a225fe` ran every target for at least 2,700 seconds (173,633,180
   executions): eight targets saved no failing input, and all 6,981 saved `timestamp` inputs
   reproduce the two corrupt-file defects in the fuzz README; both fail closed.
-- **Kani** ([`kani/`](kani/README.md), bounded proof): 36 harnesses on the real functions
-  (`#[cfg(kani)]` modules), all passing in one run at `f20cfeb7`. They cover shell-mode
-  escaping (exact output up to one 5-byte argument or two 2-byte arguments; injectivity for
-  shapes such as [3] vs [1,1]), the arguments the policy sees in shell mode, the timestamp
-  record path (CVE-2023-42456 class), record encoding, decoding and matching, the user a new
-  record names under default, `targetpw` and `rootpw` authentication (CVE-2025-64517 class),
-  `PamBuffer` bounds and wiping, `cutils`, seccomp buffer allocation and `siginfo` reading.
+- **Kani** ([`kani/`](kani/README.md), bounded proof): 45 harnesses on the real functions
+  (`#[cfg(kani)]` modules); the 36 present at `f20cfeb7` passed in one run there. They cover
+  shell-mode escaping (exact output up to one 5-byte argument or two 2-byte arguments;
+  injectivity for shapes such as [3] vs [1,1]), the arguments the policy sees in shell mode,
+  the timestamp record path (CVE-2023-42456 class), record encoding, decoding and matching,
+  the user a new record names under default, `targetpw` and `rootpw` authentication
+  (CVE-2025-64517 class), `PamBuffer` bounds and wiping, `cutils`, seccomp buffer allocation
+  and `siginfo` reading. Nine more harnesses check the NOEXEC filter bytecode against its
+  dispatch contract, the owner/mode decision on an open handle, and group-list preparation
+  and credential order, fail-stop and restoration. The last eight passed on uni-cpu in
+  `assurance-kani-credscore-41b384` and `assurance-kani-credscore-5d6f51`, the filter harness
+  in `assurance-seccomp2-65adf9`.
   Four planted bugs (the pre-fix CVE-2023-42456 record path, a space kept by `escaped`, a
   `PamBuffer` one byte too long, record decoding without its seconds precondition) each fail
   a harness that passes on the clean tree.

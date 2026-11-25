@@ -27,7 +27,9 @@ establish a counterexample or a proof. All non-`PASS` statuses make the runner f
 
 At `f20cfeb7` all 36 harnesses passed in one Slurm job (8 CPUs, 24 GB requested, GCC 11.5).
 Three groups ran concurrently; each group ran its harnesses serially with a 3600 s timeout.
-The job had no additional per-harness memory limit.
+The job had no additional per-harness memory limit. Nine harnesses were added afterwards:
+the NOEXEC bytecode check, two file-policy checks and six credential-driver checks; see
+[Secure file opening and credential changes](#secure-file-opening-and-credential-changes).
 
 ```sh
 KANI_LIMITED=/nonexistent KANI_TIMEOUT=3600 proofs/kani/run.sh common::command::
