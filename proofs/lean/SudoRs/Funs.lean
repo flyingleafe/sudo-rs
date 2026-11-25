@@ -374,7 +374,7 @@ def common.path.SudoPath.Insts.CoreCloneClone.clone
   ok { inner := s }
 
 /-- [sudo_rs::common::resolve::target_fallback]:
-    Source: 'src/common/resolve.rs', lines 200:0-212:1 -/
+    Source: 'src/common/resolve.rs', lines 265:0-277:1 -/
 def common.resolve.target_fallback
   (user_given : Bool) (group_given : Bool) :
   Result common.resolve.TargetFallback
@@ -390,7 +390,7 @@ def common.resolve.target_fallback
     else ok common.resolve.TargetFallback.Root
 
 /-- [sudo_rs::common::resolve::select_target]:
-    Source: 'src/common/resolve.rs', lines 223:0-229:1 -/
+    Source: 'src/common/resolve.rs', lines 288:0-294:1 -/
 def common.resolve.select_target
   {U : Type _} {G : Type _} (user : Option U) (group : Option G) :
   Result (core.result.Result (U × G) common.resolve.TargetMissing)
@@ -401,6 +401,250 @@ def common.resolve.select_target
     match group with
     | none => ok (core.result.Result.Err common.resolve.TargetMissing.Group)
     | some group1 => ok (core.result.Result.Ok (user1, group1))
+
+/-- [sudo_rs::common::resolve::finish_target]:
+    Source: 'src/common/resolve.rs', lines 235:0-247:1 -/
+def common.resolve.finish_target
+  {A : Type _} {U : Type _} {G : Type _} {E : Type _} {L : Type _}
+  (TargetLookupInst : common.resolve.TargetLookup L A U G E) (lookup : L)
+  (user_arg : Option A) (group_arg : Option A) (target_user : Option U)
+  (target_group : Option G) :
+  Result (core.result.Result (U × G) E)
+  := do
+  let r ← common.resolve.select_target target_user target_group
+  match r with
+  | core.result.Result.Ok pair => ok (core.result.Result.Ok pair)
+  | core.result.Result.Err tm =>
+    match tm with
+    | common.resolve.TargetMissing.User =>
+      let t ← TargetLookupInst.user_not_found lookup user_arg
+      ok (core.result.Result.Err t)
+    | common.resolve.TargetMissing.Group =>
+      let t ← TargetLookupInst.group_not_found lookup group_arg
+      ok (core.result.Result.Err t)
+
+/-- [sudo_rs::common::resolve::resolve_target_core]:
+    Source: 'src/common/resolve.rs', lines 197:0-233:1 -/
+def common.resolve.resolve_target_core
+  {A : Type _} {U : Type _} {G : Type _} {E : Type _} {L : Type _}
+  (TargetLookupInst : common.resolve.TargetLookup L A U G E) (lookup : L)
+  (user_arg : Option A) (group_arg : Option A) :
+  Result (core.result.Result (U × G) E)
+  := do
+  let user_given := core.option.Option.is_some user_arg
+  let group_given := core.option.Option.is_some group_arg
+  match user_arg with
+  | none =>
+    match group_arg with
+    | none =>
+      let tf ← common.resolve.target_fallback user_given group_given
+      match tf with
+      | common.resolve.TargetFallback.Keep =>
+        common.resolve.finish_target TargetLookupInst lookup none none none
+          none
+      | common.resolve.TargetFallback.CurrentUser =>
+        let t ← TargetLookupInst.invoking_user lookup
+        common.resolve.finish_target TargetLookupInst lookup none none (some t)
+          none
+      | common.resolve.TargetFallback.PrimaryGroupIfFound =>
+        common.resolve.finish_target TargetLookupInst lookup none none none
+          none
+      | common.resolve.TargetFallback.Root =>
+        let r ← TargetLookupInst.root_user lookup
+        let cf ← core.result.Result.Insts.CoreOpsTry.branch r
+        match cf with
+        | core.ops.control_flow.ControlFlow.Continue val =>
+          let r1 ← TargetLookupInst.root_group lookup
+          let cf1 ← core.result.Result.Insts.CoreOpsTry.branch r1
+          match cf1 with
+          | core.ops.control_flow.ControlFlow.Continue val1 =>
+            common.resolve.finish_target TargetLookupInst lookup none none val
+              val1
+          | core.ops.control_flow.ControlFlow.Break residual =>
+            core.result.Result.Insts.CoreOpsTry_traitFromResidualResult.from_residual
+              (U × G) (core.convert.FromSame E) residual
+        | core.ops.control_flow.ControlFlow.Break residual =>
+          core.result.Result.Insts.CoreOpsTry_traitFromResidualResult.from_residual
+            (U × G) (core.convert.FromSame E) residual
+    | some input =>
+      let r ← TargetLookupInst.requested_group lookup input
+      let cf ← core.result.Result.Insts.CoreOpsTry.branch r
+      match cf with
+      | core.ops.control_flow.ControlFlow.Continue val =>
+        let tf ← common.resolve.target_fallback user_given group_given
+        match tf with
+        | common.resolve.TargetFallback.Keep =>
+          common.resolve.finish_target TargetLookupInst lookup none group_arg
+            none val
+        | common.resolve.TargetFallback.CurrentUser =>
+          let t ← TargetLookupInst.invoking_user lookup
+          common.resolve.finish_target TargetLookupInst lookup none group_arg
+            (some t) val
+        | common.resolve.TargetFallback.PrimaryGroupIfFound =>
+          common.resolve.finish_target TargetLookupInst lookup none group_arg
+            none val
+        | common.resolve.TargetFallback.Root =>
+          let r1 ← TargetLookupInst.root_user lookup
+          let cf1 ← core.result.Result.Insts.CoreOpsTry.branch r1
+          match cf1 with
+          | core.ops.control_flow.ControlFlow.Continue val1 =>
+            let r2 ← TargetLookupInst.root_group lookup
+            let cf2 ← core.result.Result.Insts.CoreOpsTry.branch r2
+            match cf2 with
+            | core.ops.control_flow.ControlFlow.Continue val2 =>
+              common.resolve.finish_target TargetLookupInst lookup none
+                group_arg val1 val2
+            | core.ops.control_flow.ControlFlow.Break residual =>
+              core.result.Result.Insts.CoreOpsTry_traitFromResidualResult.from_residual
+                (U × G) (core.convert.FromSame E) residual
+          | core.ops.control_flow.ControlFlow.Break residual =>
+            core.result.Result.Insts.CoreOpsTry_traitFromResidualResult.from_residual
+              (U × G) (core.convert.FromSame E) residual
+      | core.ops.control_flow.ControlFlow.Break residual =>
+        core.result.Result.Insts.CoreOpsTry_traitFromResidualResult.from_residual
+          (U × G) (core.convert.FromSame E) residual
+  | some input =>
+    let r ← TargetLookupInst.requested_user lookup input
+    let cf ← core.result.Result.Insts.CoreOpsTry.branch r
+    match cf with
+    | core.ops.control_flow.ControlFlow.Continue val =>
+      match group_arg with
+      | none =>
+        let tf ← common.resolve.target_fallback user_given group_given
+        match tf with
+        | common.resolve.TargetFallback.Keep =>
+          common.resolve.finish_target TargetLookupInst lookup user_arg none
+            val none
+        | common.resolve.TargetFallback.CurrentUser =>
+          let t ← TargetLookupInst.invoking_user lookup
+          common.resolve.finish_target TargetLookupInst lookup user_arg none
+            (some t) none
+        | common.resolve.TargetFallback.PrimaryGroupIfFound =>
+          match val with
+          | none =>
+            common.resolve.finish_target TargetLookupInst lookup user_arg none
+              none none
+          | some user =>
+            let r1 ← TargetLookupInst.primary_group lookup user
+            let cf1 ← core.result.Result.Insts.CoreOpsTry.branch r1
+            match cf1 with
+            | core.ops.control_flow.ControlFlow.Continue val1 =>
+              common.resolve.finish_target TargetLookupInst lookup user_arg
+                none val (some val1)
+            | core.ops.control_flow.ControlFlow.Break residual =>
+              core.result.Result.Insts.CoreOpsTry_traitFromResidualResult.from_residual
+                (U × G) (core.convert.FromSame E) residual
+        | common.resolve.TargetFallback.Root =>
+          let r1 ← TargetLookupInst.root_user lookup
+          let cf1 ← core.result.Result.Insts.CoreOpsTry.branch r1
+          match cf1 with
+          | core.ops.control_flow.ControlFlow.Continue val1 =>
+            let r2 ← TargetLookupInst.root_group lookup
+            let cf2 ← core.result.Result.Insts.CoreOpsTry.branch r2
+            match cf2 with
+            | core.ops.control_flow.ControlFlow.Continue val2 =>
+              common.resolve.finish_target TargetLookupInst lookup user_arg
+                none val1 val2
+            | core.ops.control_flow.ControlFlow.Break residual =>
+              core.result.Result.Insts.CoreOpsTry_traitFromResidualResult.from_residual
+                (U × G) (core.convert.FromSame E) residual
+          | core.ops.control_flow.ControlFlow.Break residual =>
+            core.result.Result.Insts.CoreOpsTry_traitFromResidualResult.from_residual
+              (U × G) (core.convert.FromSame E) residual
+      | some input1 =>
+        let r1 ← TargetLookupInst.requested_group lookup input1
+        let cf1 ← core.result.Result.Insts.CoreOpsTry.branch r1
+        match cf1 with
+        | core.ops.control_flow.ControlFlow.Continue val1 =>
+          let tf ← common.resolve.target_fallback user_given group_given
+          match tf with
+          | common.resolve.TargetFallback.Keep =>
+            common.resolve.finish_target TargetLookupInst lookup user_arg
+              group_arg val val1
+          | common.resolve.TargetFallback.CurrentUser =>
+            let t ← TargetLookupInst.invoking_user lookup
+            common.resolve.finish_target TargetLookupInst lookup user_arg
+              group_arg (some t) val1
+          | common.resolve.TargetFallback.PrimaryGroupIfFound =>
+            match val with
+            | none =>
+              common.resolve.finish_target TargetLookupInst lookup user_arg
+                group_arg none val1
+            | some user =>
+              let r2 ← TargetLookupInst.primary_group lookup user
+              let cf2 ← core.result.Result.Insts.CoreOpsTry.branch r2
+              match cf2 with
+              | core.ops.control_flow.ControlFlow.Continue val2 =>
+                common.resolve.finish_target TargetLookupInst lookup user_arg
+                  group_arg val (some val2)
+              | core.ops.control_flow.ControlFlow.Break residual =>
+                core.result.Result.Insts.CoreOpsTry_traitFromResidualResult.from_residual
+                  (U × G) (core.convert.FromSame E) residual
+          | common.resolve.TargetFallback.Root =>
+            let r2 ← TargetLookupInst.root_user lookup
+            let cf2 ← core.result.Result.Insts.CoreOpsTry.branch r2
+            match cf2 with
+            | core.ops.control_flow.ControlFlow.Continue val2 =>
+              let r3 ← TargetLookupInst.root_group lookup
+              let cf3 ← core.result.Result.Insts.CoreOpsTry.branch r3
+              match cf3 with
+              | core.ops.control_flow.ControlFlow.Continue val3 =>
+                common.resolve.finish_target TargetLookupInst lookup user_arg
+                  group_arg val2 val3
+              | core.ops.control_flow.ControlFlow.Break residual =>
+                core.result.Result.Insts.CoreOpsTry_traitFromResidualResult.from_residual
+                  (U × G) (core.convert.FromSame E) residual
+            | core.ops.control_flow.ControlFlow.Break residual =>
+              core.result.Result.Insts.CoreOpsTry_traitFromResidualResult.from_residual
+                (U × G) (core.convert.FromSame E) residual
+        | core.ops.control_flow.ControlFlow.Break residual =>
+          core.result.Result.Insts.CoreOpsTry_traitFromResidualResult.from_residual
+            (U × G) (core.convert.FromSame E) residual
+    | core.ops.control_flow.ControlFlow.Break residual =>
+      core.result.Result.Insts.CoreOpsTry_traitFromResidualResult.from_residual
+        (U × G) (core.convert.FromSame E) residual
+
+/-- [sudo_rs::common::resolve::search_path_core]: loop 0:
+    Source: 'src/common/resolve.rs', lines 365:4-374:1 -/
+@[rust_loop]
+def common.resolve.search_path_core_loop
+  {C : Type _} {D : Type _} {I : Type _} {Clause0_Candidate : Type _}
+  (SearchEntryInst : common.resolve.SearchEntry D C Clause0_Candidate)
+  (coreitertraitsiteratorIteratorInst : core.iter.traits.iterator.Iterator I D)
+  (entries : I) (command : C) :
+  Result (Option Clause0_Candidate)
+  := do
+  let (o, entries1) ← coreitertraitsiteratorIteratorInst.next entries
+  match o with
+  | none => ok none
+  | some dir =>
+    let b ← SearchEntryInst.is_absolute dir
+    if b
+    then
+      let candidate ← SearchEntryInst.join dir command
+      let b1 ← SearchEntryInst.is_executable candidate
+      if b1
+      then ok (some candidate)
+      else
+        common.resolve.search_path_core_loop SearchEntryInst
+          coreitertraitsiteratorIteratorInst entries1 command
+    else
+      common.resolve.search_path_core_loop SearchEntryInst
+        coreitertraitsiteratorIteratorInst entries1 command
+partial_fixpoint
+
+/-- [sudo_rs::common::resolve::search_path_core]:
+    Source: 'src/common/resolve.rs', lines 361:0-374:1 -/
+@[reducible]
+def common.resolve.search_path_core
+  {C : Type _} {D : Type _} {I : Type _} {Clause0_Candidate : Type _}
+  (SearchEntryInst : common.resolve.SearchEntry D C Clause0_Candidate)
+  (coreitertraitsiteratorIteratorInst : core.iter.traits.iterator.Iterator I D)
+  (entries : I) (command : C) :
+  Result (Option Clause0_Candidate)
+  := do
+  common.resolve.search_path_core_loop SearchEntryInst
+    coreitertraitsiteratorIteratorInst entries command
 
 /-- Trait implementation: [sudo_rs::common::string::{impl core::cmp::PartialEq<str> for sudo_rs::common::string::SudoString}]
     Source: 'src/common/string.rs', lines 112:0-117:1 -/

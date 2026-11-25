@@ -53,8 +53,21 @@ structure glob.MatchOptions where
 structure common.path.SudoPath where
   inner : String
 
+/-- Trait declaration: [sudo_rs::common::resolve::TargetLookup]
+    Source: 'src/common/resolve.rs', lines 145:0-154:1 -/
+structure common.resolve.TargetLookup (Self : Type _) (A : Type _) (U : Type _)
+  (G : Type _) (E : Type _) where
+  requested_user : Self → A → Result (core.result.Result (Option U) E)
+  requested_group : Self → A → Result (core.result.Result (Option G) E)
+  invoking_user : Self → Result U
+  primary_group : Self → U → Result (core.result.Result G E)
+  root_user : Self → Result (core.result.Result (Option U) E)
+  root_group : Self → Result (core.result.Result (Option G) E)
+  user_not_found : Self → Option A → Result E
+  group_not_found : Self → Option A → Result E
+
 /-- [sudo_rs::common::resolve::TargetFallback]
-    Source: 'src/common/resolve.rs', lines 187:0-196:1 -/
+    Source: 'src/common/resolve.rs', lines 252:0-261:1 -/
 @[discriminant isize]
 inductive common.resolve.TargetFallback where
 | Keep : common.resolve.TargetFallback
@@ -63,11 +76,19 @@ inductive common.resolve.TargetFallback where
 | Root : common.resolve.TargetFallback
 
 /-- [sudo_rs::common::resolve::TargetMissing]
-    Source: 'src/common/resolve.rs', lines 216:0-219:1 -/
+    Source: 'src/common/resolve.rs', lines 281:0-284:1 -/
 @[discriminant isize]
 inductive common.resolve.TargetMissing where
 | User : common.resolve.TargetMissing
 | Group : common.resolve.TargetMissing
+
+/-- Trait declaration: [sudo_rs::common::resolve::SearchEntry]
+    Source: 'src/common/resolve.rs', lines 335:0-341:1 -/
+structure common.resolve.SearchEntry (Self : Type _) (C : Type _)
+  (Self_Candidate : Type _) where
+  is_absolute : Self → Result Bool
+  join : Self → C → Result Self_Candidate
+  is_executable : Self_Candidate → Result Bool
 
 /-- [sudo_rs::defaults::ListMode]
     Source: 'src/defaults/mod.rs', lines 6:0-10:1

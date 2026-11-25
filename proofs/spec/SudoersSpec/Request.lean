@@ -82,14 +82,37 @@ private def observedBind (result : Observed U E A) (next : A → Observed U E B)
       let (more, out) := next value
       (log ++ more, out)
 
+@[simp] theorem observedBind_result (result : Observed U E A) (next : A → Observed U E B) :
+    (observedBind result next).2 = result.2.bind (fun a => (next a).2) := by
+  obtain ⟨_, result⟩ := result
+  cases result <;> rfl
+
 private def observedLookup (call : Lookup U) (answer : Except E A) : Observed U E A :=
   ([call], answer.mapError TargetError.lookup)
+
+@[simp] theorem observedLookup_result (call : Lookup U) (answer : Except E A) :
+    (observedLookup call answer).2 = answer.mapError TargetError.lookup := rfl
 
 private def optionalLookup (arg : Option TargetArg) (call : NameOrId → Lookup U)
     (query : NameOrId → Except E (Option A)) : Observed U E (Option A) :=
   match arg.bind TargetArg.key with
   | none => ([], .ok none)
   | some key => observedLookup (call key) (query key)
+
+/-- The return of the native name-or-ID dispatch on an explicit option. A parse failure
+produces an ordinary miss without an NSS call. -/
+def lookupAnswer (query : NameOrId → Except E (Option A)) (arg : TargetArg) :
+    Except (TargetError E) (Option A) :=
+  (arg.key.elim (.ok none) query).mapError TargetError.lookup
+
+@[simp] theorem optionalLookup_result (arg : Option TargetArg) (call : NameOrId → Lookup U)
+    (query : NameOrId → Except E (Option A)) :
+    (optionalLookup arg call query).2 =
+      arg.elim (.ok none) (lookupAnswer query) := by
+  cases arg with
+  | none => rfl
+  | some arg => cases h : arg.key <;> simp [optionalLookup, lookupAnswer, observedLookup, h,
+      Except.mapError]
 
 def finishTarget (userArg groupArg : Option TargetArg) (answer : Except Missing (U × G)) :
     Except (TargetError E) (U × G) :=
@@ -98,19 +121,17 @@ def finishTarget (userArg groupArg : Option TargetArg) (answer : Except Missing 
   | .error .user => .error (.userNotFound ((userArg.map TargetArg.raw).getD ""))
   | .error .group => .error (.groupNotFound ((groupArg.map TargetArg.raw).getD ""))
 
-/-- Parameterized by the two pure decisions extracted from `resolve_target_user_and_group`.
-The NSS calls remain outside extraction. `rootGroupName` is `root` on Linux and `wheel`
-otherwise. The primary-group lookup is made only on a found user. Both ordinary explicit
-lookups precede the fallback, so even a missing user does not suppress the group lookup. -/
-def resolveTargetBy (fallback : Bool → Bool → Fallback)
-    (select : Option U → Option G → Except Missing (U × G))
-    (nss : Nss U G E) (invoker : U) (rootGroupName : String) (userArg groupArg : Option TargetArg) :
+/-- `rootGroupName` is `root` on Linux and `wheel` otherwise. The primary-group lookup is
+made only on a found user. Both ordinary explicit lookups precede the fallback, so even a
+missing user does not suppress the group lookup. -/
+def resolveTarget (nss : Nss U G E) (invoker : U) (rootGroupName : String)
+    (userArg groupArg : Option TargetArg) :
     Observed U E (U × G) :=
   let finish (u : Option U) (g : Option G) : Observed U E (U × G) :=
-    ([], finishTarget userArg groupArg (select u g))
+    ([], finishTarget userArg groupArg (selectTarget u g))
   observedBind (optionalLookup userArg .user nss.user) fun u =>
     observedBind (optionalLookup groupArg .group nss.group) fun g =>
-      match fallback userArg.isSome groupArg.isSome with
+      match targetFallback userArg.isSome groupArg.isSome with
       | .keep => finish u g
       | .currentUser => finish (some invoker) g
       | .primaryGroupIfFound =>
@@ -124,17 +145,13 @@ def resolveTargetBy (fallback : Bool → Bool → Fallback)
             let key := NameOrId.name rootGroupName
             observedBind (observedLookup (.group key) (nss.group key)) fun group => finish user group
 
-def resolveTarget (nss : Nss U G E) (invoker : U) (rootGroupName : String)
-    (userArg groupArg : Option TargetArg) : Observed U E (U × G) :=
-  resolveTargetBy targetFallback selectTarget nss invoker rootGroupName userArg groupArg
-
 /-- A user NSS error, unlike a miss, suppresses the group lookup and every fallback. -/
 theorem user_lookup_error (nss : Nss U G E) (invoker : U) (rootGroupName : String)
     (arg : TargetArg) (groupArg : Option TargetArg) (key : NameOrId) (e : E)
     (parsed : arg.key = some key) (answer : nss.user key = .error e) :
     resolveTarget nss invoker rootGroupName (some arg) groupArg =
       ([.user key], .error (.lookup e)) := by
-  simp [resolveTarget, resolveTargetBy, optionalLookup, observedLookup, observedBind, parsed,
+  simp [resolveTarget, optionalLookup, observedLookup, observedBind, parsed,
     answer, Except.mapError]
 
 /-- On an ordinary missing explicit user, the explicit group call still runs. If it errors,
@@ -148,7 +165,7 @@ theorem ordinary_user_miss (nss : Nss U G E) (invoker : U) (rootGroupName : Stri
         | .error e => .error (.lookup e)
         | .ok _ => .error (.userNotFound userArg.raw)) := by
   cases answer : nss.group g <;>
-    simp [resolveTarget, resolveTargetBy, optionalLookup, observedLookup, observedBind, userKey,
+    simp [resolveTarget, optionalLookup, observedLookup, observedBind, userKey,
       groupKey, missed, answer, Except.mapError, targetFallback, finishTarget, selectTarget]
 
 abbrev Bytes := List UInt8
@@ -160,12 +177,19 @@ def isQualified (path : Bytes) : Bool :=
   path.isEmpty || path.head? == some 47 ||
     ((path.splitOn 47).drop 1).any (fun p => !p.isEmpty && p != [46])
 
+/-- `Path::join` on an absolute directory and an unqualified command: append the original
+command bytes, inserting a `/` if needed. -/
+def joinCandidate (dir command : Bytes) : Bytes :=
+  dir ++ (if dir.getLast? == some 47 then command else 47 :: command)
+
+/-- The ordered candidates for the remaining PATH entries, before filesystem checks. -/
+def pathCandidatesFrom (dirs : List Bytes) (command : Bytes) : List Bytes :=
+  (dirs.filter fun dir => dir.head? == some 47).map fun dir => joinCandidate dir command
+
 /-- The candidates `resolve_path` considers, in order, before metadata checks. Empty and
-relative PATH entries are skipped. The supplied command is unqualified; for those commands
-`Path::join` appends the original spelling, inserting a `/` only if needed. -/
+relative PATH entries are skipped. The supplied command is unqualified. -/
 def pathCandidates (path command : Bytes) : List Bytes :=
-  ((path.splitOn 58).filter fun dir => dir.head? == some 47).map fun dir =>
-    dir ++ (if dir.getLast? == some 47 then command else 47 :: command)
+  pathCandidatesFrom (path.splitOn 58) command
 
 /-- Filesystem answers in the context of `sudo_call` with the selected user and group. The
 fields are pointwise observations, not software implementations of the filesystem. -/
@@ -261,20 +285,20 @@ theorem ordinary_explicit_target :
     resolveTarget ordinaryNss 1002 "root"
       (some ⟨"alice", some (.name "alice")⟩) (some ⟨"staff", some (.name "staff")⟩) =
       ([.user (.name "alice"), .group (.name "staff")], .ok (1000, 1001)) := by
-  simp [resolveTarget, resolveTargetBy, optionalLookup, observedLookup, observedBind, ordinaryNss,
+  simp [resolveTarget, optionalLookup, observedLookup, observedBind, ordinaryNss,
     Except.mapError, targetFallback, finishTarget, selectTarget, Option.elim]
 
 theorem ordinary_missing_target :
     resolveTarget ordinaryNss 1002 "root"
       (some ⟨"missing", some (.name "missing")⟩) (some ⟨"staff", some (.name "staff")⟩) =
       ([.user (.name "missing"), .group (.name "staff")], .error (.userNotFound "missing")) := by
-  simp [resolveTarget, resolveTargetBy, optionalLookup, observedLookup, observedBind, ordinaryNss,
+  simp [resolveTarget, optionalLookup, observedLookup, observedBind, ordinaryNss,
     Except.mapError, targetFallback, finishTarget, selectTarget, Option.elim]
 
 theorem ordinary_primary_group :
     resolveTarget ordinaryNss 1002 "root" (some ⟨"alice", some (.name "alice")⟩) none =
       ([.user (.name "alice"), .primaryGroup 1000], .ok (1000, 1000)) := by
-  simp [resolveTarget, resolveTargetBy, optionalLookup, observedLookup, observedBind, ordinaryNss,
+  simp [resolveTarget, optionalLookup, observedLookup, observedBind, ordinaryNss,
     Except.mapError, targetFallback, finishTarget, selectTarget, Option.elim]
 
 private def ordinaryFs : Filesystem where

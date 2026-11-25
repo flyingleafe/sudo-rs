@@ -272,6 +272,11 @@ of `SudoRs/{Types,Funs}External.lean` are definitions or `opaque` constants, nev
 #print axioms SudoRsProofs.Request.target_fallback_eq
 #print axioms SudoRsProofs.Request.select_target_eq
 #print axioms SudoRsProofs.Request.resolve_target_refines
+#print axioms SudoRsProofs.Request.target_stops_at_user_error
+#print axioms SudoRsProofs.Request.target_group_error_after_user_miss
 #print axioms SudoRsProofs.Request.select_command_path_eq
+#print axioms SudoRsProofs.Request.search_path_refines
+#print axioms SudoRsProofs.Request.search_path_stops_at_hit
+#print axioms SudoRsProofs.Request.search_path_skips_relative
 #print axioms SudoRsProofs.Request.command_path_refines
 #print axioms SudoRsProofs.Request.direct_command_refines
