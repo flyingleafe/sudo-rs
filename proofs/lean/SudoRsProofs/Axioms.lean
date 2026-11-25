@@ -37,6 +37,7 @@ import SudoRsProofs.Parser.Analysis.ReferenceFit
 import SudoRsProofs.Parser.TextExample
 import SudoRsProofs.Parser.Scoping.ListValidate
 import SudoRsProofs.Request
+import SudoRsProofs.EnvFilter
 
 /-!
 # Axiom audit
@@ -280,3 +281,9 @@ of `SudoRs/{Types,Funs}External.lean` are definitions or `opaque` constants, nev
 #print axioms SudoRsProofs.Request.search_path_skips_relative
 #print axioms SudoRsProofs.Request.command_path_refines
 #print axioms SudoRsProofs.Request.direct_command_refines
+#print axioms SudoRsProofs.EnvFilter.wildcard_match_eq
+#print axioms SudoRsProofs.EnvFilter.in_table_eq
+#print axioms SudoRsProofs.EnvFilter.is_safe_tz_eq
+#print axioms SudoRsProofs.EnvFilter.should_keep_eq
+#print axioms SudoRsProofs.EnvFilter.keep_inherited_eq
+#print axioms SudoRsProofs.EnvFilter.should_keep_sound

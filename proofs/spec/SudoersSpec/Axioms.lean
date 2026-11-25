@@ -22,6 +22,7 @@ import SudoersSpec.Grammar.SudoAmbiguity
 import SudoersSpec.Grammar.SudoUnique
 import SudoersSpec.Settings.ListValidate
 import SudoersSpec.Request
+import SudoersSpec.EnvFilter
 
 /-! Axiom audit: every main result depends on at most `propext`, `Classical.choice` and
 `Quot.sound`. `lake build` prints the lists. -/
@@ -362,3 +363,9 @@ open SudoersSpec
 #print axioms SudoersSpec.Request.ordinary_missing_target
 #print axioms SudoersSpec.Request.ordinary_primary_group
 #print axioms SudoersSpec.Request.ordinary_direct_command
+#print axioms SudoersSpec.EnvFilter.greedy_correct
+#print axioms SudoersSpec.EnvFilter.inTable_perm
+#print axioms SudoersSpec.EnvFilter.shouldKeep_check
+#print axioms SudoersSpec.EnvFilter.shouldKeep_tz
+#print axioms SudoersSpec.EnvFilter.shouldKeep_sound
+#print axioms SudoersSpec.EnvFilter.tzSafe_sound
