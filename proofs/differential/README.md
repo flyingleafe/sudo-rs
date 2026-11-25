@@ -36,6 +36,9 @@ switched in) agrees with `testsudoers` on every case, and the spec and C sudo di
 The property search (`./props.sh`) ran every property on at least 10,000 instances whose
 precondition holds; see *Properties of the real code*.
 
+The separate [command-path glob comparison](#command-path-glob-conformance) exercises
+path patterns that the three-way policy generator does not produce.
+
 ## Running
 
 ```
@@ -214,8 +217,9 @@ user, so the harness replaces the test process's own name there by the invoking 
 
 ### Lean hygiene
 
-`lake build` builds the package with no `sorry`, no `axiom` and no `native_decide`. The only
-theorems, `CModel.decide_off` and its helper `CModel.ite_isSome`, are proved.
+`lake build` builds the package with no `sorry`, no `axiom` and no `native_decide`.
+`CModel.decide_off` (with helper `CModel.ite_isSome`) proves the all-switches-off case;
+the separate generator proof and axiom report are in `Differential.OrdinaryPolicyRange`.
 
 ## Upper-case names
 
@@ -418,9 +422,24 @@ test):
 - `digests_are_rejected_at_parse`: `sha224:`, `sha256:`, `sha384:`, `sha512:` digests are
   rejected the same way, in a rule and in a `Cmnd_Alias` (which then matches nothing).
 
+## Command-path glob conformance
+
+[`glob-fnmatch.sh`](glob-fnmatch.sh) runs the opt-in
+[`glob_fnmatch_conformance`](../../src/sudoers/test/glob_fnmatch.rs) test. It compares
+sudo-rs's actual `compile_pattern` and `match_command` (no arguments, `glob` 0.3.4)
+with libc `fnmatch(3)` (`FNM_PATHNAME`, GNU libc 2.34, C locale), not with C sudo.
+
+In job `assurance-glob-fixed-9d3cb6`, the 802 patterns × 156 paths gave 125,112
+comparisons: 9,474 matches, 115,638 nonmatches and no disagreements. Both invalid-syntax
+controls were rejected by `compile_pattern` and excluded from the comparison.
+This is test evidence for the bounded ASCII fragment of literals, `/`, `?`, `*` and
+closed bracket expressions (lists, `!` negation and ranges). It does not cover `**`,
+other bracket dialects, escapes, other locales, non-ASCII paths, path canonicalization,
+or command-argument matching.
+
 ## What limits coverage
 
-- **Fragment.** The generator never produces:
+- **Fragment.** The three-way policy generator never produces:
   - glob metacharacters in paths, directories (`/dir/`), `sudoedit`, `list` or digests;
   - `Defaults`, `@include`, netgroups, `%:group`, or host wildcards and IP addresses;
   - `CWD=`, `APPARMOR_PROFILE=` and the ignored or unsupported tags (so the `cwd` and

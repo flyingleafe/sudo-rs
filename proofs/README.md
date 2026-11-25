@@ -3,9 +3,9 @@
 **Result.** Lean proves that the extracted `sudoers::check_permission` and
 `sudoers::permission_flags` return the same decision and tags as the hand-written spec.
 The latter includes the root/self password-tag adjustment from `Sudoers::check`.
-The same is proved for the tags behind `sudo -v` and `sudo -l` (`validate_flags`, `list_flags`)
-and for the mapping from a decision and the Defaults in force to the terms of execution
-(`Judgement::authorization`).
+The proofs also cover the `sudo -v` and `sudo -l` permission wrappers, including the
+Defaults they apply, and the mapping from a decision and the Defaults in force to the
+terms of execution (`Judgement::authorization`).
 The policy proofs (P1–P9) start from a parsed policy and a resolved request, not an invocation
 of `sudo`. They transfer to the extracted code under the oracle and representation assumptions
 below. Alias flattening preserves decisions and tags under the stated conditions, not
@@ -33,13 +33,22 @@ in valid dependency order. Exact tag equality after whole-policy alias expansion
 additional conditions, stated in `clean_expanded_flags`. [Input bounds and primitive model
 agreements](lean/ASSUMPTIONS.md#parser-and-analysis-boundaries) still apply.
 
-[`validate_flags_eq` and `list_flags_eq`](lean/SudoRsProofs/ListValidate.lean) make the
-same statement for the tags that `sudo -v` and `sudo -l` compute, against
-`SudoersSpec.validateFlags` and `SudoersSpec.listFlags`. `list_flags_eq` also assumes
-that `UnixUser::group` is a pure function (`GroupOracle`) and that `Path::new("list")`
-reads as `list` (`ListPath`); `sudo -v` and listing one's own entries need neither.
-The Defaults handling in `check_validate_permission` and `check_list_permission` and
-the `sudo -l` printing code are not verified.
+[`validate_flags_eq` and `list_flags_eq`](lean/SudoRsProofs/ListValidate.lean) compare
+the raw tags with `SudoersSpec.validateFlags` and `SudoersSpec.listFlags`.
+The [wrapper proofs](lean/SudoRsProofs/Parser/Scoping/ListValidate.lean)
+(`check_validate_permission_eq`, `check_list_permission_eq`) compare the returned
+`Authorization<()>` and policy settings on well-formed inputs. Validation applies only
+non-command Defaults, with no runas target. The list wrapper leaves the policy unchanged
+when listing oneself; for another user it applies both Defaults passes with the inspected
+user as runas and `list` as the command, with no arguments. The other-user branch needs
+the glob contract, a pure primary-group `GroupOracle` and `ListPath` for `Path::new("list")`;
+validation and self-listing do not.
+
+Separately, `search_path_then_check_list_permission_eq` composes the extracted
+`specify_host_user_runas` pass with the `-u` target before the list wrapper, as in the
+list pipeline. The first pass consumes the non-command customisers, so the wrapper cannot
+apply them again for the inspected user. This proves the result of those calls in order,
+not `search_path` itself, authentication, or selection and printing of listing entries.
 
 [`authorization_eq`](lean/SudoRsProofs/Authorization.lean) proves that the extracted
 `Judgement::authorization`, with `Settings::to_auth`, returns `ok` and equals
@@ -55,6 +64,16 @@ The [proof witnesses](lean/SudoRsProofs/NonVacuity.lean) apply the theorem to a
 synthetic policy that permits one user with explicit tags and denies another.
 They retain the glob-interface assumption. A separate spec-level negative
 control proves that an always-deny decision does not refine the spec.
+
+[`TextExample.text_allows` and `text_refuses`](lean/SudoRsProofs/Parser/TextExample.lean)
+instantiate `text_to_authorization` on one decoded, include-free file and synthetic
+accounts. The file sets `Defaults !use_pty` and grants `alice` `NOPASSWD: ALL` as root.
+Her request for `root:root` is allowed without authentication or a pty, with implicit
+`SETENV`; requesting `bob:bob` returns `Forbidden`. Both runs have no diagnostics.
+The proof discharges the input bounds, local-file domain, identity agreement and literal
+host matching. It retains `P2Oracle` (character classes, canonicalization, glob compilation
+and native argument conversion), `Latin1Agrees`, `RenderAgrees` and `GlobOracle` (glob
+matching and injective argument keys), even though the fixture does not query a glob.
 
 The decision theorem assumes valid alias-order indices, representable string and
 modifier lengths, and agreement of the identity and command-matching interfaces
@@ -111,6 +130,21 @@ results differ only by the implicit `SETENV` of a literal `ALL`
 (`authorize_expandAliases_rel`). Kernel-checked counterexamples show both conditions are
 needed; C sudo 1.9.18 behaves the same on those cases (test).
 
+[Request construction](lean/SudoRsProofs/Request.lean): `target_fallback_eq` and
+`select_target_eq` prove the extracted fallback and user/group selection decisions.
+`resolve_target_refines` composes them in a resolver model that preserves the result,
+including errors, and lookup order, given the resolved invoker, parsed option keys,
+platform root-group name and NSS answers for name/ID and primary-group lookups.
+A missing record and a lookup error are distinct. This is not a proof of native NSS.
+`select_command_path_eq` proves the extracted path and `resolved` selection.
+When search is enabled, `command_path_refines` assumes the first executable candidate
+from the ordered absolute PATH entries, or a miss. It takes a pointwise canonicalization
+answer (resolve the parent, keep the final filename, check existence) and does not try
+another candidate if that fails. Native PATH traversal is not verified.
+`direct_command_refines` starts with nonempty direct argv represented as bytes and assumes
+the Unix qualified-path test. It preserves the original `arg0` and argv tail even if
+resolution fails; it does not verify argv conversion, the context wrapper or credential changes.
+
 [Argument escaping](lean/SudoRsProofs/Escape.lean) for `sudo -s`/`-i`: the extracted
 `escaped` (`src/common/command.rs`) equals `SudoersSpec.Escape.escapeArgs` for every input
 (`escaped_eq`, `escaped_spec`): it succeeds exactly when the line fits in `usize::MAX` bytes,
@@ -134,11 +168,11 @@ model and its `parseDecimalU32`, and the specification.
 
 For stable, include-free input, the text proof covers the decoded characters through analysis,
 Defaults scoping and the returned authorization. It does not establish that the file was
-opened securely, that real identity lookups or glob matching satisfy their contracts, or
-that the installed binary authenticates, changes credentials and executes as authorized.
-The Quint lifecycle model describes these later steps separately; it is not a refinement
-proof of the Rust execution path. The AArch64 result above concerns one compiled parser,
-not the compiler or the complete `sudo` binary.
+opened securely, that native request construction or glob matching satisfies its contracts,
+or that the installed binary authenticates, changes credentials and executes as authorized.
+The Quint lifecycle model describes these later steps separately; the trace tests below
+are not a refinement proof of the Rust execution path. The AArch64 result above concerns
+one compiled parser, not the compiler or the complete `sudo` binary.
 
 The fork changes alias-membership storage from a hash table to a linear list for
 extraction. Resolving many dependent aliases can therefore be quadratic. Treat
@@ -155,6 +189,31 @@ Each item says what kind of evidence it is. A test covers only the inputs it ran
   cases the spec and sudo-rs agree on every verdict, every tag field and every alias
   diagnostic; a C model agrees with C sudo on all 17,335 cases C sudo accepts, which
   explains every spec/C difference.
+- **Glob comparison** ([`differential/`](differential/README.md#command-path-glob-conformance),
+  test): the real `compile_pattern` and `match_command` agreed with libc `fnmatch` on all
+  125,112 pairs in a bounded common glob fragment. This tests neither C sudo nor the
+  general glob-oracle contract.
+- **NOEXEC bytecode** ([model](../src/exec/noexec/filter_model.rs),
+  [runner](seccomp/run.sh), symbolic checks and bounded proof): `assurance-seccomp2-65adf9`
+  passed the native tests and 16 Miri target builds. The symbolic checks compare the
+  production filter to its modeled classic BPF dispatch contract over all `2^64`
+  `(nr, arch)` pairs for `x86_64`, `x86`, `aarch64`, `arm`, `mips`, `mipsel`, `mips64`,
+  `mips64el`, `powerpc`, `powerpc64`, `powerpc64le`, `riscv32`, `riscv64` and `s390x`.
+  Two unrecognized targets (`loongarch64`, `sparc64`) use the fallback contract, which
+  leaves `arch == 0` unspecified. One native x86-64 Kani harness checks arbitrary
+  `seccomp_data` against that target's contract; a separate native enumeration checks
+  all `2^32` syscall numbers for each architecture value in its test set. The checks
+  do not install the filter or verify the kernel, the notification handler, or every
+  build configuration.
+- **Lifecycle observations** ([Quint](quint/README.md#observed-traces), test):
+  `lifecycle-trace-efd543` replayed two runs of the real debug binary at pre-integration
+  `bdd31ae3`, not the integrated binary, against fixture-pinned verdicts. An ordinary
+  permitted command ran with the target credentials; an ordinary refused command did
+  not execute. The recorder rejected seven edited captures and Quint rejected eight
+  edited model inputs. The launch reproduced setuid-root credentials without a setuid
+  file, so secure-exec behavior was not tested. The PAM account helper (`unix_chkpwd`)
+  was observed only in the permitted run and is outside Quint. The replay does not
+  verify PAM or generalize beyond these two runs.
 - **Property search on the real code** (`differential/`, test): seven properties stated in
   Lean (lines of other users are irrelevant, appending without a command-side `!` never
   revokes, unmentioned users/hosts/commands are never allowed, textual alias expansion,
@@ -198,12 +257,13 @@ Each item says what kind of evidence it is. A test covers only the inputs it ran
 | `extract.sh` | Rust → LLBC (Charon) → Lean 4 (Aeneas) extraction. |
 | `lean/` | Lake project: generated code (`SudoRs`) and proofs (`SudoRsProofs`). |
 | `spec/` | Hand-written Lean specification of the authorization decision. |
-| `quint/` | Quint model of the surrounding lifecycle. |
+| [`quint/`](quint/README.md) | Quint model of the surrounding lifecycle and trace replay harness. |
 | `check.sh` | Local gate for proof builds, axiom audit, model checks, and sudoers unit tests. |
-| `differential/` | Unprivileged comparison of the Lean, Rust and C policy decisions; property search on the real code. |
+| [`differential/`](differential/README.md) | Unprivileged policy comparisons, property search, and command-path glob conformance. |
 | `sanitizers/` | Unit suite under debug overflow checks, AddressSanitizer and Miri. |
 | `../fuzz/` | libFuzzer targets on the real code and the campaign runner. |
 | `kani/` | Runner and results of the Kani bounded proofs (harnesses in `src/**/kani_proofs.rs`). |
+| [`seccomp/run.sh`](seccomp/run.sh) | Modeled checks of the production NOEXEC filter bytecode. |
 | `machine-code/` | AArch64 machine-code proof of `NameOrId::<UserId>::parse` (own Lean project, pinned engine) and its re-check script. |
 | `compliance/` | Docker comparison of upstream and refactored sudo-rs. |
 | [`parser/`](parser/README.md) | Evidence index for the stable text parser, its grammar, extraction, local analysis, and the [P0–P5 plan](parser/PLAN.md). |
@@ -327,6 +387,6 @@ Upstream code at `81dff9a1`, one `--start-from` per function:
 
 These are baseline experiments. The committed `lean/SudoRs/` is now generated from the
 roots listed in `Cargo.toml` under `[package.metadata.charon]`. Run the extraction drift
-check above to compare it with the current source. `Judgement::authorization` extracted
-on the fork once `ChDir::construct` was made opaque: its `str::contains` reaches the
-`Pattern` trait, which Aeneas does not translate.
+check above to compare it with the current source. An early extraction of
+`Judgement::authorization` made `ChDir::construct` opaque because its `str::contains`
+reaches the `Pattern` trait, which Aeneas does not translate.
