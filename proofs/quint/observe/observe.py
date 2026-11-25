@@ -43,6 +43,9 @@ REFUSAL = "sudo: I'm sorry %s. I'm afraid I can't do that\n" % INVOKER
 # Fixture accounts -> account constants of types.qnt (ROOT, ALICE, BOB).
 ACCOUNTS = {"root": 0, "ferris": 1, "another_user": 2}
 NOT_RUN = "none"  # execCmd of a refused run (not a member of COMMANDS)
+# pam_unix's helper; the only program besides the command a run may execute, and only under
+# the rule in `pam_helper_violation`.
+PAM_HELPER = "/usr/sbin/unix_chkpwd"
 CRED_FIELDS = ("ruid", "euid", "suid", "rgid", "egid", "sgid", "groups")
 SETID = ("setgroups", "setuid", "setgid", "setreuid", "setregid", "setresuid", "setresgid")
 FORKS = ("clone", "clone3", "fork", "vfork")
@@ -258,11 +261,13 @@ def setgroups_arg(args):
 
 
 def execve_args(args):
+    """Path, argv and the number of environment variables of a traced execve."""
     path = re.match(r'^"((?:[^"\\]|\\.)*)"', args)
     argv = re.search(r"\[([^\]]*)\]", args)
-    if not path or not argv or "..." in argv.group(1):
+    env = re.search(r"/\* (\d+) vars? \*/", args)
+    if not path or not argv or not env or "..." in argv.group(1):
         raise Reject("unparsed execve arguments %r" % args)
-    return path.group(1), re.findall(r'"((?:[^"\\]|\\.)*)"', argv.group(1))
+    return path.group(1), re.findall(r'"((?:[^"\\]|\\.)*)"', argv.group(1)), int(env.group(1))
 
 
 def apply_setid(creds, name, args):
@@ -310,22 +315,24 @@ def analyse_strace(text, sudo_bin, sudo_argv, launcher_creds):
     root = events[0][0]
     creds = {root: dict.fromkeys(CRED_FIELDS)}
     birth = {}
+    parent = {}
     calls = {}
     execs = []
     start = None
-    for pid, name, args, ret in events:
+    for index, (pid, name, args, ret) in enumerate(events):
         if pid not in creds:
             raise Reject("process %d appears without a traced fork" % pid)
         if name in FORKS:
             if ret is not None and ret > 0:
                 creds[ret] = dict(creds[pid])
                 birth[ret] = dict(creds[pid])
+                parent[ret] = pid
                 calls[ret] = []
             continue
         if name == "execve":
             if ret != 0:
                 continue
-            path, argv = execve_args(args)
+            path, argv, env = execve_args(args)
             if start is None:
                 if pid != root:
                     raise Reject("process %d executed %s before sudo started" % (pid, path))
@@ -341,7 +348,8 @@ def analyse_strace(text, sudo_bin, sudo_argv, launcher_creds):
                 elif os.path.basename(path) != "setpriv":
                     raise Reject("the launcher executed %s" % path)
                 continue
-            execs.append({"pid": pid, "path": path, "argv": argv, "creds": dict(creds[pid])})
+            execs.append({"pid": pid, "parent": parent.get(pid), "index": index, "path": path,
+                          "argv": argv, "env": env, "creds": dict(creds[pid])})
             continue
         if name not in SETID:
             raise Reject("unexpected traced call %s" % name)
@@ -349,10 +357,11 @@ def analyse_strace(text, sudo_bin, sudo_argv, launcher_creds):
             raise Reject("%s(%s) failed in process %d" % (name, args, pid))
         creds[pid] = apply_setid(creds[pid], name, args)
         if start is not None:
-            calls[pid].append({"call": name, "args": args})
+            calls[pid].append({"call": name, "args": args, "index": index})
     if start is None:
         raise Reject("sudo was never executed")
-    return {"start": start, "creds": creds, "birth": birth, "calls": calls, "execs": execs}
+    return {"sudo_pid": root, "start": start, "creds": creds, "birth": birth, "parent": parent,
+            "calls": calls, "execs": execs}
 
 
 # ---- derivation -----------------------------------------------------------------------------
@@ -476,12 +485,27 @@ def derive_scenario(raw, name, decl, sudo_bin, control, start_creds, uid_map, gi
         "execCreds": placeholder, "execCmd": NOT_RUN, "ticketOwners": owners_after,
     }
 
+    # Programs executed after sudo: the command, and at most one classified PAM helper.
+    helpers = [ex for ex in trace["execs"] if ex["path"] == PAM_HELPER]
+    programs = [ex for ex in trace["execs"] if ex["path"] != PAM_HELPER]
+    for ex in helpers:
+        why = pam_helper_violation(ex, trace)
+        if why:
+            raise Reject("%s in process %d is not the classified PAM helper: %s"
+                         % (PAM_HELPER, ex["pid"], why))
+    if len(helpers) > 1:
+        raise Reject("%s ran %d times; the PAM-helper rule admits one run" % (PAM_HELPER, len(helpers)))
+    if len(programs) > 1:
+        raise Reject("%d unclassified programs executed after sudo; the model executes at most "
+                     "the command" % len(programs))
+    if helpers and not programs:
+        raise Reject("the PAM helper ran but no command did; sudo-rs reaches PAM only after the "
+                     "policy allows the request")
+    if helpers and helpers[0]["index"] > programs[0]["index"]:
+        raise Reject("the PAM helper ran after the command")
     cmd_pid = None
-    if len(trace["execs"]) > 1:
-        raise Reject("%d programs executed after sudo; the model executes at most the command"
-                     % len(trace["execs"]))
-    if trace["execs"]:
-        ex = trace["execs"][0]
+    if programs:
+        ex = programs[0]
         cmd_pid = ex["pid"]
         if exit_code != 0 or stderr != "":
             raise Reject("the command ran but sudo exited %d with stderr %r" % (exit_code, stderr))
@@ -518,7 +542,8 @@ def derive_scenario(raw, name, decl, sudo_bin, control, start_creds, uid_map, gi
         raise Reject("neither a completed exec nor the policy refusal (exit %d, stderr %r): outside "
                      "the replay boundary" % (exit_code, stderr))
 
-    others = sorted(p for p in trace["calls"] if p != cmd_pid)
+    helper_pids = {ex["pid"] for ex in helpers}
+    others = sorted(p for p in trace["calls"] if p != cmd_pid and p not in helper_pids)
     temporary = sum(len(trace["calls"][p]) for p in others)
     for p in others:
         if trace["creds"][p] != trace["start"]:
@@ -526,10 +551,44 @@ def derive_scenario(raw, name, decl, sudo_bin, control, start_creds, uid_map, gi
                          % (p, trace["creds"][p]))
     unmodelled.append("%d set*id calls in sudo's own processes (temporary switches for command "
                       "resolution), every process back at its launch credentials" % temporary)
-    return {"observed": observed, "evidence": evidence(observed, argv), "unmodelled": unmodelled}
+    for ex in helpers:
+        unmodelled.append("PAM helper: process %d, forked by sudo (process %d) before the command, "
+                          "setuid(0), executed %s with uid 0/0/0, gid %s, groups %s, %d environment "
+                          "variables" % (ex["pid"], ex["parent"], " ".join(ex["argv"]),
+                                         "/".join(str(ex["creds"][k]) for k in ("rgid", "egid", "sgid")),
+                                         ex["creds"]["groups"], ex["env"]))
+    return {"observed": observed, "evidence": evidence(observed, argv, len(helpers)),
+            "unmodelled": unmodelled}
 
 
-def evidence(observed, argv):
+def pam_helper_violation(ex, trace):
+    """Why `ex` breaks the acceptance rule of the PAM helper, or None.
+
+    The rule admits exactly the event seen in the guest capture of commit 776a0317: pam_unix's
+    account management (common-account) runs `unix_chkpwd <user> chkexpiry` in a child of
+    sudo's main process, after setuid(0) and with an empty environment. The child inherits
+    sudo's launch credentials; setuid(0) as euid 0 sets all three uids to 0; gids and groups
+    stay the invoker's. Nothing else may happen in that process."""
+    pid = ex["pid"]
+    if ex["argv"] != [PAM_HELPER, INVOKER, "chkexpiry"]:
+        return "argv %s is not [%s, %s, chkexpiry]" % (ex["argv"], PAM_HELPER, INVOKER)
+    if ex["env"] != 0:
+        return "%d environment variables, not 0" % ex["env"]
+    if ex["parent"] != trace["sudo_pid"]:
+        return "forked by process %s, not by sudo's main process" % ex["parent"]
+    if trace["birth"].get(pid) != trace["start"]:
+        return "not forked with sudo's launch credentials"
+    calls = trace["calls"][pid]
+    if [(c["call"], ints(c["args"])) for c in calls] != [("setuid", [0])] or calls[0]["index"] > ex["index"]:
+        return "credential calls %s are not exactly setuid(0) before the exec" % calls
+    if ex["creds"] != dict(trace["start"], ruid=0, euid=0, suid=0):
+        return "credentials %s at the exec" % ex["creds"]
+    if sum(1 for e in trace["execs"] if e["pid"] == pid) != 1:
+        return "the process executed more than one program"
+    return None
+
+
+def evidence(observed, argv, pam_helpers):
     """What each model step rests on (README.md, "Observed traces")."""
     ran = observed["outcome"] == "exec"
     rows = [
@@ -542,7 +601,7 @@ def evidence(observed, argv):
         ("parse, load", "unobserved", "internal to sudo"),
         ("decide: verdict", "pinned", "fixture/scenarios, before the run"),
         ("decide: user, host, time of the request", "unobserved", "internal to sudo"),
-        ("PAM: pam_start, account management, session, credentials",
+        ("PAM: pam_start, account management, session, credentials (library calls)",
          "unobserved" if ran else "not reached",
          "not modelled; no PAM event is synthesised" if ran
          else "sudo-rs refuses before any PAM call (code reading: pipeline.rs `run`)"),
@@ -563,8 +622,15 @@ def evidence(observed, argv):
     else:
         rows.append(("refusal", "observed", "exit 1, refusal message, no execve after sudo, no "
                                             "lasting credential change"))
+    if pam_helpers:
+        rows.append(("PAM account helper (pam_unix unix_chkpwd)", "observed, not modelled",
+                     "strace: forked by sudo's main process before the command, setuid(0), "
+                     "`unix_chkpwd <invoker> chkexpiry` with uid 0, the invoker's gids and "
+                     "groups, empty environment; accepted only under the PAM-helper rule"))
     rows += [
-        ("helpers (none)", "observed", "strace: no other program executed"),
+        ("sudo helpers (mailer, askpass, editor: none)", "observed",
+         "strace: no program executed besides the command%s"
+         % (" and the classified PAM helper" if pam_helpers else "")),
         ("tickets", "observed", "timestamp directory listed before and after the run"),
     ]
     return [{"element": e, "status": s, "source": src} for e, s, src in rows]
@@ -777,6 +843,17 @@ def raw_controls(obs):
         o["raw"][key] = re.sub(r"^Groups:.*$", "Groups:\t%d" % 0, o["raw"][key], flags=re.M)
 
     edited("command output edited (Groups line)", groups_line)
+    trace_key = "scenario/permitted/strace"
+    if '"%s"' % PAM_HELPER in obs["raw"].get(trace_key, ""):
+        def helper_argv(o):
+            o["raw"][trace_key] = o["raw"][trace_key].replace('"chkexpiry"', '"other"')
+
+        def helper_keeps_uid(o):
+            o["raw"][trace_key] = re.sub(r"^\d+\s+setuid\(0\)\s+= 0\n", "", o["raw"][trace_key],
+                                         flags=re.M)
+
+        edited("PAM helper argv edited", helper_argv)
+        edited("PAM helper's setuid(0) removed", helper_keeps_uid)
     edited("guest binary hash edited",
            lambda o: o["raw"].__setitem__("meta/binary.sha256", "0" * 64 + "\n"))
     edited("installed sudoers hash edited", lambda o: o["raw"].__setitem__(

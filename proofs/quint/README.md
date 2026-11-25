@@ -249,12 +249,13 @@ An observation file holds the raw capture verbatim (except the binary, kept as i
 | `decide`: verdict | pinned | `observe/fixture/scenarios`, before the run; derived by hand from the one sudoers rule, not by `text_to_authorization` |
 | `decide`: user, host, time of the request | unobserved | internal to sudo |
 | `auth`: no password check | follows from the pinned verdict | with `-n`, a required password ends the run with "interactive authentication is required"; observed: exit 0, empty stderr |
-| PAM (`pam_start`, account management, session open/close, setcred) | unobserved, not modelled | no PAM event is synthesised; in the refusal sudo-rs stops before PAM (code reading: `src/sudo/pipeline.rs`, `run`) |
+| PAM library calls (`pam_start`, account management, session open/close, setcred) | unobserved, not modelled | no PAM event is synthesised; in the refusal sudo-rs stops before PAM (code reading: `src/sudo/pipeline.rs`, `run`) |
+| PAM account helper (`/usr/sbin/unix_chkpwd`) | observed, not modelled | permitted run only: pam_unix's account management runs it; acceptance rule below |
 | `set_groups`, `set_gid`, `set_uid` | observed | strace: arguments and results in the command process; must be exactly `setgroups`, `setgid`, `setuid`, all successful, from the launch credentials |
 | `exec`: program and arguments | observed | strace `execve`; `Name` in the command's `/proc/self/status` |
 | `exec`: credentials | observed | the command's `/proc/self/status`, equal to the credentials traced at its exec |
 | refusal | observed | exit 1, `sudo: I'm sorry ferris. I'm afraid I can't do that`, no `execve` after sudo, no lasting credential change |
-| helpers | observed | no other program executed |
+| sudo's helpers (mailer, askpass, editor) | observed | none: no program executed besides the command and the classified PAM helper |
 | tickets | observed | timestamp directory empty before the run (the model starts without tickets) and listed after it |
 | temporary credential switches of sudo itself | observed, not modelled | `sudo_call` switches to the target to resolve the command; accepted only if every sudo process ends at its launch credentials |
 | fsuid/fsgid, `CapEff`, `NoNewPrivs` of the command | observed, not modelled | recorded in the observation |
@@ -262,13 +263,33 @@ An observation file holds the raw capture verbatim (except the binary, kept as i
 Concrete ids map to `types.qnt` by account: root → `ROOT`, ferris → `ALICE`, another_user → `BOB`.
 The recorder rejects a capture whose accounts do not fit the model's convention (gid = own group, no other groups) or that contains an id outside the three accounts.
 
+### The PAM account helper
+
+The first guest capture (commit `776a0317`, job `lifecycle-trace-d41939`) showed a second program in the permitted run.
+sudo's main process forked a child before the command. The child called `setuid(0)` and executed `/usr/sbin/unix_chkpwd ferris chkexpiry` with an empty environment.
+The child inherits sudo's launch credentials (real uid ferris, effective and saved uid 0), so after `setuid(0)` all three uids are 0. The gids and the group list stay ferris's.
+The program, the `chkexpiry` argument and the `common-account` include of the fixture's PAM file point to pam_unix's account management, which runs this helper to check password expiry. That attribution is an inference from the trace, not checked against the Linux-PAM source here.
+No such program appears in the refusal, which stops before PAM.
+
+The recorder accepts this event only if all of the following hold:
+- the path is `/usr/sbin/unix_chkpwd` and the argv is exactly `unix_chkpwd <invoker> chkexpiry`, with no environment variables;
+- the process was forked by sudo's main process and started with sudo's launch credentials;
+- its only credential call is `setuid(0)`, before the exec, and it executes nothing else;
+- at the exec its credentials are the launch credentials with all three uids 0;
+- it runs at most once, only in a run that executes the command, and before the command.
+
+Any other program, or this program in any other form, is rejected as unclassified.
+
+The model does not cover this event. `inv4_helperIsolation` is about the helpers sudo itself starts (mailer, askpass, editor), which drop to the invoker's credentials. The PAM helper is started by the PAM stack inside sudo's process, as root and with fixed arguments, and the model contains no PAM.
+The replay therefore makes no claim about it. Its credentials are recorded in the observation (`unmodelled`), and the rule above keeps every detail of the event fixed.
+
 ### Rejection
 
-The recorder and `replay` reject, before the model runs: a guest refusal or incomplete capture; fixture or guest script different from the committed ones; installed sudoers or PAM file different from the fixture; a binary with setuid/setgid bits, other owner or mode, or a guest hash different from the copied binary; `src.tar` different from `git archive` of the recorded commit (checked when the clone has the commit); a launcher, environment or argv other than the declared ones; strace output that cannot be parsed or a failed credential call; more than one program executed after sudo; a command process whose credential calls differ from `setgroups`, `setgid`, `setuid`; command credentials that differ from the traced ones; an outcome that is neither a completed exec nor the policy refusal; a timestamp record before the run.
+The recorder and `replay` reject, before the model runs: a guest refusal or incomplete capture; fixture or guest script different from the committed ones; installed sudoers or PAM file different from the fixture; a binary with setuid/setgid bits, other owner or mode, or a guest hash different from the copied binary; `src.tar` different from `git archive` of the recorded commit (checked when the clone has the commit); a launcher, environment or argv other than the declared ones; strace output that cannot be parsed or a failed credential call; any program executed after sudo other than the command and the classified PAM helper; a command process whose credential calls differ from `setgroups`, `setgid`, `setuid`; command credentials that differ from the traced ones; an outcome that is neither a completed exec nor the policy refusal; a timestamp record before the run.
 The model rejects: a permitted run whose pinned verdict requires a password (`setup` is not enabled), a refusal under a permitting verdict, an exec after a denial, launch credentials other than `setuidRootExec(invoker)`, credential calls or command credentials other than the model's, a command other than the decided one, a ticket the model does not create, and any invariant violation.
 
 `observe.py controls` shows on each real observation that the replay is not vacuous. It first requires both scenarios to be accepted, then requires every control to be rejected.
-Raw controls (edited captures): command output, binary hash, installed sudoers hash, the stored verdict, the provenance kind.
+Raw controls (edited captures): command output, PAM helper argv, the PAM helper's `setuid(0)` removed (both only when the capture contains the helper), binary hash, installed sudoers hash, the stored verdict, the provenance kind.
 Model controls (edited facts, never written as observations): the command ran with the invoker's credentials; kept the invoker's group; another command ran; a timestamp record appeared; the fixture pins a password rule; sudo started without setuid-root credentials; the denied request executed; the permitted request was refused.
 
 ### Boundary
@@ -276,7 +297,7 @@ Model controls (edited facts, never written as observations): the command ran wi
 - Two runs of one fixture. The replay shows that these runs are runs of the model and satisfy its invariants; it says nothing about other requests, policies or attackers.
 - The binary does not run setuid. `setpriv` reproduces the credentials of a setuid-root exec, but not the kernel's secure-exec handling (`AT_SECURE`, dumpability, dynamic-loader environment filtering). sudo-rs's own check (`self_check`) only tests the effective uid (code reading: `src/sudo/mod.rs`).
 - strace (a tracer is attached, `TracerPid` is set) changes timing, not results; nothing is injected.
-- PAM is neither observed nor modelled. The model's only authentication event, the password check, does not occur in either run.
+- PAM's library calls are neither observed nor modelled. The model's only authentication event, the password check, does not occur in either run. PAM's helper program is observed, but not modelled (see above).
 - The verdicts are pinned by reading the fixture rule, not by the kernel-checked `text_to_authorization`.
 - The model's `setresgid(g,g,g)`/`setresuid(u,u,u)` stands for sudo-rs's `setgid`/`setuid` as root, which set all three ids on Linux (`kernel.qnt` semantics).
 - Debug build with default features; the compliance image builds with other features.
