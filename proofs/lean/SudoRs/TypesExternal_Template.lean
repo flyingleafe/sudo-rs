@@ -109,3 +109,7 @@ axiom glob.Pattern : Type
     Visibility: public -/
 axiom common.string.SudoString : Type
 
+/-- [sudo_rs::sudo::env::filter::TableIter]
+    Source: 'src/sudo/env/filter.rs', lines 28:0-30:1 -/
+axiom sudo.env.filter.TableIter : Type
+

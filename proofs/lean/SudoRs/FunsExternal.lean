@@ -581,3 +581,32 @@ def alloc.vec.Vec.append {T : Type _} (_A : Type _)
   if h : joined.length ≤ Usize.max then
     ok (alloc.vec.Vec.from joined h, alloc.vec.Vec.new T)
   else fail .maximumSizeExceeded
+
+/-! ### Environment policy externals (`src/sudo/env/filter.rs`) -/
+
+/-- [sudo_rs::sudo::env::filter::table_iter]: `table.iter()`, kept opaque for Charon. With the
+list model of `HashSet`, the cursor at the first entry is the list of all entries. -/
+def sudo.env.filter.table_iter
+    (table : std.collections.hash.set.HashSet String std.hash.random.RandomState
+      alloc.alloc.Global) :
+    Result sudo.env.filter.TableIter :=
+  ok table
+
+/-- [sudo_rs::sudo::env::filter::table_next]: `iter.next().map(|e| e.as_bytes())`, kept opaque
+for Charon: the bytes of the next entry and the cursor after it, or `None` at the end. -/
+def sudo.env.filter.table_next (iter : sudo.env.filter.TableIter) :
+    Result (Option (Slice U8) × sudo.env.filter.TableIter) :=
+  match iter with
+  | [] => ok (none, [])
+  | entry :: rest => do
+    let bytes ← sudo_rs.strOfString entry
+    ok (some bytes, rest)
+
+/-- [sudo_rs::sudo::env::filter::path_max]: `PATH_MAX as usize`, kept opaque for Charon; a
+platform constant of `libc`. Abstract: theorems name its value in a hypothesis. -/
+opaque sudo.env.filter.path_max : Result Usize
+
+/-- [sudo_rs::system::audit::zoneinfo_path]: the first of three fixed directories that exists
+and passes the ownership and mode checks; reads the file system. Kept opaque for Charon and
+abstract here: theorems name its result in a hypothesis. -/
+opaque system.audit.zoneinfo_path : Result (Option Str)

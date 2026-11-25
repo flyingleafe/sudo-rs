@@ -300,6 +300,56 @@ inductive exec.Umask where
 | Extend : Std.U32 → exec.Umask
 | Override : Std.U32 → exec.Umask
 
+/-- [sudo_rs::sudo::env::filter::ByteClass]
+    Source: 'src/sudo/env/filter.rs', lines 95:0-101:1 -/
+@[discriminant isize]
+inductive sudo.env.filter.ByteClass where
+| NotPrintable : sudo.env.filter.ByteClass
+| PercentOrSlash : sudo.env.filter.ByteClass
+
+/-- [sudo_rs::sudo::env::wildcard_match::MatchState]
+    Source: 'src/sudo/env/wildcard_match.rs', lines 2:0-14:1 -/
+structure sudo.env.wildcard_match.MatchState where
+  test_index : Std.Usize
+  pattern_index : Std.Usize
+  star : Bool
+  star_test : Std.Usize
+  star_pattern : Std.Usize
+  matched : Bool
+  more : Bool
+
+/-- [sudo_rs::sudoers::policy::Logging]
+    Source: 'src/sudoers/policy.rs', lines 94:0-97:1
+    Visibility: public -/
+@[discriminant u32 [86649125,181786330]]
+inductive sudoers.policy.Logging where
+| Auth : sudoers.policy.Logging
+| Disabled : sudoers.policy.Logging
+
+/-- [sudo_rs::sudoers::policy::DirChange]
+    Source: 'src/sudoers/policy.rs', lines 86:0-89:1
+    Visibility: public -/
+@[discriminant u32 [86649125,181786330]]
+inductive sudoers.policy.DirChange where
+| Strict : Option common.path.SudoPath → sudoers.policy.DirChange
+| Any : sudoers.policy.DirChange
+
+/-- [sudo_rs::sudoers::policy::Restrictions]
+    Source: 'src/sudoers/policy.rs', lines 69:0-81:1
+    Visibility: public -/
+structure sudoers.policy.Restrictions where
+  use_pty : Bool
+  trust_environment : Bool
+  noexec : Bool
+  env_keep : std.collections.hash.set.HashSet String
+    std.hash.random.RandomState alloc.alloc.Global
+  env_check : std.collections.hash.set.HashSet String
+    std.hash.random.RandomState alloc.alloc.Global
+  chdir : sudoers.policy.DirChange
+  path : Option Str
+  umask : exec.Umask
+  log : sudoers.policy.Logging
+
 /-- [sudo_rs::sudoers::ast::Qualified]
     Source: 'src/sudoers/ast.rs', lines 17:0-20:1
     Visibility: public -/
@@ -931,38 +981,6 @@ inductive sudoers.IncludeFile where
 @[discriminant u32 [181786330]]
 inductive sudoers.IncludeState where
 | Allowed : Std.U8 → sudoers.IncludeState
-
-/-- [sudo_rs::sudoers::policy::Logging]
-    Source: 'src/sudoers/policy.rs', lines 94:0-97:1
-    Visibility: public -/
-@[discriminant u32 [86649125,181786330]]
-inductive sudoers.policy.Logging where
-| Auth : sudoers.policy.Logging
-| Disabled : sudoers.policy.Logging
-
-/-- [sudo_rs::sudoers::policy::DirChange]
-    Source: 'src/sudoers/policy.rs', lines 86:0-89:1
-    Visibility: public -/
-@[discriminant u32 [86649125,181786330]]
-inductive sudoers.policy.DirChange where
-| Strict : Option common.path.SudoPath → sudoers.policy.DirChange
-| Any : sudoers.policy.DirChange
-
-/-- [sudo_rs::sudoers::policy::Restrictions]
-    Source: 'src/sudoers/policy.rs', lines 69:0-81:1
-    Visibility: public -/
-structure sudoers.policy.Restrictions where
-  use_pty : Bool
-  trust_environment : Bool
-  noexec : Bool
-  env_keep : std.collections.hash.set.HashSet String
-    std.hash.random.RandomState alloc.alloc.Global
-  env_check : std.collections.hash.set.HashSet String
-    std.hash.random.RandomState alloc.alloc.Global
-  chdir : sudoers.policy.DirChange
-  path : Option Str
-  umask : exec.Umask
-  log : sudoers.policy.Logging
 
 /-- [sudo_rs::sudoers::policy::{sudo_rs::sudoers::Judgement}::authorization::{closure}::{closure}]
     Source: 'src/sudoers/policy.rs', lines 143:56-145:25 -/

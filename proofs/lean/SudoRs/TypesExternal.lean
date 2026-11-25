@@ -73,3 +73,8 @@ structure core.num.error.ParseIntError where
 /-- [core::mem::maybe_uninit::MaybeUninit]: named by the extraction but not used by the generated
 definitions; nothing is known about it. -/
 opaque core.mem.maybe_uninit.MaybeUninit (T : Type _) : Type
+
+/-- [sudo_rs::sudo::env::filter::TableIter] (`src/sudo/env/filter.rs`), kept opaque for Charon:
+a cursor over the entries of an `env_keep`/`env_check` table, i.e. a
+`std::collections::hash_set::Iter<'_, String>`. Modelled as the entries not visited yet. -/
+abbrev sudo.env.filter.TableIter := List String

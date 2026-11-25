@@ -2111,6 +2111,496 @@ def defaults.Settings.impl.runcwd
   (self : defaults.Settings) : Result (Option Str) := do
   core.option.Option.as_deref (core.ops.deref.DerefBoxInst Str) self.runcwd
 
+/-- [sudo_rs::sudo::env::filter::starts_with_bytes]: loop 0:
+    Source: 'src/sudo/env/filter.rs', lines 55:4-58:5 -/
+@[rust_loop]
+def sudo.env.filter.starts_with_bytes_loop
+  (text : Slice Std.U8) («prefix» : Slice Std.U8) (ok1 : Bool)
+  (i : Std.Usize) :
+  Result Bool
+  := do
+  if ok1
+  then
+    let i1 := Slice.len «prefix»
+    if i < i1
+    then
+      let i2 ← Slice.index_usize text i
+      let i3 ← Slice.index_usize «prefix» i
+      let i4 ← i + 1#usize
+      sudo.env.filter.starts_with_bytes_loop text «prefix» (i2 = i3) i4
+    else ok ok1
+  else ok ok1
+partial_fixpoint
+
+/-- [sudo_rs::sudo::env::filter::starts_with_bytes]:
+    Source: 'src/sudo/env/filter.rs', lines 52:0-60:1 -/
+def sudo.env.filter.starts_with_bytes
+  (text : Slice Std.U8) («prefix» : Slice Std.U8) : Result Bool := do
+  let i := Slice.len «prefix»
+  let i1 := Slice.len text
+  sudo.env.filter.starts_with_bytes_loop text «prefix» (i <= i1) 0#usize
+
+/-- [sudo_rs::sudo::env::filter::equals_bytes]:
+    Source: 'src/sudo/env/filter.rs', lines 63:0-65:1 -/
+def sudo.env.filter.equals_bytes
+  (text : Slice Std.U8) (word : Slice Std.U8) : Result Bool := do
+  let i := Slice.len text
+  let i1 := Slice.len word
+  if i = i1
+  then sudo.env.filter.starts_with_bytes text word
+  else ok false
+
+/-- [sudo_rs::sudo::env::filter::find_equals]: loop 0:
+    Source: 'src/sudo/env/filter.rs', lines 71:4-76:5 -/
+@[rust_loop]
+def sudo.env.filter.find_equals_loop
+  (input : Slice Std.U8) (position : Std.Usize) (i : Std.Usize) :
+  Result Std.Usize
+  := do
+  let i1 := Slice.len input
+  if i < i1
+  then
+    let i2 := Slice.len input
+    if position = i2
+    then
+      let i3 ← Slice.index_usize input i
+      let position1 ← if i3 = 61#u8
+                        then ok i
+                        else ok position
+      let i4 ← i + 1#usize
+      sudo.env.filter.find_equals_loop input position1 i4
+    else ok position
+  else ok position
+partial_fixpoint
+
+/-- [sudo_rs::sudo::env::filter::find_equals]:
+    Source: 'src/sudo/env/filter.rs', lines 68:0-78:1 -/
+def sudo.env.filter.find_equals (input : Slice Std.U8) : Result Std.Usize := do
+  let position := Slice.len input
+  sudo.env.filter.find_equals_loop input position 0#usize
+
+/-- [sudo_rs::sudo::env::filter::contains_dotdot]: loop 0:
+    Source: 'src/sudo/env/filter.rs', lines 84:4-89:5 -/
+@[rust_loop]
+def sudo.env.filter.contains_dotdot_loop
+  (value : Slice Std.U8) (found : Bool) (i : Std.Usize) : Result Bool := do
+  if found
+  then ok found
+  else
+    let i1 := Slice.len value
+    if i < i1
+    then
+      let i2 ← i - 1#usize
+      let i3 ← Slice.index_usize value i2
+      let found1 ←
+        if i3 = 46#u8
+        then
+          do
+          let i4 ← Slice.index_usize value i
+          if i4 = 46#u8
+          then ok true
+          else ok found
+        else ok found
+      let i4 ← i + 1#usize
+      sudo.env.filter.contains_dotdot_loop value found1 i4
+    else ok found
+partial_fixpoint
+
+/-- [sudo_rs::sudo::env::filter::contains_dotdot]:
+    Source: 'src/sudo/env/filter.rs', lines 81:0-91:1 -/
+@[reducible]
+def sudo.env.filter.contains_dotdot (value : Slice Std.U8) : Result Bool := do
+  sudo.env.filter.contains_dotdot_loop value false 1#usize
+
+/-- [sudo_rs::sudo::env::filter::in_class]:
+    Source: 'src/sudo/env/filter.rs', lines 103:0-108:1 -/
+def sudo.env.filter.in_class
+  (c : Std.U8) («class» : sudo.env.filter.ByteClass) : Result Bool := do
+  match «class» with
+  | sudo.env.filter.ByteClass.NotPrintable =>
+    let b ←
+      if 33#u8 <= c
+      then if c <= 126#u8
+           then ok true
+           else ok false
+      else ok false
+    ok (¬ b)
+  | sudo.env.filter.ByteClass.PercentOrSlash =>
+    if c = 37#u8
+    then ok true
+    else ok (c = 47#u8)
+
+/-- [sudo_rs::sudo::env::filter::contains_class]: loop 0:
+    Source: 'src/sudo/env/filter.rs', lines 114:4-119:5 -/
+@[rust_loop]
+def sudo.env.filter.contains_class_loop
+  (input : Slice Std.U8) («class» : sudo.env.filter.ByteClass) (found : Bool)
+  (i : Std.Usize) :
+  Result Bool
+  := do
+  if found
+  then ok found
+  else
+    let i1 := Slice.len input
+    if i < i1
+    then
+      let i2 ← Slice.index_usize input i
+      let b ← sudo.env.filter.in_class i2 «class»
+      let found1 ← if b
+                     then ok true
+                     else ok found
+      let i3 ← i + 1#usize
+      sudo.env.filter.contains_class_loop input «class» found1 i3
+    else ok found
+partial_fixpoint
+
+/-- [sudo_rs::sudo::env::filter::contains_class]:
+    Source: 'src/sudo/env/filter.rs', lines 111:0-121:1 -/
+@[reducible]
+def sudo.env.filter.contains_class
+  (input : Slice Std.U8) («class» : sudo.env.filter.ByteClass) :
+  Result Bool
+  := do
+  sudo.env.filter.contains_class_loop input «class» false 0#usize
+
+/-- [sudo_rs::sudo::env::filter::is_safe_tz]:
+    Source: 'src/sudo/env/filter.rs', lines 131:0-157:1 -/
+def sudo.env.filter.is_safe_tz (value : Slice Std.U8) : Result Bool := do
+  let s ← lift (Array.to_slice (Array.make 1#usize [ 58#u8 ]))
+  let b ← sudo.env.filter.starts_with_bytes value s
+  let check_value ←
+    if b
+    then do
+         let (_, rest) ← core.slice.Slice.split_at value 1#usize
+         ok rest
+    else ok value
+  let s1 ← lift (Array.to_slice (Array.make 1#usize [ 47#u8 ]))
+  let b1 ← sudo.env.filter.starts_with_bytes check_value s1
+  if b1
+  then
+    let o ← system.audit.zoneinfo_path
+    match o with
+    | none => ok false
+    | some path_zoneinfo =>
+      let zoneinfo ← core.str.Str.as_bytes path_zoneinfo
+      let b2 ← sudo.env.filter.starts_with_bytes check_value zoneinfo
+      if b2
+      then
+        let i := Slice.len check_value
+        let i1 := Slice.len zoneinfo
+        if i <= i1
+        then ok false
+        else
+          let i2 := Slice.len zoneinfo
+          let i3 ← Slice.index_usize check_value i2
+          if i3 != 47#u8
+          then ok false
+          else
+            let b3 ← sudo.env.filter.contains_dotdot check_value
+            if b3
+            then ok false
+            else
+              let b4 ←
+                sudo.env.filter.contains_class check_value
+                  sudo.env.filter.ByteClass.NotPrintable
+              if b4
+              then ok false
+              else
+                let i4 := Slice.len check_value
+                let i5 ← sudo.env.filter.path_max
+                ok (i4 < i5)
+      else ok false
+  else
+    let b2 ← sudo.env.filter.contains_dotdot check_value
+    if b2
+    then ok false
+    else
+      let b3 ←
+        sudo.env.filter.contains_class check_value
+          sudo.env.filter.ByteClass.NotPrintable
+      if b3
+      then ok false
+      else
+        let i := Slice.len check_value
+        let i1 ← sudo.env.filter.path_max
+        ok (i < i1)
+
+/-- [sudo_rs::sudo::env::wildcard_match::wildcard_step]:
+    Source: 'src/sudo/env/wildcard_match.rs', lines 18:0-55:1 -/
+def sudo.env.wildcard_match.wildcard_step
+  (test : Slice Std.U8) (pattern : Slice Std.U8)
+  (state : sudo.env.wildcard_match.MatchState) :
+  Result sudo.env.wildcard_match.MatchState
+  := do
+  let i := Slice.len pattern
+  if state.pattern_index < i
+  then
+    let i1 := Slice.len test
+    if state.test_index < i1
+    then
+      let i2 ← Slice.index_usize pattern state.pattern_index
+      if i2 = 42#u8
+      then
+        let i3 ← state.pattern_index + 1#usize
+        ok
+          {
+            state
+              with
+              pattern_index := i3,
+              star := true,
+              star_test := state.test_index,
+              star_pattern := i3
+          }
+      else
+        let i3 ← Slice.index_usize test state.test_index
+        if i2 = i3
+        then
+          let i4 ← state.pattern_index + 1#usize
+          let i5 ← state.test_index + 1#usize
+          ok { state with test_index := i5, pattern_index := i4 }
+        else
+          if state.star
+          then
+            let i4 ← state.star_test + 1#usize
+            ok
+              {
+                state
+                  with
+                  test_index := i4,
+                  pattern_index := state.star_pattern,
+                  star_test := i4
+              }
+          else ok { state with more := false }
+    else
+      let i2 := Slice.len test
+      if state.test_index < i2
+      then
+        if state.star
+        then
+          let i3 ← state.star_test + 1#usize
+          ok
+            {
+              state
+                with
+                test_index := i3,
+                pattern_index := state.star_pattern,
+                star_test := i3
+            }
+        else ok { state with more := false }
+      else
+        let i3 := Slice.len pattern
+        if state.pattern_index < i3
+        then
+          let i4 ← Slice.index_usize pattern state.pattern_index
+          if i4 = 42#u8
+          then
+            let i5 ← state.pattern_index + 1#usize
+            ok { state with pattern_index := i5 }
+          else ok { state with more := false }
+        else ok { state with matched := true, more := false }
+  else
+    let i1 := Slice.len test
+    if state.test_index < i1
+    then
+      if state.star
+      then
+        let i2 ← state.star_test + 1#usize
+        ok
+          {
+            state
+              with
+              test_index := i2,
+              pattern_index := state.star_pattern,
+              star_test := i2
+          }
+      else ok { state with more := false }
+    else
+      let i2 := Slice.len pattern
+      if state.pattern_index < i2
+      then
+        let i3 ← Slice.index_usize pattern state.pattern_index
+        if i3 = 42#u8
+        then
+          let i4 ← state.pattern_index + 1#usize
+          ok { state with pattern_index := i4 }
+        else ok { state with more := false }
+      else ok { state with matched := true, more := false }
+
+/-- [sudo_rs::sudo::env::wildcard_match::wildcard_match]: loop 0:
+    Source: 'src/sudo/env/wildcard_match.rs', lines 76:4-78:5 -/
+@[rust_loop]
+def sudo.env.wildcard_match.wildcard_match_loop
+  (test : Slice Std.U8) (pattern : Slice Std.U8)
+  (state : sudo.env.wildcard_match.MatchState) :
+  Result Bool
+  := do
+  if state.more
+  then
+    let state1 ← sudo.env.wildcard_match.wildcard_step test pattern state
+    sudo.env.wildcard_match.wildcard_match_loop test pattern state1
+  else ok state.matched
+partial_fixpoint
+
+/-- [sudo_rs::sudo::env::wildcard_match::wildcard_match]:
+    Source: 'src/sudo/env/wildcard_match.rs', lines 66:0-80:1 -/
+@[reducible]
+def sudo.env.wildcard_match.wildcard_match
+  (test : Slice Std.U8) (pattern : Slice Std.U8) : Result Bool := do
+  sudo.env.wildcard_match.wildcard_match_loop test pattern
+    {
+      test_index := 0#usize,
+      pattern_index := 0#usize,
+      star := false,
+      star_test := 0#usize,
+      star_pattern := 0#usize,
+      matched := false,
+      more := true
+    }
+
+/-- [sudo_rs::sudo::env::filter::entry_matches]:
+    Source: 'src/sudo/env/filter.rs', lines 162:0-171:1 -/
+def sudo.env.filter.entry_matches
+  (key : Slice Std.U8) (value : Slice Std.U8) (entry : Slice Std.U8) :
+  Result Bool
+  := do
+  let separator ← sudo.env.filter.find_equals entry
+  let i := Slice.len entry
+  if separator < i
+  then
+    let (key_pattern, rest) ← core.slice.Slice.split_at entry separator
+    let (_, value_pattern) ← core.slice.Slice.split_at rest 1#usize
+    let b ← sudo.env.wildcard_match.wildcard_match key key_pattern
+    if b
+    then sudo.env.wildcard_match.wildcard_match value value_pattern
+    else ok false
+  else sudo.env.wildcard_match.wildcard_match key entry
+
+/-- [sudo_rs::sudo::env::filter::in_table]: loop 0:
+    Source: 'src/sudo/env/filter.rs', lines 179:4-191:5 -/
+@[rust_loop]
+def sudo.env.filter.in_table_loop
+  (key : Slice Std.U8) (value : Slice Std.U8)
+  (entries : sudo.env.filter.TableIter) (found : Bool) (more : Bool) :
+  Result Bool
+  := do
+  if more
+  then
+    let (o, entries1) ← sudo.env.filter.table_next entries
+    match o with
+    | none => sudo.env.filter.in_table_loop key value entries1 found false
+    | some entry =>
+      let b ← sudo.env.filter.entry_matches key value entry
+      if b
+      then sudo.env.filter.in_table_loop key value entries1 true false
+      else sudo.env.filter.in_table_loop key value entries1 found more
+  else ok found
+partial_fixpoint
+
+/-- [sudo_rs::sudo::env::filter::in_table]:
+    Source: 'src/sudo/env/filter.rs', lines 175:0-193:1 -/
+def sudo.env.filter.in_table
+  (key : Slice Std.U8) (value : Slice Std.U8)
+  (table : std.collections.hash.set.HashSet String std.hash.random.RandomState
+  alloc.alloc.Global) :
+  Result Bool
+  := do
+  let entries ← sudo.env.filter.table_iter table
+  sudo.env.filter.in_table_loop key value entries false true
+
+/-- [sudo_rs::sudo::env::filter::is_secured_path]:
+    Source: 'src/sudo/env/filter.rs', lines 197:0-202:1 -/
+def sudo.env.filter.is_secured_path
+  (key : Slice Std.U8) (path : Option Str) : Result Bool := do
+  match path with
+  | none => ok false
+  | some _ =>
+    let s ←
+      lift (Array.to_slice (Array.make 4#usize [ 80#u8, 65#u8, 84#u8, 72#u8 ]))
+    sudo.env.filter.equals_bytes key s
+
+/-- [sudo_rs::sudo::env::filter::should_keep]:
+    Source: 'src/sudo/env/filter.rs', lines 210:0-229:1 -/
+def sudo.env.filter.should_keep
+  (key : Slice Std.U8) (value : Slice Std.U8)
+  (cfg : sudoers.policy.Restrictions) :
+  Result Bool
+  := do
+  let s ← lift (Array.to_slice (Array.make 2#usize [ 40#u8, 41#u8 ]))
+  let b ← sudo.env.filter.starts_with_bytes value s
+  if b
+  then ok false
+  else
+    let b1 ← sudo.env.filter.is_secured_path key cfg.path
+    if b1
+    then ok false
+    else
+      let s1 ← lift (Array.to_slice (Array.make 2#usize [ 84#u8, 90#u8 ]))
+      let b2 ← sudo.env.filter.equals_bytes key s1
+      if b2
+      then
+        let b3 ← sudo.env.filter.in_table key value cfg.env_keep
+        if b3
+        then ok true
+        else
+          let b4 ← sudo.env.filter.in_table key value cfg.env_check
+          if b4
+          then sudo.env.filter.is_safe_tz value
+          else ok false
+      else
+        let b3 ← sudo.env.filter.in_table key value cfg.env_check
+        if b3
+        then
+          let b4 ←
+            sudo.env.filter.contains_class value
+              sudo.env.filter.ByteClass.PercentOrSlash
+          ok (¬ b4)
+        else sudo.env.filter.in_table key value cfg.env_keep
+
+/-- [sudo_rs::sudo::env::filter::is_login_variable]:
+    Source: 'src/sudo/env/filter.rs', lines 232:0-237:1 -/
+def sudo.env.filter.is_login_variable (key : Slice Std.U8) : Result Bool := do
+  let s ←
+    lift (Array.to_slice (Array.make 4#usize [ 72#u8, 79#u8, 77#u8, 69#u8 ]))
+  let b ← sudo.env.filter.equals_bytes key s
+  if b
+  then ok true
+  else
+    let s1 ←
+      lift (Array.to_slice
+        (Array.make 5#usize [ 83#u8, 72#u8, 69#u8, 76#u8, 76#u8 ]))
+    let b1 ← sudo.env.filter.equals_bytes key s1
+    if b1
+    then ok true
+    else
+      let s2 ←
+        lift (Array.to_slice
+          (Array.make 4#usize [ 85#u8, 83#u8, 69#u8, 82#u8 ]))
+      let b2 ← sudo.env.filter.equals_bytes key s2
+      if b2
+      then ok true
+      else
+        let s3 ←
+          lift (Array.to_slice
+            (Array.make 7#usize [
+              76#u8, 79#u8, 71#u8, 78#u8, 65#u8, 77#u8, 69#u8
+              ]))
+        sudo.env.filter.equals_bytes key s3
+
+/-- [sudo_rs::sudo::env::filter::keep_inherited]:
+    Source: 'src/sudo/env/filter.rs', lines 241:0-243:1 -/
+def sudo.env.filter.keep_inherited
+  (key : Slice Std.U8) (value : Slice Std.U8) (login : Bool)
+  (cfg : sudoers.policy.Restrictions) :
+  Result Bool
+  := do
+  if login
+  then
+    let b ← sudo.env.filter.is_login_variable key
+    if b
+    then ok false
+    else sudo.env.filter.should_keep key value cfg
+  else sudo.env.filter.should_keep key value cfg
+
 /-- [sudo_rs::sudoers::tokens::{impl sudo_rs::sudoers::basic_parser::Many for sudo_rs::sudoers::tokens::Meta<T>}::LIMIT]
     Source: 'src/sudoers/tokens.rs', lines 266:4-266:34
     Visibility: public -/

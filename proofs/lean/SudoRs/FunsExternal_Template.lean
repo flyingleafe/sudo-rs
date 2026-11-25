@@ -641,6 +641,29 @@ axiom common.string.SudoString.Insts.CoreOpsDerefDerefStr.deref
 axiom common.string.SudoString.Insts.CoreCmpPartialEqStr.eq
   : common.string.SudoString → Str → Result Bool
 
+/-- [sudo_rs::sudo::env::filter::table_iter]:
+    Source: 'src/sudo/env/filter.rs', lines 33:0-37:1 -/
+axiom sudo.env.filter.table_iter
+  :
+  std.collections.hash.set.HashSet String std.hash.random.RandomState
+    alloc.alloc.Global → Result sudo.env.filter.TableIter
+
+/-- [sudo_rs::sudo::env::filter::table_next]:
+    Source: 'src/sudo/env/filter.rs', lines 41:0-43:1 -/
+axiom sudo.env.filter.table_next
+  :
+  sudo.env.filter.TableIter → Result ((Option (Slice Std.U8)) ×
+    sudo.env.filter.TableIter)
+
+/-- [sudo_rs::sudo::env::filter::path_max]:
+    Source: 'src/sudo/env/filter.rs', lines 47:0-49:1 -/
+axiom sudo.env.filter.path_max : Result Std.Usize
+
+/-- [sudo_rs::system::audit::zoneinfo_path]:
+    Source: 'src/system/audit.rs', lines 175:0-186:1
+    Visibility: public -/
+axiom system.audit.zoneinfo_path : Result (Option Str)
+
 /-- [sudo_rs::sudoers::char_stream::chars_of]:
     Source: 'src/sudoers/char_stream.rs', lines 95:0-97:1
     Visibility: public -/

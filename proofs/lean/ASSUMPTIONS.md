@@ -35,6 +35,7 @@ call, so the proofs describe a run in which those lookups give consistent answer
 | `glob.Pattern` | `opaque` type | Glob semantics is not modelled. |
 | `common.string.SudoString` | `structure { str : String }` | Opaque for Charon; Rust `struct SudoString { inner: String }` where `inner` = text + NUL; modelled by the text its `Deref<Target = str>` exposes. |
 | `core.time.Duration` | `structure { secs : U64, nanos : U32 }` | Rust `struct Duration { secs: u64, nanos: Nanoseconds }` (`core/src/time.rs`); only built by `Duration::from_secs`. |
+| `sudo.env.filter.TableIter` | list of the entries not visited yet (`List String`) | Opaque for Charon (`src/sudo/env/filter.rs`): a struct around `std::collections::hash_set::Iter<'_, String>`, which borrows the set. `hash_set::Iter` yields every element of the set exactly once and then `None` (`std/src/collections/hash/set.rs`, `Iterator for Iter`, backed by `hashbrown::raw::RawIter`, a finite walk over the occupied buckets); the order is unspecified. The list model fixes the order of the `HashSet` list model; `SudoersSpec.EnvFilter.inTable_perm` shows the decision does not depend on it. |
 
 `glob.MatchOptions` is a plain struct that Aeneas extracts itself (`SudoRs/Types.lean`).
 
@@ -117,6 +118,10 @@ Helpers: `sudo_rs.stringBytes s` = the UTF-8 bytes of `s` as `U8`s; `sudo_rs.str
 | `std.collections.hash.set.HashSet.Insts.CoreCloneClone.clone` | the keys, each cloned with the key's `Clone` (`List.mapM`) | `HashSet::clone` clones the table element by element; the list model keeps the order of its keys. Reached by `Clone for Settings` (`env_keep`, `env_check`, `env_delete`). |
 | `std.hash.random.RandomState.Insts.CoreCloneClone.clone` | **`opaque`** | Hash seeding is not observed by the set model; it only fills the dictionary of the `HashSet` clone, which the model above does not call. |
 | `alloc.vec.Vec.append` | concatenate the two element lists in order, return the concatenation and an empty second vector; fail if the new length does not fit | `Vec::append` (`alloc/src/vec/mod.rs`): reserves for the other vector's length, copies those elements after the current ones, and sets the other length to zero. Allocation capacities are erased and the bound is the same as for the Aeneas model of `Vec::push`. Used for the entries of alias directives. |
+| `sudo.env.filter.table_iter` | `ok table` | Opaque for Charon: `TableIter { entries: table.iter() }`. Starts at the first entry; allocates nothing. |
+| `sudo.env.filter.table_next` | `[]` ↦ `(none, [])`; `e :: rest` ↦ `(some (strOfString e), rest)` | Opaque for Charon: `iter.entries.next().map(\|e\| e.as_bytes())`. `String::as_bytes` is the UTF-8 bytes (`strOfString`, which only fails beyond `usize::MAX` bytes, impossible for a Rust `String`). After the last entry the cursor stays empty, so the loop of `in_table` terminates after at most one call per entry plus one. |
+| `sudo.env.filter.path_max` | **`opaque`** `Result Usize` | Opaque for Charon: `PATH_MAX as usize` (`libc`, 4096 on Linux, 1024 on FreeBSD). The theorems take its value `pm` as a hypothesis `path_max = ok pm`. |
+| `system.audit.zoneinfo_path` | **`opaque`** `Result (Option Str)` | Opaque for Charon: the first of `/usr/share/zoneinfo`, `/usr/share/lib/zoneinfo`, `/usr/lib/zoneinfo` that exists, is owned by root, is not world-writable and is not group-writable unless its group is root (`src/system/audit.rs`, `checks`); a file-system read, called by `is_safe_tz` only for a fully-qualified TZ value. The theorems take its result `z` as a hypothesis `zoneinfo_path = ok z`, i.e. they hold for every file-system state, per call. |
 
 ## Hypotheses of the theorems
 
@@ -203,16 +208,6 @@ Rust calls it twice (for `skip_passwd` and for the root fallback): the translati
 calls. Under `InstOracle` (`is_root` is a function of the user) this changes nothing, but it is a
 point where the model is not a literal transcription of the source.
 
-The [Defaults-aware wrapper proofs](SudoRsProofs/Parser/Scoping/ListValidate.lean)
-add the range of the incoming settings and the correspondence and validity of the
-Defaults entries consumed by each pass. `check_validate_permission_eq` needs the
-non-command entries only; `check_list_permission_self_eq` consumes neither list;
-`check_list_permission_other_eq` needs both passes and the group and path contracts
-above. These conclusions concern the returned `Authorization<()>` and policy
-state, not PAM or the printed listing. `search_path_then_check_list_permission_eq`
-composes two extracted calls in the order read from the caller; it does not prove
-the caller makes these calls.
-
 The theorems quantify over the oracle `O`, the abstraction `A`, the instances and all inputs, so
 they hold for every OS user database and glob semantics consistent with the hypotheses.
 
@@ -249,12 +244,6 @@ keeps all scalar fields and compares `env_keep` and `env_check` by membership. F
 UTF-8 decoding before the character cursor, PAM, NSS consistency, and OS execution are
 not established by these theorems. `@socket` is not in the default extraction.
 
-The [concrete file witness](SudoRsProofs/Parser/TextExample.lean) constructs and
-checks its input bounds, local-file premise, host and identity instance. Its
-allow and refusal still depend on `P2Oracle`, agreement on Latin-1 character
-classes, `RenderAgrees` and `GlobOracle`. A kernel check of this instance is
-not a proof that all opaque primitive contracts hold on a particular machine.
-
 ## Hypotheses of the argument-escaping theorems
 
 `SudoRsProofs/Escape.lean` (`escaped` of `src/common/command.rs` against
@@ -267,3 +256,21 @@ is in `escaped_spec`: the line has at most `usize::MAX` bytes, which is when the
 Real Rust aborts earlier, at `isize::MAX` bytes of capacity; that bound is not modelled.
 `escaped_flatMap`, `escaped_injective`, `escaped_unescape` assume only that `escaped` returned.
 Arguments are read through `osBytes` (bytes as Lean `UInt8`s), an injective abstraction.
+
+## Hypotheses of the environment-policy theorems
+
+`SudoRsProofs/EnvFilter.lean` (`src/sudo/env/filter.rs` and `wildcard_match.rs` against
+`SudoersSpec.EnvFilter`) uses the `HashSet` list model, the `strOfString` model of
+`String::as_bytes`, the five environment rows above (`TableIter`, `table_iter`, `table_next`,
+`path_max`, `zoneinfo_path`), and the Aeneas library models of slice indexing, `split_at`,
+`usize` addition and subtraction and byte-array literals. `wildcard_match_eq`,
+`entry_matches_eq` and the byte helpers have no hypothesis. `is_safe_tz_eq` takes
+`zoneinfo_path = ok z` and `path_max = ok pm` for the filesystem result and platform constant;
+it does not establish those results or resolve a TZ path. `in_table_eq` requires every
+entry to fit in `usize` bytes (`Fits`), true of every Rust `String`. `should_keep_eq`,
+`keep_inherited_eq` and `should_keep_sound` use both external-result equations and `TablesFit r`
+for the two tables. The decision is stated on `configOf (absRestrictions r)`, using the same
+`Restrictions` representation as `Judgement::authorization`. `get_target_environment` calls
+`keep_inherited` for invoking-user entries and `should_keep` for checked overrides.
+Environment collection, PAM input, map assembly and unchecked trusted overrides
+(`dangerous_extend`) remain outside the extraction. Bytes are read as `Nat`s (`vals`).
