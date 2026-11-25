@@ -93,6 +93,18 @@ An earlier attempt is excluded: both runs completed but used the same image beca
 the Cargo target was shared. Neither that attempt nor the ignored tests is counted
 as evidence of candidate behavior.
 
+### Run 5: request, environment and credential changes
+
+A separate disposable KVM guest (Debian 13, signed snapshot; its own Docker and builders, no
+host mounts, no network in the test containers) ran the unchanged, unfiltered suite on the
+pushed baseline `afbada67` and candidate `e21d70d9`. Both sides completed with **827 passed,
+0 failed, 36 ignored** and the same 863 test names (`names_sha256` identical). No case outcome
+changed. The installed `/usr/bin/sudo` hashes differed (`cd38f67b…` on A, `bf67b902…` on B),
+as did the image IDs, while both used base image `3b199fd6…`. The candidate revision is the
+last change to `src/`; later branch commits touch documentation and comparison scripts only.
+Job `assurance-compliance-ab-117288`; the launcher refuses a changed test framework, a
+filtered run, or an incomplete count.
+
 ### `warn_ignored` ordering
 
 Between `ccf4489e` and `46d955a1` the two `warn_ignored` warnings ("non-unix group ... was ignored",
