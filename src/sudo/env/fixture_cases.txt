@@ -1,0 +1,44 @@
+# In-process environment policy examples. No commands are executed.
+# Each block starts with `case NAME`. `keep` and `check` take space-separated table entries;
+# `env` and `set` take one NAME=VALUE each; `secure_path` takes a PATH. An `expect` line is
+# NAME=VALUE, !NAME for an absent variable, or `reject` for a rejected command-line assignment.
+# Supply a different fixture through SUDO_RS_ENV_CASES.
+
+case preserve
+keep SUDOENV_SAMPLE
+check TZ
+env SUDOENV_SAMPLE=hello
+env SUDOENV_OTHER=world
+env TZ=UTC
+expect SUDOENV_SAMPLE=hello
+expect !SUDOENV_OTHER
+expect TZ=UTC
+
+case check
+keep SUDOENV_LABEL
+check SUDOENV_LABEL SUDOENV_MODE
+env SUDOENV_LABEL=alpha/beta
+env SUDOENV_MODE=normal
+expect !SUDOENV_LABEL
+expect SUDOENV_MODE=normal
+
+case pattern
+keep SUDOENV_COLOR=blu*
+env SUDOENV_COLOR=blue
+expect SUDOENV_COLOR=blue
+
+case secure
+keep PATH
+secure_path /usr/bin:/bin
+env PATH=/usr/local/bin:/usr/bin
+expect PATH=/usr/bin:/bin
+
+case assignment
+keep SUDOENV_SAMPLE
+set SUDOENV_SAMPLE=hello
+expect SUDOENV_SAMPLE=hello
+
+case unlisted-assignment
+keep SUDOENV_SAMPLE
+set SUDOENV_OTHER=world
+expect reject

@@ -1,14 +1,13 @@
 use std::{
-    collections::{HashMap, HashSet},
+    collections::HashMap,
     ffi::{OsStr, OsString},
     os::unix::prelude::OsStrExt,
 };
 
 use crate::common::{CommandAndArguments, Context, Error, context::LaunchType};
 use crate::sudoers::Restrictions;
-use crate::system::{PATH_MAX, audit::zoneinfo_path};
 
-use super::wildcard_match::wildcard_match;
+use super::filter::{keep_inherited, should_keep};
 
 // TODO: use _PATH_STDPATH from paths.h
 pub(crate) const PATH_DEFAULT: &str = "/usr/bin:/bin:/usr/sbin:/sbin";
@@ -18,13 +17,6 @@ pub type Environment = HashMap<OsString, OsString>;
 /// obtain the system environment
 pub fn system_environment() -> Environment {
     std::env::vars_os().collect()
-}
-
-/// check byte slice contains with given byte slice
-fn contains_subsequence(haystack: &[u8], needle: &[u8]) -> bool {
-    haystack
-        .windows(needle.len())
-        .any(|window| window == needle)
 }
 
 /// Formats the command and arguments passed for the SUDO_COMMAND
@@ -117,76 +109,6 @@ fn add_extra_env(
     }
 }
 
-/// Check a string only contains printable (non-space) characters
-fn is_printable(input: &[u8]) -> bool {
-    input
-        .iter()
-        .all(|c| c.is_ascii_alphanumeric() || c.is_ascii_punctuation())
-}
-
-/// The TZ variable is considered unsafe if any of the following are true:
-/// It consists of a fully-qualified path name, optionally prefixed with a colon (‘:’), that does not match the location of the zoneinfo directory.
-/// It contains a .. path element.
-/// It contains white space or non-printable characters.
-/// It is longer than the value of PATH_MAX.
-fn is_safe_tz(value: &[u8]) -> bool {
-    let check_value = if value.starts_with(b":") {
-        &value[1..]
-    } else {
-        value
-    };
-
-    if check_value.starts_with(b"/") {
-        if let Some(path_zoneinfo) = zoneinfo_path() {
-            if !check_value.starts_with(path_zoneinfo.as_bytes())
-                || check_value.get(path_zoneinfo.len()) != Some(&b'/')
-            {
-                return false;
-            }
-        } else {
-            return false;
-        }
-    }
-
-    !contains_subsequence(check_value, "..".as_bytes())
-        && is_printable(check_value)
-        && check_value.len() < PATH_MAX as usize
-}
-
-/// Check whether the needle exists in a haystack, in which the haystack is a list of patterns, possibly containing wildcards
-fn in_table(needle: (&OsStr, &OsStr), haystack: &HashSet<String>) -> bool {
-    haystack.iter().any(|pattern| {
-        if let Some((key, value)) = pattern.split_once('=') {
-            wildcard_match(needle.0.as_bytes(), key.as_bytes())
-                && wildcard_match(needle.1.as_bytes(), value.as_bytes())
-        } else {
-            wildcard_match(needle.0.as_bytes(), pattern.as_bytes())
-        }
-    })
-}
-
-/// Determine whether a specific environment variable should be kept
-fn should_keep(key: &OsStr, value: &OsStr, cfg: &Restrictions) -> bool {
-    if value.as_bytes().starts_with("()".as_bytes()) {
-        return false;
-    }
-
-    if cfg.path.is_some() && key == "PATH" {
-        return false;
-    }
-
-    if key == "TZ" {
-        return in_table((key, value), cfg.env_keep)
-            || (in_table((key, value), cfg.env_check) && is_safe_tz(value.as_bytes()));
-    }
-
-    if in_table((key, value), cfg.env_check) {
-        return !value.as_bytes().iter().any(|c| *c == b'%' || *c == b'/');
-    }
-
-    in_table((key, value), cfg.env_keep)
-}
-
 /// Construct the final environment from the current one and a sudo context
 /// see <https://github.com/sudo-project/sudo/blob/main/plugins/sudoers/env.c> for the original implementation
 /// see <https://www.sudo.ws/docs/man/sudoers.man/#Command_environment> for the original documentation
@@ -214,21 +136,18 @@ pub fn get_target_environment(
     // env_keep list take precedence over those in the PAM environment
     let mut environment: HashMap<_, _> = additional_env.into_iter().collect();
 
-    let login_vars: &[_] = if context.launch == LaunchType::Login {
-        &["HOME", "SHELL", "USER", "LOGNAME"].map(OsStr::new)
-    } else {
-        &[]
-    };
-
+    // the policy decision per variable is `filter::keep_inherited` (on the bytes of name and
+    // value); collecting and merging the maps stays here
+    let login = context.launch == LaunchType::Login;
     environment.extend(current_env.into_iter().filter(|(key, value)| {
-        !login_vars.contains(&key.as_os_str()) && should_keep(key, value, settings)
+        keep_inherited(key.as_bytes(), value.as_bytes(), login, settings)
     }));
 
     add_extra_env(context, settings, sudo_ps1, &mut environment);
 
     let mut rejected_vars = Vec::new();
     for (key, value) in user_override {
-        if should_keep(OsStr::new(&key), OsStr::new(&value), settings) {
+        if should_keep(key.as_bytes(), value.as_bytes(), settings) {
             environment.insert(key.into(), value.into());
         } else {
             rejected_vars.push(key);
@@ -251,91 +170,4 @@ where
             .into_iter()
             .map(|(key, value)| (key.into(), value.into())),
     )
-}
-
-#[cfg(test)]
-mod tests {
-    use super::{is_safe_tz, should_keep, zoneinfo_path};
-    use std::{collections::HashSet, ffi::OsStr};
-
-    struct TestConfiguration {
-        keep: HashSet<String>,
-        check: HashSet<String>,
-        path: Option<String>,
-    }
-
-    impl TestConfiguration {
-        pub fn check_should_keep(&self, key: &str, value: &str, expected: bool) {
-            assert_eq!(
-                should_keep(
-                    OsStr::new(key),
-                    OsStr::new(value),
-                    &crate::sudoers::Restrictions {
-                        env_keep: &self.keep,
-                        env_check: &self.check,
-                        path: self.path.as_deref(),
-                        chdir: crate::sudoers::DirChange::Strict(None),
-                        trust_environment: false,
-                        use_pty: true,
-                        umask: crate::exec::Umask::Preserve,
-                        #[cfg(feature = "apparmor")]
-                        apparmor_profile: None,
-                        noexec: false,
-                        log: crate::sudoers::Logging::Auth,
-                    }
-                ),
-                expected,
-                "{} should {}",
-                key,
-                if expected { "be kept" } else { "not be kept" }
-            );
-        }
-    }
-
-    #[test]
-    fn test_filtering() {
-        let mut config = TestConfiguration {
-            keep: HashSet::from(["AAP".to_string(), "NOOT".to_string()]),
-            check: HashSet::from(["MIES".to_string(), "TZ".to_string()]),
-            path: Some("/bin".to_string()),
-        };
-
-        config.check_should_keep("AAP", "FOO", true);
-        config.check_should_keep("MIES", "BAR", true);
-        config.check_should_keep("AAP", "()=foo", false);
-        config.check_should_keep("TZ", "Europe/Amsterdam", true);
-        config.check_should_keep("TZ", "../Europe/Berlin", false);
-        config.check_should_keep("MIES", "FOO/BAR", false);
-        config.check_should_keep("MIES", "FOO/BAR", false);
-
-        config.keep.insert("PATH".to_string());
-        config.check_should_keep("PATH", "FOO", false);
-        config.path = None;
-        config.check_should_keep("PATH", "FOO", true);
-    }
-
-    #[allow(clippy::bool_assert_comparison)]
-    #[test]
-    fn test_tzinfo() {
-        let path_zoneinfo = zoneinfo_path().unwrap();
-        assert_eq!(is_safe_tz(b"Europe/Amsterdam"), true);
-        assert_eq!(
-            is_safe_tz(format!("{path_zoneinfo}/Europe/London").as_bytes()),
-            true
-        );
-        assert_eq!(
-            is_safe_tz(format!(":{path_zoneinfo}/Europe/Amsterdam").as_bytes()),
-            true
-        );
-        assert_eq!(is_safe_tz(b"/Europe/Amsterdam"), false);
-        assert_eq!(is_safe_tz(b"/schaap/Europe/Amsterdam"), false);
-        assert_eq!(
-            is_safe_tz(format!("{path_zoneinfo}/../Europe/London").as_bytes()),
-            false
-        );
-        assert_eq!(
-            is_safe_tz(format!("{path_zoneinfo}/../Europe/London").as_bytes()),
-            false
-        );
-    }
 }

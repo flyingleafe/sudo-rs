@@ -98,6 +98,9 @@ start_from = [
     "crate::common::command::select_command_path",
     "crate::common::resolve::search_path_core",
     "crate::common::resolve::resolve_target_core",
+    "crate::sudo::env::wildcard_match::wildcard_match",
+    "crate::sudo::env::filter::should_keep",
+    "crate::sudo::env::filter::keep_inherited",
 ]
 opaque = [
     "crate::common::string",
@@ -115,4 +118,9 @@ opaque = [
     "crate::sudoers::include_file",
     "crate::sudoers::include_dir_files",
     "crate::sudoers::fatal_message",
+    "crate::sudo::env::filter::TableIter",
+    "crate::sudo::env::filter::table_iter",
+    "crate::sudo::env::filter::table_next",
+    "crate::sudo::env::filter::path_max",
+    "crate::system::audit::zoneinfo_path",
 ]

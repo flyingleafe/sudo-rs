@@ -193,3 +193,153 @@ fn test_environment_variable_filtering() {
         );
     }
 }
+
+/// One case of `fixture_cases.txt` or of an external fixture with the same format.
+#[derive(Default)]
+struct FixtureCase {
+    name: String,
+    keep: HashSet<String>,
+    check: HashSet<String>,
+    secure_path: Option<String>,
+    env: Vec<(String, String)>,
+    set: Vec<(String, String)>,
+    expect: Vec<String>,
+}
+
+fn parse_fixture(text: &str) -> Vec<FixtureCase> {
+    let mut cases: Vec<FixtureCase> = Vec::new();
+    for line in text.lines() {
+        let line = line.trim();
+        if line.is_empty() || line.starts_with('#') {
+            continue;
+        }
+        let (word, rest) = line.split_once(' ').unwrap_or((line, ""));
+        let pair = |s: &str| {
+            let (k, v) = s.split_once('=').expect("NAME=VALUE");
+            (k.to_string(), v.to_string())
+        };
+        if word == "case" {
+            cases.push(FixtureCase {
+                name: rest.to_string(),
+                ..Default::default()
+            });
+            continue;
+        }
+        let case = cases.last_mut().expect("a `case` line first");
+        match word {
+            "keep" => case.keep.extend(rest.split_whitespace().map(String::from)),
+            "check" => case.check.extend(rest.split_whitespace().map(String::from)),
+            "secure_path" => case.secure_path = Some(rest.to_string()),
+            "env" => case.env.push(pair(rest)),
+            "set" => case.set.push(pair(rest)),
+            "expect" => case.expect.push(rest.to_string()),
+            _ => panic!("unknown environment fixture directive"),
+        }
+    }
+    cases
+}
+
+/// Ordinary filtering cases through the real `get_target_environment`, with a synthetic
+/// `sudo /usr/bin/env` context, no actual execution and no PAM environment.
+#[test]
+fn env_fixture_cases() {
+    use std::{collections::BTreeSet, ffi::OsStr, fmt::Write};
+
+    let observations_path = std::env::var_os("SUDO_RS_ENV_OBSERVATIONS");
+    let mut observations = String::new();
+    let external_fixture = std::env::var_os("SUDO_RS_ENV_CASES")
+        .map(|path| std::fs::read_to_string(path).expect("could not read environment fixture"));
+    let text = external_fixture
+        .as_deref()
+        .unwrap_or(include_str!("fixture_cases.txt"));
+    let cases = parse_fixture(text);
+    assert!(!cases.is_empty(), "empty environment fixture");
+    for (index, case) in cases.into_iter().enumerate() {
+        let options = SudoAction::try_parse_from(["sudo", "/usr/bin/env"])
+            .unwrap()
+            .try_into_run()
+            .ok()
+            .unwrap();
+        let context = create_test_context(options);
+        let current_env: Environment = case
+            .env
+            .iter()
+            .map(|(k, v)| (k.into(), v.into()))
+            .collect();
+        let result = get_target_environment(
+            current_env,
+            HashMap::new(),
+            case.set.clone(),
+            &context,
+            &crate::sudoers::Restrictions {
+                env_keep: &case.keep,
+                env_check: &case.check,
+                path: case.secure_path.as_deref(),
+                use_pty: true,
+                chdir: crate::sudoers::DirChange::Strict(None),
+                trust_environment: false,
+                umask: crate::exec::Umask::Preserve,
+                #[cfg(feature = "apparmor")]
+                apparmor_profile: None,
+                noexec: false,
+                log: crate::sudoers::Logging::Auth,
+            },
+        );
+        if observations_path.is_some() {
+            match &result {
+                Err(_) => writeln!(observations, "{}\t-\terror", case.name).unwrap(),
+                Ok(env) => {
+                    let keys: BTreeSet<&str> = case
+                        .env
+                        .iter()
+                        .chain(&case.set)
+                        .map(|(key, _)| key.as_str())
+                        .chain(case.secure_path.as_ref().map(|_| "PATH"))
+                        .collect();
+                    for key in keys {
+                        let origin = match env.get(OsStr::new(key)) {
+                            None => "drop",
+                            Some(value) => {
+                                let matches = |(k, v): &(String, String)| {
+                                    k == key && value.as_os_str() == OsStr::new(v)
+                                };
+                                if case.set.iter().any(matches) {
+                                    "set"
+                                } else if key == "PATH"
+                                    && case.secure_path.as_deref().map(OsStr::new)
+                                        == Some(value.as_os_str())
+                                {
+                                    "secure_path"
+                                } else if case.env.iter().any(matches) {
+                                    "caller"
+                                } else {
+                                    "other"
+                                }
+                            }
+                        };
+                        writeln!(observations, "{}\t{key}\t{origin}", case.name).unwrap();
+                    }
+                }
+            }
+            continue;
+        }
+        for expect in &case.expect {
+            if expect == "reject" {
+                assert!(result.is_err(), "case {index}: expected a rejection");
+            } else if let Some(var) = expect.strip_prefix('!') {
+                let env = result.as_ref().unwrap_or_else(|_| panic!("case {index}: rejected"));
+                assert!(!env.contains_key(OsStr::new(var)), "case {index}: variable kept");
+            } else {
+                let (var, value) = expect.split_once('=').expect("expected NAME=VALUE");
+                let env = result.as_ref().unwrap_or_else(|_| panic!("case {index}: rejected"));
+                assert!(
+                    env.get(OsStr::new(var)).and_then(|v| v.to_str()) == Some(value),
+                    "case {index}: unexpected variable value"
+                );
+            }
+        }
+    }
+    if let Some(path) = observations_path {
+        std::fs::write(path, observations).unwrap();
+    }
+}
