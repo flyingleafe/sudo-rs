@@ -275,9 +275,8 @@ Each item says what kind of evidence it is. A test covers only the inputs it ran
   (CVE-2025-64517 class), `PamBuffer` bounds and wiping, `cutils`, seccomp buffer allocation
   and `siginfo` reading. Nine more harnesses check the NOEXEC filter bytecode against its
   dispatch contract, the owner/mode decision on an open handle, and group-list preparation
-  and credential order, fail-stop and restoration. The last eight passed on uni-cpu in
-  `assurance-kani-credscore-41b384` and `assurance-kani-credscore-5d6f51`, the filter harness
-  in `assurance-seccomp2-65adf9`.
+  and credential order, fail-stop and restoration. Job `assurance-final-kani-235a46` ran all
+  45 on the integrated tree: all passed, with every coverage witness satisfied.
   Four planted bugs (the pre-fix CVE-2023-42456 record path, a space kept by `escaped`, a
   `PamBuffer` one byte too long, record decoding without its seconds precondition) each fail
   a harness that passes on the clean tree.

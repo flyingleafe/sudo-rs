@@ -30,6 +30,8 @@ Three groups ran concurrently; each group ran its harnesses serially with a 3600
 The job had no additional per-harness memory limit. Nine harnesses were added afterwards:
 the NOEXEC bytecode check, two file-policy checks and six credential-driver checks; see
 [Secure file opening and credential changes](#secure-file-opening-and-credential-changes).
+Job `assurance-final-kani-235a46` then ran all 45 together on the integrated tree: every
+harness passed and every coverage witness was satisfied.
 
 ```sh
 KANI_LIMITED=/nonexistent KANI_TIMEOUT=3600 proofs/kani/run.sh common::command::
