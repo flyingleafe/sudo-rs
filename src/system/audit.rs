@@ -14,7 +14,8 @@ use std::os::unix::{
 use std::path::{Component, Path};
 
 use super::{
-    Group, GroupId, User, UserId, cerr, inject_group, interface::UnixUser, set_supplementary_groups,
+    Credentials, Group, GroupId, NativeCredentials, TemporaryCredentialOps, User, UserId, cerr,
+    inject_group, interface::UnixUser, with_temporary_credentials,
 };
 use crate::common::resolve::CurrentUser;
 
@@ -39,21 +40,28 @@ pub(crate) fn sudo_call<T>(
             let mut groups = target_user.groups.clone();
             inject_group(target_group.gid, &mut groups);
 
-    // SAFETY: these libc functions are always safe to call
-    let (cur_user_id, cur_group_id) =
-        unsafe { (UserId::new(libc::geteuid()), GroupId::new(libc::getegid())) };
+            if cfg!(test)
+                && target_user.uid == previous.uid
+                && target_group.gid == previous.gid
+                && groups.iter().collect::<HashSet<_>>()
+                    == previous.groups.iter().collect::<HashSet<_>>()
+            {
+                // In tests without privileges, just run the operation if the ids already match.
+                return None;
+            }
 
-    let cur_groups = {
-        // SAFETY: calling with size 0 does not modify through the pointer, and is
-        // a documented way of getting the length needed.
-        let len = cerr(unsafe { libc::getgroups(0, std::ptr::null_mut()) })?;
+            Some(Credentials {
+                uid: target_user.uid,
+                gid: target_group.gid,
+                groups,
+            })
+        },
+        operation,
+    )
+}
 
-        let mut buf: Vec<GroupId> = vec![GroupId::new(KEEP_GID); len as usize];
-        // SAFETY: we pass a correct pointer to a slice of the given length
-        cerr(unsafe {
-            // We can cast to gid_t because `GroupId` is marked as transparent
-            libc::getgroups(len, buf.as_mut_ptr().cast::<libc::gid_t>())
-        })?;
+impl TemporaryCredentialOps for NativeCredentials<true> {
+    type Groups = Vec<GroupId>;
 
     fn snapshot(&mut self) -> io::Result<Credentials<Self::Groups>> {
         // SAFETY: these libc functions are always safe to call.
@@ -69,25 +77,9 @@ pub(crate) fn sudo_call<T>(
         Ok(Credentials { uid, gid, groups })
     }
 
-    struct ResetUserGuard(UserId, GroupId, Vec<GroupId>);
-
-    impl Drop for ResetUserGuard {
-        fn drop(&mut self) {
-            // restore privileges in reverse order
-            (|| {
-                // SAFETY: this function is always safe to call
-                cerr(unsafe { libc::setresuid(KEEP_UID, UserId::inner(&self.0), KEEP_UID) })?;
-                // SAFETY: this function is always safe to call
-                cerr(unsafe { libc::setresgid(KEEP_GID, GroupId::inner(&self.1), KEEP_GID) })?;
-                set_supplementary_groups(&self.2)
-            })()
-            .expect("could not restore to saved user id");
-        }
+    fn restore_failed(&mut self, error: io::Error) -> ! {
+        panic!("could not restore to saved user id: {error:?}");
     }
-    // SAFETY: this function is always safe to call
-    cerr(unsafe { libc::setresgid(KEEP_GID, GroupId::inner(&target_group.gid), KEEP_GID) })?;
-    // SAFETY: this function is always safe to call
-    cerr(unsafe { libc::setresuid(KEEP_UID, UserId::inner(&target_user.uid), KEEP_UID) })?;
 }
 
 #[cfg(feature = "unstable-remote-sudoers")]
@@ -193,28 +185,83 @@ pub fn zoneinfo_path() -> Option<&'static str> {
     })
 }
 
-fn checks(path: &Path, meta: Metadata) -> io::Result<()> {
-    let error = |msg| Error::new(ErrorKind::PermissionDenied, msg);
+/// Owner, group and permission bits of a file: the part of its metadata that `checks` inspects.
+#[derive(Clone, Copy)]
+struct OwnerMode {
+    uid: u32,
+    gid: u32,
+    mode: u32,
+}
 
-    let path_mode = meta.permissions().mode();
-    if meta.uid() != 0 {
-        Err(error(xlat!(
-            "{path} must be owned by root",
-            path = path.display()
-        )))
-    } else if meta.gid() != 0 && (path_mode & mode(Category::Group, Op::Write) != 0) {
-        Err(error(xlat!(
-            "{path} cannot be group-writable",
-            path = path.display()
-        )))
-    } else if path_mode & mode(Category::World, Op::Write) != 0 {
-        Err(error(xlat!(
-            "{path} cannot be world-writable",
-            path = path.display()
-        )))
-    } else {
-        Ok(())
+impl OwnerMode {
+    fn of(meta: &Metadata) -> Self {
+        OwnerMode {
+            uid: meta.uid(),
+            gid: meta.gid(),
+            mode: meta.permissions().mode(),
+        }
     }
+
+    /// Why a file with this owner and mode is refused by `checks`, if it is: the first of
+    /// "not owned by root", "group-writable and the group is not root", "world-writable".
+    fn insecurity(self) -> Option<Insecure> {
+        if self.uid != 0 {
+            Some(Insecure::NotRootOwned)
+        } else if self.gid != 0 && (self.mode & mode(Category::Group, Op::Write) != 0) {
+            Some(Insecure::GroupWritable)
+        } else if self.mode & mode(Category::World, Op::Write) != 0 {
+            Some(Insecure::WorldWritable)
+        } else {
+            None
+        }
+    }
+}
+
+/// The reasons for which `checks` refuses a file.
+#[derive(Clone, Copy)]
+enum Insecure {
+    NotRootOwned,
+    GroupWritable,
+    WorldWritable,
+}
+
+impl Insecure {
+    fn message(self, path: &Path) -> String {
+        match self {
+            Insecure::NotRootOwned => xlat!("{path} must be owned by root", path = path.display()),
+            Insecure::GroupWritable => xlat!(
+                "{path} cannot be group-writable",
+                path = path.display()
+            ),
+            Insecure::WorldWritable => xlat!(
+                "{path} cannot be world-writable",
+                path = path.display()
+            ),
+        }
+    }
+}
+
+fn checks(path: &Path, meta: Metadata) -> io::Result<()> {
+    check_owner_mode(path, OwnerMode::of(&meta))
+}
+
+/// `checks` on the owner and mode of the file at `path`.
+fn check_owner_mode(path: &Path, owner_mode: OwnerMode) -> io::Result<()> {
+    match owner_mode.insecurity() {
+        None => Ok(()),
+        Some(insecure) => Err(Error::new(ErrorKind::PermissionDenied, insecure.message(path))),
+    }
+}
+
+/// Hand out `handle`, opened from `path`, only if the owner and mode read from the handle itself
+/// (not from `path`, which may name another file by now) pass `checks`; otherwise it is dropped.
+fn checked_handle<H>(
+    path: &Path,
+    handle: H,
+    owner_mode_of: impl FnOnce(&H) -> io::Result<OwnerMode>,
+) -> io::Result<H> {
+    check_owner_mode(path, owner_mode_of(&handle)?)?;
+    Ok(handle)
 }
 
 // Open `path` with options `open_options`, provided that it is "secure".
@@ -252,10 +299,9 @@ fn secure_open_impl(
     }
 
     let file = open_options.open(path)?;
-    let meta = file.metadata()?;
-    checks(path, meta)?;
-
-    Ok(file)
+    checked_handle(path, file, |file| {
+        file.metadata().map(|meta| OwnerMode::of(&meta))
+    })
 }
 
 #[cfg(feature = "unstable-remote-sudoers")]
@@ -462,6 +508,9 @@ fn traversed_secure_open(
 
     Ok(cur)
 }
+
+#[cfg(kani)]
+mod kani_proofs;
 
 #[cfg(test)]
 mod test {
