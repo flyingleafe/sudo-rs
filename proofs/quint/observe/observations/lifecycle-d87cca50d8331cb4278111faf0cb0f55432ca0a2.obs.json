@@ -1,0 +1,321 @@
+{
+ "derived": {
+  "binary_sha256": "14ea33a699551c6a78819d50ae167929b494b8b39b5f353fd75bfa07ebd9b808",
+  "commit": "d87cca50d8331cb4278111faf0cb0f55432ca0a2",
+  "guest": {
+   "date": "2026-11-25T00:51:34Z",
+   "kernel": "Linux 6.12.117+deb13-amd64 x86_64",
+   "setpriv-version": "setpriv from util-linux 2.41.5",
+   "strace-version": "strace -- version 6.13",
+   "toolchain": "cargo 1.85.1 (d73d2caf9 2024-12-31)\nrustc 1.85.1 (4eb161250 2025-03-15) (built from a source tarball)"
+  },
+  "provenance_checks": [
+   "guest inputs guest-run.sh, sudoers, pam.d-sudo, scenarios equal the committed fixture",
+   "fixture pam.d-sudo equals STOCK_PAM_D_SUDO of the compliance framework",
+   "installed /etc/sudoers-rs and /etc/pam.d/sudo equal the fixture",
+   "binary root:root 0755, no setuid/setgid bit; guest and host hashes agree"
+  ],
+  "scenarios": {
+   "permitted": {
+    "evidence": [
+     {
+      "element": "start: invoker, argv",
+      "source": "strace: execve of sudo; launcher control status",
+      "status": "observed"
+     },
+     {
+      "element": "start: credentials",
+      "source": "strace: launcher set*id calls up to the exec of sudo, equal to the launcher control",
+      "status": "observed"
+     },
+     {
+      "element": "start: TZ, EDITOR",
+      "source": "environment fixed by `env -i PATH=/usr/bin:/bin`",
+      "status": "observed"
+     },
+     {
+      "element": "start: session, /proc/self/stat session",
+      "source": "not observable here; no ticket is read or written in either scenario",
+      "status": "fixed"
+     },
+     {
+      "element": "parse, load",
+      "source": "internal to sudo",
+      "status": "unobserved"
+     },
+     {
+      "element": "decide: verdict",
+      "source": "fixture/scenarios, before the run",
+      "status": "pinned"
+     },
+     {
+      "element": "decide: user, host, time of the request",
+      "source": "internal to sudo",
+      "status": "unobserved"
+     },
+     {
+      "element": "PAM: pam_start, account management, session, credentials (library calls)",
+      "source": "not modelled; no PAM event is synthesised",
+      "status": "unobserved"
+     },
+     {
+      "element": "auth: no password check",
+      "source": "with -n, a password requirement would end the run with \"interactive authentication is required\"; observed: exit 0, empty stderr",
+      "status": "model step from the pinned verdict"
+     },
+     {
+      "element": "setup: environment",
+      "source": "internal to sudo",
+      "status": "unobserved"
+     },
+     {
+      "element": "set_groups, set_gid, set_uid",
+      "source": "strace: arguments and results in the command process",
+      "status": "observed"
+     },
+     {
+      "element": "exec: program and argv",
+      "source": "strace: execve; /proc/self/status Name",
+      "status": "observed"
+     },
+     {
+      "element": "exec: credentials",
+      "source": "/proc/self/status of the command, equal to the credentials traced at its exec",
+      "status": "observed"
+     },
+     {
+      "element": "PAM account helper (pam_unix unix_chkpwd)",
+      "source": "strace: forked by sudo's main process before the command, setuid(0), `unix_chkpwd <invoker> chkexpiry` with uid 0, the invoker's gids and groups, empty environment; accepted only under the PAM-helper rule",
+      "status": "observed, not modelled"
+     },
+     {
+      "element": "sudo helpers (mailer, askpass, editor: none)",
+      "source": "strace: no program executed besides the command and the classified PAM helper",
+      "status": "observed"
+     },
+     {
+      "element": "tickets",
+      "source": "timestamp directory listed before and after the run",
+      "status": "observed"
+     }
+    ],
+    "observed": {
+     "calls": {
+      "gid": 2,
+      "groups": [
+       2
+      ],
+      "uid": 2
+     },
+     "execCmd": "c1",
+     "execCreds": {
+      "egid": 2,
+      "euid": 2,
+      "groups": [
+       2
+      ],
+      "rgid": 2,
+      "ruid": 2,
+      "sgid": 2,
+      "suid": 2
+     },
+     "outcome": "exec",
+     "start": {
+      "askpass": false,
+      "chroot": false,
+      "cmd": "c1",
+      "editorExtra": [],
+      "file": "f1",
+      "groupArg": 0,
+      "hasGroup": false,
+      "hostArg": "",
+      "invoker": 1,
+      "mode": "run",
+      "runasArg": 2,
+      "runasKind": "name",
+      "session": 1,
+      "statSession": 1,
+      "tzOffset": 0
+     },
+     "startCreds": {
+      "egid": 1,
+      "euid": 0,
+      "groups": [
+       1
+      ],
+      "rgid": 1,
+      "ruid": 1,
+      "sgid": 1,
+      "suid": 0
+     },
+     "ticketOwners": [],
+     "verdict": "nopasswd"
+    },
+    "unmodelled": [
+     "command: fsuid 1001, fsgid 1001, CapEff 0000000000000000, NoNewPrivs 0",
+     "6 set*id calls in sudo's own processes (temporary switches for command resolution), every process back at its launch credentials",
+     "PAM helper: process 949, forked by sudo (process 948) before the command, setuid(0), executed /usr/sbin/unix_chkpwd ferris chkexpiry with uid 0/0/0, gid 1000/1000/1000, groups [1000], 0 environment variables"
+    ]
+   },
+   "refused": {
+    "evidence": [
+     {
+      "element": "start: invoker, argv",
+      "source": "strace: execve of sudo; launcher control status",
+      "status": "observed"
+     },
+     {
+      "element": "start: credentials",
+      "source": "strace: launcher set*id calls up to the exec of sudo, equal to the launcher control",
+      "status": "observed"
+     },
+     {
+      "element": "start: TZ, EDITOR",
+      "source": "environment fixed by `env -i PATH=/usr/bin:/bin`",
+      "status": "observed"
+     },
+     {
+      "element": "start: session, /proc/self/stat session",
+      "source": "not observable here; no ticket is read or written in either scenario",
+      "status": "fixed"
+     },
+     {
+      "element": "parse, load",
+      "source": "internal to sudo",
+      "status": "unobserved"
+     },
+     {
+      "element": "decide: verdict",
+      "source": "fixture/scenarios, before the run",
+      "status": "pinned"
+     },
+     {
+      "element": "decide: user, host, time of the request",
+      "source": "internal to sudo",
+      "status": "unobserved"
+     },
+     {
+      "element": "PAM: pam_start, account management, session, credentials (library calls)",
+      "source": "sudo-rs refuses before any PAM call (code reading: pipeline.rs `run`)",
+      "status": "not reached"
+     },
+     {
+      "element": "refusal",
+      "source": "exit 1, refusal message, no execve after sudo, no lasting credential change",
+      "status": "observed"
+     },
+     {
+      "element": "sudo helpers (mailer, askpass, editor: none)",
+      "source": "strace: no program executed besides the command",
+      "status": "observed"
+     },
+     {
+      "element": "tickets",
+      "source": "timestamp directory listed before and after the run",
+      "status": "observed"
+     }
+    ],
+    "observed": {
+     "calls": {
+      "gid": 0,
+      "groups": [],
+      "uid": 0
+     },
+     "execCmd": "none",
+     "execCreds": {
+      "egid": 0,
+      "euid": 0,
+      "groups": [],
+      "rgid": 0,
+      "ruid": 0,
+      "sgid": 0,
+      "suid": 0
+     },
+     "outcome": "refused",
+     "start": {
+      "askpass": false,
+      "chroot": false,
+      "cmd": "c2",
+      "editorExtra": [],
+      "file": "f1",
+      "groupArg": 0,
+      "hasGroup": false,
+      "hostArg": "",
+      "invoker": 1,
+      "mode": "run",
+      "runasArg": 2,
+      "runasKind": "name",
+      "session": 1,
+      "statSession": 1,
+      "tzOffset": 0
+     },
+     "startCreds": {
+      "egid": 1,
+      "euid": 0,
+      "groups": [
+       1
+      ],
+      "rgid": 1,
+      "ruid": 1,
+      "sgid": 1,
+      "suid": 0
+     },
+     "ticketOwners": [],
+     "verdict": "deny"
+    },
+    "unmodelled": [
+     "6 set*id calls in sudo's own processes (temporary switches for command resolution), every process back at its launch credentials"
+    ]
+   }
+  },
+  "src_tar_sha256": "5e7e6134dfdbe3af7cf74b02dcb9449d64d405f918a42912fdb310dd92b83330"
+ },
+ "format": "lifecycle-trace/1",
+ "provenance": {
+  "kind": "real-binary-guest-capture",
+  "recorder": "proofs/quint/observe/observe.py record",
+  "recorder_sha256": "14dfac94591f27c636a94edb60182dc8e30885c20c0f29ff5188759cc65177b3"
+ },
+ "raw": {
+  "COMPLETE": "2026-11-25T00:51:34Z\n",
+  "bin/sudo.sha256": "14ea33a699551c6a78819d50ae167929b494b8b39b5f353fd75bfa07ebd9b808\n",
+  "build/log": "   Compiling libc v0.2.189\n   Compiling glob v0.3.4\n   Compiling sudo-rs v0.2.15 (/var/tmp/lifecycle-build.SO6sLkLt/src)\nwarning: unreachable expression\n   --> src/pam/rpassword.rs:152:9\n    |\n152 | /         while let Some(signal) = signal::take_first_pending() {\n153 | |             match signal {\n154 | |                 SIGTSTP | SIGTTIN | SIGTTOU => {\n155 | |                     crate::system::kill(crate::system::Process::process_id(), signal)?;\n...   |\n159 | |                     exit_with_signal(signal).unwrap();\n    | |                     --------------------------------- any code following this expression is unreachable\n...   |\n162 | |         }\n    | |_________^ unreachable expression\n    |\nnote: this expression has type `Infallible`, which is uninhabited\n   --> src/pam/rpassword.rs:159:21\n    |\n159 |                     exit_with_signal(signal).unwrap();\n    |                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n    = note: `#[warn(unreachable_code)]` on by default\n\nwarning: `sudo-rs` (lib) generated 1 warning\n    Finished `dev` profile [unoptimized + debuginfo] target(s) in 8.17s\n",
+  "launcher/status": "Name:\tcat\nUmask:\t0022\nState:\tR (running)\nTgid:\t940\nNgid:\t0\nPid:\t940\nPPid:\t508\nTracerPid:\t0\nUid:\t1000\t0\t0\t0\nGid:\t1000\t1000\t1000\t1000\nFDSize:\t64\nGroups:\t1000 \nNStgid:\t940\nNSpid:\t940\nNSpgid:\t507\nNSsid:\t402\nKthread:\t0\nVmPeak:\t    2848 kB\nVmSize:\t    2848 kB\nVmLck:\t       0 kB\nVmPin:\t       0 kB\nVmHWM:\t    1488 kB\nVmRSS:\t    1488 kB\nRssAnon:\t     108 kB\nRssFile:\t    1380 kB\nRssShmem:\t       0 kB\nVmData:\t     488 kB\nVmStk:\t     132 kB\nVmExe:\t      24 kB\nVmLib:\t    1588 kB\nVmPTE:\t      44 kB\nVmSwap:\t       0 kB\nHugetlbPages:\t       0 kB\nCoreDumping:\t0\nTHP_enabled:\t1\nuntag_mask:\t0xffffffffffffffff\nThreads:\t1\nSigQ:\t0/15458\nSigPnd:\t0000000000000000\nShdPnd:\t0000000000000000\nSigBlk:\t0000000000000000\nSigIgn:\t0000000000001000\nSigCgt:\t0000000000000000\nCapInh:\t0000000000000000\nCapPrm:\t000001ffffffffff\nCapEff:\t000001ffffffffff\nCapBnd:\t000001ffffffffff\nCapAmb:\t0000000000000000\nNoNewPrivs:\t0\nSeccomp:\t0\nSeccomp_filters:\t0\nSpeculation_Store_Bypass:\tthread vulnerable\nSpeculationIndirectBranch:\tconditional enabled\nCpus_allowed:\tf\nCpus_allowed_list:\t0-3\nMems_allowed:\t00000000,00000000,00000000,00000000,00000000,00000000,00000000,00000000,00000000,00000000,00000000,00000000,00000000,00000000,00000000,00000000,00000000,00000000,00000000,00000000,00000000,00000000,00000000,00000000,00000000,00000000,00000000,00000000,00000000,00000000,00000000,00000001\nMems_allowed_list:\t0\nvoluntary_ctxt_switches:\t0\nnonvoluntary_ctxt_switches:\t0\nx86_Thread_features:\t\nx86_Thread_features_locked:\t\n",
+  "meta/binary-path": "/usr/local/libexec/lifecycle-trace/sudo\n",
+  "meta/binary-stat": "755 0 0\n",
+  "meta/binary.sha256": "14ea33a699551c6a78819d50ae167929b494b8b39b5f353fd75bfa07ebd9b808\n",
+  "meta/build-command": "cargo build --locked --offline --bin sudo\n",
+  "meta/commit": "d87cca50d8331cb4278111faf0cb0f55432ca0a2\n",
+  "meta/crates.sha256": "e4eba85ea1d0a966a983acd07deee566e67395d2d96b6fb39e62b5a833f1eb0b  glob-0.3.4.crate\n3eaf3ede3fee6db1a4c2ee091bf8a8b4dccdc6d17f656fb07896ee72867612f2  libc-0.2.189.crate\n",
+  "meta/date": "2026-11-25T00:51:34Z\n",
+  "meta/environment": "env -i PATH=/usr/bin:/bin\n",
+  "meta/group": "root:x:0:\nferris:x:1000:\nanother_user:x:1001:\n",
+  "meta/groups": "ferris 1000\nanother_user 1001\n",
+  "meta/inputs.sha256": "949aa3cb4286c0e36386cfc500e3029ab09284b86215a81d96b36a0b6ff1a84e  guest-run.sh\n5e7e6134dfdbe3af7cf74b02dcb9449d64d405f918a42912fdb310dd92b83330  src.tar\ne044fadf84a7a07d311f2e130df35f6dc9f3a11c20a10c45fe1603655ecf5be4  sudoers\nf3058d95d6c3cddfee860a7768c1d2d8bcad7fa3051dfa9ea93cd25afd2a4ad2  pam.d-sudo\nf4c8be8943c21fabe269ecb86cd215b3a143cba47aac9706c6000a9516f44bec  scenarios\n",
+  "meta/installed.sha256": "e044fadf84a7a07d311f2e130df35f6dc9f3a11c20a10c45fe1603655ecf5be4  /etc/sudoers-rs\nf3058d95d6c3cddfee860a7768c1d2d8bcad7fa3051dfa9ea93cd25afd2a4ad2  /etc/pam.d/sudo\nb787b01c7e71c658fa9acb84cbe153f71786cf380af4b01ae9135210cdc0154d  /etc/pam.d/common-auth\naa8a63d72e79399b6c51ebe4e9f828c954145a799eb4b8f3224724f51cbb9fac  /etc/pam.d/common-account\n5c624c6f8a8c9b1c75e487f339bbb67d02622736c133e26b39cf72600c39399b  /etc/pam.d/common-session-noninteractive\n",
+  "meta/kernel": "Linux 6.12.117+deb13-amd64 x86_64\n",
+  "meta/launcher": "setpriv --ruid=1000 --euid=0 --rgid=1000 --egid=1000 --init-groups --\n",
+  "meta/os-release": "PRETTY_NAME=\"Debian GNU/Linux 13 (trixie)\"\nNAME=\"Debian GNU/Linux\"\nVERSION_ID=\"13\"\nVERSION=\"13 (trixie)\"\nVERSION_CODENAME=trixie\nDEBIAN_VERSION_FULL=13.8\nID=debian\nHOME_URL=\"https://www.debian.org/\"\nSUPPORT_URL=\"https://www.debian.org/support\"\nBUG_REPORT_URL=\"https://bugs.debian.org/\"\n",
+  "meta/pam-origin": "installed\n",
+  "meta/passwd": "root:x:0:0:root:/root:/bin/bash\nferris:x:1000:1000::/home/ferris:/bin/sh\nanother_user:x:1001:1001::/home/another_user:/bin/sh\n",
+  "meta/setpriv-version": "setpriv from util-linux 2.41.5\n",
+  "meta/strace-version": "strace -- version 6.13\n",
+  "meta/toolchain": "cargo 1.85.1 (d73d2caf9 2024-12-31)\nrustc 1.85.1 (4eb161250 2025-03-15) (built from a source tarball)\n",
+  "scenario/permitted/argv": "-n\n-u\nanother_user\n/usr/bin/cat\n/proc/self/status\n",
+  "scenario/permitted/declared": "nopasswd c1\n",
+  "scenario/permitted/exit": "0\n",
+  "scenario/permitted/stderr": "",
+  "scenario/permitted/stdout": "Name:\tcat\nUmask:\t0022\nState:\tR (running)\nTgid:\t950\nNgid:\t0\nPid:\t950\nPPid:\t948\nTracerPid:\t945\nUid:\t1001\t1001\t1001\t1001\nGid:\t1001\t1001\t1001\t1001\nFDSize:\t64\nGroups:\t1001 \nNStgid:\t950\nNSpid:\t950\nNSpgid:\t944\nNSsid:\t402\nKthread:\t0\nVmPeak:\t    2848 kB\nVmSize:\t    2848 kB\nVmLck:\t       0 kB\nVmPin:\t       0 kB\nVmHWM:\t    1488 kB\nVmRSS:\t    1488 kB\nRssAnon:\t     100 kB\nRssFile:\t    1388 kB\nRssShmem:\t       0 kB\nVmData:\t     488 kB\nVmStk:\t     132 kB\nVmExe:\t      24 kB\nVmLib:\t    1588 kB\nVmPTE:\t      44 kB\nVmSwap:\t       0 kB\nHugetlbPages:\t       0 kB\nCoreDumping:\t0\nTHP_enabled:\t1\nuntag_mask:\t0xffffffffffffffff\nThreads:\t1\nSigQ:\t0/15458\nSigPnd:\t0000000000000000\nShdPnd:\t0000000000000000\nSigBlk:\t0000000000000000\nSigIgn:\t0000000000000000\nSigCgt:\t0000000000000000\nCapInh:\t0000000000000000\nCapPrm:\t0000000000000000\nCapEff:\t0000000000000000\nCapBnd:\t000001ffffffffff\nCapAmb:\t0000000000000000\nNoNewPrivs:\t0\nSeccomp:\t0\nSeccomp_filters:\t0\nSpeculation_Store_Bypass:\tthread vulnerable\nSpeculationIndirectBranch:\tconditional enabled\nCpus_allowed:\tf\nCpus_allowed_list:\t0-3\nMems_allowed:\t00000000,00000000,00000000,00000000,00000000,00000000,00000000,00000000,00000000,00000000,00000000,00000000,00000000,00000000,00000000,00000000,00000000,00000000,00000000,00000000,00000000,00000000,00000000,00000000,00000000,00000000,00000000,00000000,00000000,00000000,00000000,00000001\nMems_allowed_list:\t0\nvoluntary_ctxt_switches:\t101\nnonvoluntary_ctxt_switches:\t0\nx86_Thread_features:\t\nx86_Thread_features_locked:\t\n",
+  "scenario/permitted/strace": "948   execve(\"/usr/bin/setpriv\", [\"setpriv\", \"--ruid=1000\", \"--euid=0\", \"--rgid=1000\", \"--egid=1000\", \"--init-groups\", \"--\", \"/usr/local/libexec/lifecycle-trace/sudo\", \"-n\", \"-u\", \"another_user\", \"/usr/bin/cat\", \"/proc/self/status\"], 0x7ffde8b653d0 /* 1 var */) = 0\n948   setresuid(1000, 0, 0)             = 0\n948   setresgid(1000, 1000, 1000)       = 0\n948   setgroups(1, [1000])              = 0\n948   execve(\"/usr/local/libexec/lifecycle-trace/sudo\", [\"/usr/local/libexec/lifecycle-trace/sudo\", \"-n\", \"-u\", \"another_user\", \"/usr/bin/cat\", \"/proc/self/status\"], 0x7ffe91782a48 /* 1 var */) = 0\n948   setgroups(1, [1001])              = 0\n948   setresgid(-1, 1001, -1)           = 0\n948   setresuid(-1, 1001, -1)           = 0\n948   setresuid(-1, 0, -1)              = 0\n948   setresgid(-1, 1000, -1)           = 0\n948   setgroups(1, [1000])              = 0\n948   clone(child_stack=NULL, flags=CLONE_CHILD_CLEARTID|CLONE_CHILD_SETTID|SIGCHLD, child_tidptr=0x7fb4e90b5ad0) = 949\n949   setuid(0)                         = 0\n949   execve(\"/usr/sbin/unix_chkpwd\", [\"/usr/sbin/unix_chkpwd\", \"ferris\", \"chkexpiry\"], 0x7fb4e8e53018 /* 0 vars */) = 0\n948   clone(child_stack=NULL, flags=CLONE_CHILD_CLEARTID|CLONE_CHILD_SETTID|SIGCHLD, child_tidptr=0x7fb4e90b5ad0) = 950\n950   setgroups(1, [1001])              = 0\n950   setgid(1001)                      = 0\n950   setuid(1001)                      = 0\n950   execve(\"/usr/bin/cat\", [\"/usr/bin/cat\", \"/proc/self/status\"], 0x555f6f4b37a0 /* 11 vars */) = 0\n",
+  "scenario/permitted/ts-after": "ABSENT\n",
+  "scenario/permitted/ts-before": "ABSENT\n",
+  "scenario/refused/argv": "-n\n-u\nanother_user\n/usr/bin/id\n",
+  "scenario/refused/declared": "deny c2\n",
+  "scenario/refused/exit": "1\n",
+  "scenario/refused/stderr": "sudo: I'm sorry ferris. I'm afraid I can't do that\n",
+  "scenario/refused/stdout": "",
+  "scenario/refused/strace": "956   execve(\"/usr/bin/setpriv\", [\"setpriv\", \"--ruid=1000\", \"--euid=0\", \"--rgid=1000\", \"--egid=1000\", \"--init-groups\", \"--\", \"/usr/local/libexec/lifecycle-trace/sudo\", \"-n\", \"-u\", \"another_user\", \"/usr/bin/id\"], 0x7ffe1bcfaf38 /* 1 var */) = 0\n956   setresuid(1000, 0, 0)             = 0\n956   setresgid(1000, 1000, 1000)       = 0\n956   setgroups(1, [1000])              = 0\n956   execve(\"/usr/local/libexec/lifecycle-trace/sudo\", [\"/usr/local/libexec/lifecycle-trace/sudo\", \"-n\", \"-u\", \"another_user\", \"/usr/bin/id\"], 0x7ffc1b9167e0 /* 1 var */) = 0\n956   setgroups(1, [1001])              = 0\n956   setresgid(-1, 1001, -1)           = 0\n956   setresuid(-1, 1001, -1)           = 0\n956   setresuid(-1, 0, -1)              = 0\n956   setresgid(-1, 1000, -1)           = 0\n956   setgroups(1, [1000])              = 0\n",
+  "scenario/refused/ts-after": "ABSENT\n",
+  "scenario/refused/ts-before": "ABSENT\n"
+ }
+}
