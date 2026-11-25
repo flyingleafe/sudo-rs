@@ -132,53 +132,118 @@ pub(crate) fn resolve_target_user_and_group(
     target_group_name_or_id: &Option<SudoString>,
     current_user: &CurrentUser,
 ) -> Result<(User, Group), Error> {
-    // resolve user name or #<id> to a user
-    let mut target_user =
-        resolve_from_name_or_id(target_user_name_or_id, User::from_name, User::from_uid)?;
+    resolve_target_core(
+        current_user,
+        target_user_name_or_id.as_ref(),
+        target_group_name_or_id.as_ref(),
+    )
+}
 
-    // resolve group name or #<id> to a group
-    let mut target_group =
-        resolve_from_name_or_id(target_group_name_or_id, Group::from_name, Group::from_gid)?;
+/// Native name-service and diagnostic operations consumed by `resolve_target_core`.
+/// The trait keeps the ordered control flow extractable without substituting any of
+/// these operations in production.
+trait TargetLookup<A, U, G, E> {
+    fn requested_user(&self, input: &A) -> Result<Option<U>, E>;
+    fn requested_group(&self, input: &A) -> Result<Option<G>, E>;
+    fn invoking_user(&self) -> U;
+    fn primary_group(&self, user: &U) -> Result<G, E>;
+    fn root_user(&self) -> Result<Option<U>, E>;
+    fn root_group(&self) -> Result<Option<G>, E>;
+    fn user_not_found(&self, input: Option<&A>) -> E;
+    fn group_not_found(&self, input: Option<&A>) -> E;
+}
 
-    match target_fallback(target_user_name_or_id.is_some(), target_group_name_or_id.is_some()) {
+impl TargetLookup<SudoString, User, Group, Error> for CurrentUser {
+    fn requested_user(&self, input: &SudoString) -> Result<Option<User>, Error> {
+        resolve_from_name_or_id(input, User::from_name, User::from_uid)
+    }
+
+    fn requested_group(&self, input: &SudoString) -> Result<Option<Group>, Error> {
+        resolve_from_name_or_id(input, Group::from_name, Group::from_gid).map_err(Error::from)
+    }
+
+    fn invoking_user(&self) -> User {
+        self.clone().into()
+    }
+
+    fn primary_group(&self, user: &User) -> Result<Group, Error> {
+        user.primary_group().map_err(Error::from)
+    }
+
+    fn root_user(&self) -> Result<Option<User>, Error> {
+        User::from_name(c"root")
+    }
+
+    fn root_group(&self) -> Result<Option<Group>, Error> {
+        Group::from_name(if cfg!(target_os = "linux") {
+            c"root"
+        } else {
+            c"wheel"
+        })
+        .map_err(Error::from)
+    }
+
+    fn user_not_found(&self, input: Option<&SudoString>) -> Error {
+        Error::UserNotFound(input.map(|arg| arg.as_str()).unwrap_or_default().to_string())
+    }
+
+    fn group_not_found(&self, input: Option<&SudoString>) -> Error {
+        Error::GroupNotFound(input.map(|arg| arg.as_str()).unwrap_or_default().to_string())
+    }
+}
+
+/// The lookup/selection control flow used in production. The requested group must
+/// be looked up after a user miss but not after a user lookup error.
+fn resolve_target_core<A, U, G, E, L: TargetLookup<A, U, G, E>>(
+    lookup: &L,
+    user_arg: Option<&A>,
+    group_arg: Option<&A>,
+) -> Result<(U, G), E> {
+    let user_given = user_arg.is_some();
+    let group_given = group_arg.is_some();
+    let mut target_user = match user_arg {
+        Some(input) => lookup.requested_user(input)?,
+        None => None,
+    };
+    let mut target_group = match group_arg {
+        Some(input) => lookup.requested_group(input)?,
+        None => None,
+    };
+
+    match target_fallback(user_given, group_given) {
         // when -g is specified, but -u is not specified default -u to the current user
         TargetFallback::CurrentUser => {
-            target_user = Some(current_user.clone().into());
+            target_user = Some(lookup.invoking_user());
         }
         // when -u is specified but -g is not specified, default -g to the primary group of the specified user
         TargetFallback::PrimaryGroupIfFound => {
             if let Some(user) = &target_user {
-                target_group = Some(user.primary_group()?);
+                target_group = Some(lookup.primary_group(user)?);
             }
         }
         // when no -u or -g is specified, default to root:root
         TargetFallback::Root => {
-            target_user = User::from_name(c"root")?;
-            target_group = Group::from_name(if cfg!(target_os = "linux") {
-                c"root"
-            } else {
-                c"wheel"
-            })?;
+            target_user = lookup.root_user()?;
+            target_group = lookup.root_group()?;
         }
         TargetFallback::Keep => {}
     }
 
-    select_target(target_user, target_group).map_err(|missing| match missing {
-        // group name or id not found
-        TargetMissing::Group => Error::GroupNotFound(
-            target_group_name_or_id
-                .as_deref()
-                .unwrap_or_default()
-                .to_string(),
-        ),
-        // user (and maybe group) name or id not found
-        TargetMissing::User => Error::UserNotFound(
-            target_user_name_or_id
-                .as_deref()
-                .unwrap_or_default()
-                .to_string(),
-        ),
-    })
+    finish_target(lookup, user_arg, group_arg, target_user, target_group)
+}
+
+fn finish_target<A, U, G, E, L: TargetLookup<A, U, G, E>>(
+    lookup: &L,
+    user_arg: Option<&A>,
+    group_arg: Option<&A>,
+    target_user: Option<U>,
+    target_group: Option<G>,
+) -> Result<(U, G), E> {
+    match select_target(target_user, target_group) {
+        Ok(pair) => Ok(pair),
+        Err(TargetMissing::User) => Err(lookup.user_not_found(user_arg)),
+        Err(TargetMissing::Group) => Err(lookup.group_not_found(group_arg)),
+    }
 }
 
 /// How [resolve_target_user_and_group] completes the target pair once the user and the group
@@ -229,14 +294,14 @@ fn select_target<U, G>(user: Option<U>, group: Option<G>) -> Result<(U, G), Targ
 }
 
 fn resolve_from_name_or_id<T, I, E>(
-    input: &Option<SudoString>,
+    input: &SudoString,
     from_name: impl FnOnce(&CStr) -> Result<Option<T>, E>,
     from_id: impl FnOnce(I) -> Result<Option<T>, E>,
 ) -> Result<Option<T>, E>
 where
     I: FromStr,
 {
-    match input.as_ref().and_then(NameOrId::parse) {
+    match NameOrId::parse(input) {
         Some(NameOrId::Name(name)) => from_name(name.as_cstr()),
         Some(NameOrId::Id(id)) => from_id(id),
         None => Ok(None),
@@ -263,14 +328,49 @@ pub(crate) fn resolve_path(command: &Path, path: &str) -> Option<PathBuf> {
     // Depending on the security policy, the user's PATH environment variable may be modified,
     // replaced, or passed unchanged to the program that sudo executes.
 
-    path.split(':')
-        .map(Path::new)
-        // ignore all relative paths ("", "." or "./")
-        .filter(|path| path.is_absolute())
-        // construct a possible executable absolute path candidate
-        .map(|path| path.join(command))
-        // check whether the candidate is a regular file and any executable flag is set
-        .find(|arg| is_valid_executable(arg))
+    search_path_core(path.split(':').map(Path::new), command)
+}
+
+/// The native path operations used for one directory entry.
+trait SearchEntry<C: ?Sized> {
+    type Candidate;
+
+    fn is_absolute(&self) -> bool;
+    fn join(self, command: &C) -> Self::Candidate;
+    fn is_executable(path: &Self::Candidate) -> bool;
+}
+
+impl SearchEntry<Path> for &Path {
+    type Candidate = PathBuf;
+
+    fn is_absolute(&self) -> bool {
+        Path::is_absolute(self)
+    }
+
+    fn join(self, command: &Path) -> PathBuf {
+        Path::join(self, command)
+    }
+
+    fn is_executable(path: &PathBuf) -> bool {
+        is_valid_executable(path)
+    }
+}
+
+/// Consume the native split iterator lazily, returning the first viable candidate
+/// without copying it or inspecting later entries.
+fn search_path_core<C: ?Sized, D: SearchEntry<C>, I: Iterator<Item = D>>(
+    mut entries: I,
+    command: &C,
+) -> Option<D::Candidate> {
+    while let Some(dir) = entries.next() {
+        if dir.is_absolute() {
+            let candidate = dir.join(command);
+            if D::is_executable(&candidate) {
+                return Some(candidate);
+            }
+        }
+    }
+    None
 }
 
 #[cfg(test)]

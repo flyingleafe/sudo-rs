@@ -96,6 +96,8 @@ start_from = [
     "crate::common::resolve::target_fallback",
     "crate::common::resolve::select_target",
     "crate::common::command::select_command_path",
+    "crate::common::resolve::search_path_core",
+    "crate::common::resolve::resolve_target_core",
 ]
 opaque = [
     "crate::common::string",
