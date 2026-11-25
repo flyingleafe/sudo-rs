@@ -93,6 +93,9 @@ start_from = [
     "crate::sudoers::Sudoers::check_list_permission",
     "crate::sudoers::Sudoers::check_validate_permission",
     "{impl core::default::Default for crate::defaults::Settings}::default",
+    "crate::common::resolve::target_fallback",
+    "crate::common::resolve::select_target",
+    "crate::common::command::select_command_path",
 ]
 opaque = [
     "crate::common::string",

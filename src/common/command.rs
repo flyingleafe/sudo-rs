@@ -99,10 +99,18 @@ pub(crate) fn fuzz_escaped(arguments: Vec<OsString>) -> OsString {
     escaped(arguments)
 }
 
-//checks whether the Path is actually describing a qualified path (i.e. contains "/")
-//or just specifying the name of a file (in which case we are going to resolve it via PATH)
+// An unqualified path has exactly one relative component (as normalized by Path).
 fn is_qualified(path: impl AsRef<Path>) -> bool {
     path.as_ref().parent() != Some(Path::new(""))
+}
+
+/// Replace the path after a successful PATH search or canonicalization. A failed step
+/// keeps its input path and clears `resolved`; later steps cannot restore that flag.
+fn select_command_path<P>(input: P, replacement: Option<P>, resolved: bool) -> (P, bool) {
+    match replacement {
+        Some(path) => (path, resolved),
+        None => (input, false),
+    }
 }
 
 impl CommandAndArguments {
@@ -129,19 +137,15 @@ impl CommandAndArguments {
 
             // resolve the command, remembering errors (but not propagating them)
             if !is_qualified(&command) {
-                match resolve_path(&command, path) {
-                    Some(qualified_path) => command = qualified_path,
-                    None => resolved = false,
-                }
+                let found = resolve_path(&command, path);
+                (command, resolved) = select_command_path(command, found, resolved);
             }
         }
 
-        // resolve symlinks, even if the command was obtained through a PATH or SHELL
-        // once again, failure to canonicalize should not stop the pipeline
-        match canonicalize(&command) {
-            Ok(canon_path) => command = canon_path,
-            Err(_) => resolved = false,
-        }
+        // Canonicalize the directories and check existence, retaining the final path component.
+        // Failure should not stop the pipeline.
+        let canonical = canonicalize(&command).ok();
+        (command, resolved) = select_command_path(command, canonical, resolved);
 
         CommandAndArguments {
             command,
@@ -309,6 +313,20 @@ mod test {
                 arg0: None,
             }
         );
+    }
+
+    #[test]
+    fn direct_arguments_keep_their_boundaries_and_bytes() {
+        // Construct the command; do not execute it or change credentials.
+        let executable = std::env::current_exe().unwrap();
+        let tail = vec![os(b"a b"), os(b""), os(b"c\\d"), os(b"\xff")];
+        let argv = std::iter::once(executable.clone().into_os_string())
+            .chain(tail.iter().cloned())
+            .collect();
+        let command = CommandAndArguments::build_from_args(None, argv, "");
+        assert!(command.resolved);
+        assert_eq!(command.arg0, Some(executable));
+        assert_eq!(command.arguments, tail);
     }
 
     #[test]

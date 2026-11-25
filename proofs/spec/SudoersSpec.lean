@@ -80,3 +80,4 @@ import SudoersSpec.Grammar.SudoUserFailure
 import SudoersSpec.Grammar.SudoPermissionAt
 import SudoersSpec.Grammar.SudoPermissionDispatchAt
 import SudoersSpec.Settings.ListValidate
+import SudoersSpec.Request

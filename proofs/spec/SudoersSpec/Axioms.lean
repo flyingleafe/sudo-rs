@@ -21,6 +21,7 @@ import SudoersSpec.Grammar.SudoRunasExact
 import SudoersSpec.Grammar.SudoAmbiguity
 import SudoersSpec.Grammar.SudoUnique
 import SudoersSpec.Settings.ListValidate
+import SudoersSpec.Request
 
 /-! Axiom audit: every main result depends on at most `propext`, `Classical.choice` and
 `Quot.sound`. `lake build` prints the lists. -/
@@ -352,3 +353,12 @@ open SudoersSpec
 #print axioms SudoersSpec.Analysis.validateAuthorization_eq_some
 #print axioms SudoersSpec.Analysis.listAuthorization_eq_none_iff
 #print axioms SudoersSpec.Analysis.listAuthorization_eq_some
+#print axioms SudoersSpec.Request.user_lookup_error
+#print axioms SudoersSpec.Request.ordinary_user_miss
+#print axioms SudoersSpec.Request.search_first
+#print axioms SudoersSpec.Request.path_miss
+#print axioms SudoersSpec.Request.direct_argv
+#print axioms SudoersSpec.Request.ordinary_explicit_target
+#print axioms SudoersSpec.Request.ordinary_missing_target
+#print axioms SudoersSpec.Request.ordinary_primary_group
+#print axioms SudoersSpec.Request.ordinary_direct_command

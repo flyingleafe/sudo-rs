@@ -53,6 +53,7 @@ impl Context {
         let hostname = Hostname::resolve();
         let current_user = CurrentUser::resolve()?;
 
+        // The target pair and command below become the policy request in `pipeline::judge`.
         let (target_user, target_group) =
             resolve_target_user_and_group(&sudo_options.user, &sudo_options.group, &current_user)?;
 
@@ -78,6 +79,7 @@ impl Context {
                 system_path.as_ref()
             };
 
+            // PATH lookup and canonicalization here observe the target credentials.
             sudo_call(&target_user, &target_group, || {
                 CommandAndArguments::build_from_args(shell, sudo_options.positional_args, path)
             })?

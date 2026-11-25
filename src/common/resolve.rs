@@ -140,19 +140,19 @@ pub(crate) fn resolve_target_user_and_group(
     let mut target_group =
         resolve_from_name_or_id(target_group_name_or_id, Group::from_name, Group::from_gid)?;
 
-    match (&target_user_name_or_id, &target_group_name_or_id) {
+    match target_fallback(target_user_name_or_id.is_some(), target_group_name_or_id.is_some()) {
         // when -g is specified, but -u is not specified default -u to the current user
-        (None, Some(_)) => {
+        TargetFallback::CurrentUser => {
             target_user = Some(current_user.clone().into());
         }
         // when -u is specified but -g is not specified, default -g to the primary group of the specified user
-        (Some(_), None) => {
+        TargetFallback::PrimaryGroupIfFound => {
             if let Some(user) = &target_user {
                 target_group = Some(user.primary_group()?);
             }
         }
         // when no -u or -g is specified, default to root:root
-        (None, None) => {
+        TargetFallback::Root => {
             target_user = User::from_name(c"root")?;
             target_group = Group::from_name(if cfg!(target_os = "linux") {
                 c"root"
@@ -160,28 +160,71 @@ pub(crate) fn resolve_target_user_and_group(
                 c"wheel"
             })?;
         }
-        _ => {}
+        TargetFallback::Keep => {}
     }
 
-    match (target_user, target_group) {
-        (Some(user), Some(group)) => {
-            // resolve success
-            Ok((user, group))
-        }
+    select_target(target_user, target_group).map_err(|missing| match missing {
         // group name or id not found
-        (Some(_), None) => Err(Error::GroupNotFound(
+        TargetMissing::Group => Error::GroupNotFound(
             target_group_name_or_id
                 .as_deref()
                 .unwrap_or_default()
                 .to_string(),
-        )),
+        ),
         // user (and maybe group) name or id not found
-        _ => Err(Error::UserNotFound(
+        TargetMissing::User => Error::UserNotFound(
             target_user_name_or_id
                 .as_deref()
                 .unwrap_or_default()
                 .to_string(),
-        )),
+        ),
+    })
+}
+
+/// How [resolve_target_user_and_group] completes the target pair once the user and the group
+/// that `-u` and `-g` name have been looked up.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum TargetFallback {
+    /// Keep the results of the `-u`/`-g` lookups: both options given.
+    Keep,
+    /// `-g` without `-u`: the invoking user.
+    CurrentUser,
+    /// `-u` without `-g`: look up the primary group only if the user was found.
+    PrimaryGroupIfFound,
+    /// Neither option: `root` and the root group (`wheel` outside Linux), looked up by name.
+    Root,
+}
+
+/// The completion step of [resolve_target_user_and_group], from whether `-u` and `-g` were
+/// given. A pure decision: the lookups it selects are made by the caller.
+fn target_fallback(user_given: bool, group_given: bool) -> TargetFallback {
+    if user_given {
+        if group_given {
+            TargetFallback::Keep
+        } else {
+            TargetFallback::PrimaryGroupIfFound
+        }
+    } else if group_given {
+        TargetFallback::CurrentUser
+    } else {
+        TargetFallback::Root
+    }
+}
+
+/// The part of the target pair that [select_target] reports missing.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum TargetMissing {
+    User,
+    Group,
+}
+
+/// The last step of [resolve_target_user_and_group]: the pair if both parts are present,
+/// otherwise the missing part, the user before the group.
+fn select_target<U, G>(user: Option<U>, group: Option<G>) -> Result<(U, G), TargetMissing> {
+    match (user, group) {
+        (Some(user), Some(group)) => Ok((user, group)),
+        (Some(_), None) => Err(TargetMissing::Group),
+        _ => Err(TargetMissing::User),
     }
 }
 
@@ -237,7 +280,26 @@ mod tests {
     use crate::common::resolve::CurrentUser;
     use crate::system::ROOT_GROUP_NAME;
 
-    use super::{NameOrId, is_valid_executable, resolve_path, resolve_target_user_and_group};
+    use super::{
+        NameOrId, TargetFallback, TargetMissing, is_valid_executable, resolve_path,
+        resolve_target_user_and_group, select_target, target_fallback,
+    };
+
+    #[test]
+    fn target_selection_cases() {
+        assert_eq!(target_fallback(false, false), TargetFallback::Root);
+        assert_eq!(target_fallback(false, true), TargetFallback::CurrentUser);
+        assert_eq!(target_fallback(true, false), TargetFallback::PrimaryGroupIfFound);
+        assert_eq!(target_fallback(true, true), TargetFallback::Keep);
+
+        // An ordinary synthetic account and group; no policy checks or NSS changes.
+        let user = Some(1000u32);
+        let group = Some(1001u32);
+        assert_eq!(select_target(user, group), Ok((1000, 1001)));
+        assert_eq!(select_target(user, None::<u32>), Err(TargetMissing::Group));
+        assert_eq!(select_target(None::<u32>, group), Err(TargetMissing::User));
+        assert_eq!(select_target(None::<u32>, None::<u32>), Err(TargetMissing::User));
+    }
 
     #[test]
     fn test_resolve_path() {
