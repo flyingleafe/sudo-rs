@@ -280,6 +280,112 @@ fn set_supplementary_groups(groups: &[GroupId]) -> io::Result<()> {
     Ok(())
 }
 
+trait CredentialOps {
+    type Error;
+
+    fn set_groups(&mut self, groups: &[GroupId]) -> Result<(), Self::Error>;
+    fn set_gid(&mut self, gid: GroupId) -> Result<(), Self::Error>;
+    fn set_uid(&mut self, uid: UserId) -> Result<(), Self::Error>;
+}
+
+/// The order is shared by the command hook and the temporary sudoedit switch.
+fn apply_credentials<O: CredentialOps>(
+    ops: &mut O,
+    uid: UserId,
+    gid: GroupId,
+    groups: &[GroupId],
+) -> Result<(), O::Error> {
+    ops.set_groups(groups)?;
+    ops.set_gid(gid)?;
+    ops.set_uid(uid)
+}
+
+struct Credentials<G> {
+    uid: UserId,
+    gid: GroupId,
+    groups: G,
+}
+
+trait TemporaryCredentialOps: CredentialOps {
+    type Groups: AsRef<[GroupId]>;
+
+    fn snapshot(&mut self) -> Result<Credentials<Self::Groups>, Self::Error>;
+    fn restore_failed(&mut self, error: Self::Error) -> !;
+}
+
+struct RestoreCredentials<'a, O: TemporaryCredentialOps> {
+    ops: &'a mut O,
+    previous: Credentials<O::Groups>,
+}
+
+impl<O: TemporaryCredentialOps> Drop for RestoreCredentials<'_, O> {
+    fn drop(&mut self) {
+        // Regain the original effective uid before restoring the groups.
+        let restore = (|| {
+            self.ops.set_uid(self.previous.uid)?;
+            self.ops.set_gid(self.previous.gid)?;
+            self.ops.set_groups(self.previous.groups.as_ref())
+        })();
+        if let Err(error) = restore {
+            self.ops.restore_failed(error);
+        }
+    }
+}
+
+fn with_temporary_credentials<O: TemporaryCredentialOps, G: AsRef<[GroupId]>, T>(
+    ops: &mut O,
+    prepare: impl FnOnce(&Credentials<O::Groups>) -> Option<Credentials<G>>,
+    operation: impl FnOnce() -> T,
+) -> Result<T, O::Error> {
+    let previous = ops.snapshot()?;
+    let Some(target) = prepare(&previous) else {
+        // Only the sudoedit test shortcut skips switching.
+        return Ok(operation());
+    };
+
+    let guard = RestoreCredentials { ops, previous };
+    apply_credentials(guard.ops, target.uid, target.gid, target.groups.as_ref())?;
+    let result = operation();
+    drop(guard);
+    Ok(result)
+}
+
+/// Statically select effective-only changes for sudoedit or the full credential change for
+/// the command. Neither choice needs per-instance state.
+struct NativeCredentials<const EFFECTIVE_ONLY: bool>;
+
+impl<const EFFECTIVE_ONLY: bool> CredentialOps for NativeCredentials<EFFECTIVE_ONLY> {
+    type Error = io::Error;
+
+    fn set_groups(&mut self, groups: &[GroupId]) -> io::Result<()> {
+        set_supplementary_groups(groups)
+    }
+
+    fn set_gid(&mut self, gid: GroupId) -> io::Result<()> {
+        // SAFETY: setgid and setresgid only affect process credentials.
+        let result = unsafe {
+            if EFFECTIVE_ONLY {
+                libc::setresgid(libc::gid_t::MAX, gid.inner(), libc::gid_t::MAX)
+            } else {
+                libc::setgid(gid.inner())
+            }
+        };
+        cerr(result).map(|_| ())
+    }
+
+    fn set_uid(&mut self, uid: UserId) -> io::Result<()> {
+        // SAFETY: setuid and setresuid only affect process credentials.
+        let result = unsafe {
+            if EFFECTIVE_ONLY {
+                libc::setresuid(libc::uid_t::MAX, uid.inner(), libc::uid_t::MAX)
+            } else {
+                libc::setuid(uid.inner())
+            }
+        };
+        cerr(result).map(|_| ())
+    }
+}
+
 /// set target user and groups (uid, gid, additional groups) for a command
 pub fn set_target_user(
     cmd: &mut std::process::Command,
@@ -296,15 +402,14 @@ pub fn set_target_user(
     // SAFETY: Setuid, setgid and setgroups are async-signal-safe.
     unsafe {
         cmd.pre_exec(move || {
-            set_supplementary_groups(&target_user.groups)?;
-            // setgid and setuid set the real, effective and saved version of the gid and uid
-            // respectively rather than just the real gid and uid. The original sudo uses setresgid
-            // and setresuid instead with all three arguments equal, but as this does the same as
-            // setgid and setuid using the latter is fine too.
-            cerr(libc::setgid(target_group.gid.inner()))?;
-            cerr(libc::setuid(target_user.uid.inner()))?;
-
-            Ok(())
+            // With the privileges of this hook, setgid/setuid set the real, effective and
+            // saved ids; sudoedit, in contrast, only switches effective ids.
+            apply_credentials(
+                &mut NativeCredentials::<false>,
+                target_user.uid,
+                target_group.gid,
+                &target_user.groups,
+            )
         });
     }
 }
@@ -920,6 +1025,9 @@ pub(crate) const ROOT_GROUP_NAME: &str = "root";
 
 #[cfg(all(test, not(target_os = "linux")))]
 pub(crate) const ROOT_GROUP_NAME: &str = "wheel";
+
+#[cfg(kani)]
+mod kani_proofs;
 
 #[allow(clippy::undocumented_unsafe_blocks)]
 #[cfg(test)]

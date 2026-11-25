@@ -33,8 +33,11 @@ pub(crate) fn sudo_call<T>(
     target_group: &Group,
     operation: impl FnOnce() -> T,
 ) -> io::Result<T> {
-    const KEEP_UID: libc::uid_t = -1i32 as libc::uid_t;
-    const KEEP_GID: libc::gid_t = -1i32 as libc::gid_t;
+    with_temporary_credentials(
+        &mut NativeCredentials::<true>,
+        |previous| {
+            let mut groups = target_user.groups.clone();
+            inject_group(target_group.gid, &mut groups);
 
     // SAFETY: these libc functions are always safe to call
     let (cur_user_id, cur_group_id) =
@@ -52,20 +55,18 @@ pub(crate) fn sudo_call<T>(
             libc::getgroups(len, buf.as_mut_ptr().cast::<libc::gid_t>())
         })?;
 
-        buf
-    };
+    fn snapshot(&mut self) -> io::Result<Credentials<Self::Groups>> {
+        // SAFETY: these libc functions are always safe to call.
+        let (uid, gid) = unsafe { (UserId::new(libc::geteuid()), GroupId::new(libc::getegid())) };
 
-    let mut target_groups = target_user.groups.clone();
-    inject_group(target_group.gid, &mut target_groups);
+        // SAFETY: size 0 is the documented query for the required length and does not write.
+        let len = cerr(unsafe { libc::getgroups(0, std::ptr::null_mut()) })?;
+        let mut groups = vec![GroupId::new(libc::gid_t::MAX); len as usize];
+        // SAFETY: we pass a correct pointer to a slice of the given length. GroupId is
+        // transparent over gid_t.
+        cerr(unsafe { libc::getgroups(len, groups.as_mut_ptr().cast::<libc::gid_t>()) })?;
 
-    if cfg!(test)
-        && target_user.uid == cur_user_id
-        && target_group.gid == cur_group_id
-        && target_groups.iter().collect::<HashSet<_>>() == cur_groups.iter().collect::<HashSet<_>>()
-    {
-        // we are not actually switching users, simply run the closure
-        // (this would also be safe in production mode, but it is a needless check)
-        return Ok(operation());
+        Ok(Credentials { uid, gid, groups })
     }
 
     struct ResetUserGuard(UserId, GroupId, Vec<GroupId>);
@@ -83,19 +84,10 @@ pub(crate) fn sudo_call<T>(
             .expect("could not restore to saved user id");
         }
     }
-
-    let guard = ResetUserGuard(cur_user_id, cur_group_id, cur_groups);
-
-    set_supplementary_groups(&target_groups)?;
     // SAFETY: this function is always safe to call
     cerr(unsafe { libc::setresgid(KEEP_GID, GroupId::inner(&target_group.gid), KEEP_GID) })?;
     // SAFETY: this function is always safe to call
     cerr(unsafe { libc::setresuid(KEEP_UID, UserId::inner(&target_user.uid), KEEP_UID) })?;
-
-    let result = operation();
-
-    std::mem::drop(guard);
-    Ok(result)
 }
 
 #[cfg(feature = "unstable-remote-sudoers")]
