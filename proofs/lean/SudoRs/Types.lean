@@ -53,6 +53,22 @@ structure glob.MatchOptions where
 structure common.path.SudoPath where
   inner : String
 
+/-- [sudo_rs::common::resolve::TargetFallback]
+    Source: 'src/common/resolve.rs', lines 187:0-196:1 -/
+@[discriminant isize]
+inductive common.resolve.TargetFallback where
+| Keep : common.resolve.TargetFallback
+| CurrentUser : common.resolve.TargetFallback
+| PrimaryGroupIfFound : common.resolve.TargetFallback
+| Root : common.resolve.TargetFallback
+
+/-- [sudo_rs::common::resolve::TargetMissing]
+    Source: 'src/common/resolve.rs', lines 216:0-219:1 -/
+@[discriminant isize]
+inductive common.resolve.TargetMissing where
+| User : common.resolve.TargetMissing
+| Group : common.resolve.TargetMissing
+
 /-- [sudo_rs::defaults::ListMode]
     Source: 'src/defaults/mod.rs', lines 6:0-10:1
     Visibility: public -/

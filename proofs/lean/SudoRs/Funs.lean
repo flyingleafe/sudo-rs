@@ -355,6 +355,16 @@ def common.command.escaped
     common.command.escaped_loop arguments (alloc.vec.Vec.new Std.U8) 0#usize
   std.ffi.os_str.OsString.Insts.StdOsUnixFfiOs_strOsStringExt.from_vec line
 
+/-- [sudo_rs::common::command::select_command_path]:
+    Source: 'src/common/command.rs', lines 109:0-114:1 -/
+def common.command.select_command_path
+  {P : Type _} (input : P) (replacement : Option P) (resolved : Bool) :
+  Result (P × Bool)
+  := do
+  match replacement with
+  | none => ok (input, false)
+  | some path => ok (path, resolved)
+
 /-- [sudo_rs::common::path::{impl core::clone::Clone for sudo_rs::common::path::SudoPath}::clone]:
     Source: 'src/common/path.rs', lines 12:9-12:14
     Visibility: public -/
@@ -362,6 +372,35 @@ def common.path.SudoPath.Insts.CoreCloneClone.clone
   (self : common.path.SudoPath) : Result common.path.SudoPath := do
   let s ← alloc.string.String.Insts.CoreCloneClone.clone self.inner
   ok { inner := s }
+
+/-- [sudo_rs::common::resolve::target_fallback]:
+    Source: 'src/common/resolve.rs', lines 200:0-212:1 -/
+def common.resolve.target_fallback
+  (user_given : Bool) (group_given : Bool) :
+  Result common.resolve.TargetFallback
+  := do
+  if user_given
+  then
+    if group_given
+    then ok common.resolve.TargetFallback.Keep
+    else ok common.resolve.TargetFallback.PrimaryGroupIfFound
+  else
+    if group_given
+    then ok common.resolve.TargetFallback.CurrentUser
+    else ok common.resolve.TargetFallback.Root
+
+/-- [sudo_rs::common::resolve::select_target]:
+    Source: 'src/common/resolve.rs', lines 223:0-229:1 -/
+def common.resolve.select_target
+  {U : Type _} {G : Type _} (user : Option U) (group : Option G) :
+  Result (core.result.Result (U × G) common.resolve.TargetMissing)
+  := do
+  match user with
+  | none => ok (core.result.Result.Err common.resolve.TargetMissing.User)
+  | some user1 =>
+    match group with
+    | none => ok (core.result.Result.Err common.resolve.TargetMissing.Group)
+    | some group1 => ok (core.result.Result.Ok (user1, group1))
 
 /-- Trait implementation: [sudo_rs::common::string::{impl core::cmp::PartialEq<str> for sudo_rs::common::string::SudoString}]
     Source: 'src/common/string.rs', lines 112:0-117:1 -/
