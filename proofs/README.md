@@ -153,6 +153,17 @@ is still a single modeled answer, so a failed canonicalization does not try anot
 qualified-path contract; it preserves `arg0` and the tail when resolution fails. The
 command-line parser, argv conversion and the context wrapper are not covered.
 
+[Environment policy](lean/SudoRsProofs/EnvFilter.lean): `wildcard_match`, `should_keep` and
+`keep_inherited` (`src/sudo/env/filter.rs`) are extracted and refined against
+`SudoersSpec.EnvFilter`. `wildcard_match_eq` holds for every byte slice; the matcher loop is
+also proved equal to full wildcard semantics (`greedy_correct`). Retention
+(`should_keep_eq`, `keep_inherited_eq`, `should_keep_sound`, `in_table_eq`, `is_safe_tz_eq`)
+assumes the results of the zoneinfo lookup and `PATH_MAX` and that every policy-table entry
+fits in memory as a Rust string (`TablesFit`); table order is irrelevant (`inTable_perm`).
+Collecting the environment, the PAM environment, the `SUDO_*` additions and
+`dangerous_extend` are not extracted; that they apply the decision to each variable's bytes
+is code reading. The comparisons with C sudo are tests, not proof.
+
 [Argument escaping](lean/SudoRsProofs/Escape.lean) for `sudo -s`/`-i`: the extracted
 `escaped` (`src/common/command.rs`) equals `SudoersSpec.Escape.escapeArgs` for every input
 (`escaped_eq`, `escaped_spec`): it succeeds exactly when the line fits in `usize::MAX` bytes,
