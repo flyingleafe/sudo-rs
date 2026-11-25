@@ -458,6 +458,11 @@ on that input; the run exits 1 for a complete comparison with a difference and 2
 evidence is invalid or incomplete. This is in-process comparison, not a test of PAM,
 credential changes, `sudoers` evaluation, or command execution.
 
+A matcher-level comparison ([`env/pattern-run.sh`](env/pattern-run.sh)) drove sudo-rs's
+`entry_matches` and C sudo's own `check_env_pattern` over 40,404 ordinary cases
+(job `assurance-env-pattern-e7d46b`): 39,630 agreed, 774 matched only in sudo-rs and
+none only in C. That is evidence about pattern matching, not about filtering or assembly.
+
 ## What limits coverage
 
 - **Fragment.** The three-way policy generator never produces:
