@@ -203,6 +203,16 @@ Rust calls it twice (for `skip_passwd` and for the root fallback): the translati
 calls. Under `InstOracle` (`is_root` is a function of the user) this changes nothing, but it is a
 point where the model is not a literal transcription of the source.
 
+The [Defaults-aware wrapper proofs](SudoRsProofs/Parser/Scoping/ListValidate.lean)
+add the range of the incoming settings and the correspondence and validity of the
+Defaults entries consumed by each pass. `check_validate_permission_eq` needs the
+non-command entries only; `check_list_permission_self_eq` consumes neither list;
+`check_list_permission_other_eq` needs both passes and the group and path contracts
+above. These conclusions concern the returned `Authorization<()>` and policy
+state, not PAM or the printed listing. `search_path_then_check_list_permission_eq`
+composes two extracted calls in the order read from the caller; it does not prove
+the caller makes these calls.
+
 The theorems quantify over the oracle `O`, the abstraction `A`, the instances and all inputs, so
 they hold for every OS user database and glob semantics consistent with the hypotheses.
 
@@ -238,6 +248,12 @@ does not require this extra clean premise. [`observeAuthorization`](../spec/Sudo
 keeps all scalar fields and compares `env_keep` and `env_check` by membership. File ownership,
 UTF-8 decoding before the character cursor, PAM, NSS consistency, and OS execution are
 not established by these theorems. `@socket` is not in the default extraction.
+
+The [concrete file witness](SudoRsProofs/Parser/TextExample.lean) constructs and
+checks its input bounds, local-file premise, host and identity instance. Its
+allow and refusal still depend on `P2Oracle`, agreement on Latin-1 character
+classes, `RenderAgrees` and `GlobOracle`. A kernel check of this instance is
+not a proof that all opaque primitive contracts hold on a particular machine.
 
 ## Hypotheses of the argument-escaping theorems
 
