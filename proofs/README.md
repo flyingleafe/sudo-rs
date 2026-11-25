@@ -214,6 +214,11 @@ Each item says what kind of evidence it is. A test covers only the inputs it ran
   file, so secure-exec behavior was not tested. The PAM account helper (`unix_chkpwd`)
   was observed only in the permitted run and is outside Quint. The replay does not
   verify PAM or generalize beyond these two runs.
+- **File checks and credential changes** ([Kani bounds](kani/README.md#secure-file-opening-and-credential-changes)):
+  the metadata and open-handle checks cover every `u32` owner, group and mode. For the stated
+  short group lists, the credential drivers apply the setters in order, stop on a failure,
+  and restore the saved credentials on the temporary-switch path. These are bounded checks
+  of production control flow with modeled effects, not checks of the actual kernel calls.
 - **Property search on the real code** (`differential/`, test): seven properties stated in
   Lean (lines of other users are irrelevant, appending without a command-side `!` never
   revokes, unmentioned users/hosts/commands are never allowed, textual alias expansion,
