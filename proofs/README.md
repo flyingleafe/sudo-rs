@@ -130,20 +130,28 @@ results differ only by the implicit `SETENV` of a literal `ALL`
 (`authorize_expandAliases_rel`). Kernel-checked counterexamples show both conditions are
 needed; C sudo 1.9.18 behaves the same on those cases (test).
 
-[Request construction](lean/SudoRsProofs/Request.lean): `target_fallback_eq` and
-`select_target_eq` prove the extracted fallback and user/group selection decisions.
-`resolve_target_refines` composes them in a resolver model that preserves the result,
-including errors, and lookup order, given the resolved invoker, parsed option keys,
-platform root-group name and NSS answers for name/ID and primary-group lookups.
-A missing record and a lookup error are distinct. This is not a proof of native NSS.
-`select_command_path_eq` proves the extracted path and `resolved` selection.
-When search is enabled, `command_path_refines` assumes the first executable candidate
-from the ordered absolute PATH entries, or a miss. It takes a pointwise canonicalization
-answer (resolve the parent, keep the final filename, check existence) and does not try
-another candidate if that fails. Native PATH traversal is not verified.
-`direct_command_refines` starts with nonempty direct argv represented as bytes and assumes
-the Unix qualified-path test. It preserves the original `arg0` and argv tail even if
-resolution fails; it does not verify argv conversion, the context wrapper or credential changes.
+[Request construction](lean/SudoRsProofs/Request.lean): the production target selection
+and command-path search are refined against the reference under per-call interfaces.
+`target_fallback_eq` and `select_target_eq` prove the extracted fallback and pair
+selection; `resolve_target_refines` then follows the extracted driver's ordered lookups.
+Each call's answer is compared to the reference (`TargetPrimitives`), so a lookup error
+stops immediately while a *miss* still permits the group lookup
+(`target_group_error_after_user_miss`), and a missing part produces the diagnostic for
+its argument text. The native name service and platform root-group name are modeled
+adapters, not extracted code.
+
+`search_path_core` is the native traversal itself: it consumes the split iterator lazily
+and returns the first absolute entry whose joined candidate passes the executable test.
+`search_path_refines` proves it implements `searchPath` from `PathPrimitives` — per-step
+`next`, "is absolute", "join" and metadata answers — and one input-representation premise
+that the initial entries are `path.splitOn 58`. `search_path_stops_at_hit` and
+`search_path_skips_relative` state the two short-circuit steps: later entries are not
+inspected after a hit, and a relative entry needs no join or filesystem answer.
+`command_path_refines` places that search in `build_from_args`; the later canonicalization
+is still a single modeled answer, so a failed canonicalization does not try another entry.
+`direct_command_refines` starts from nonempty direct argv converted to bytes and the Unix
+qualified-path contract; it preserves `arg0` and the tail when resolution fails. The
+command-line parser, argv conversion and the context wrapper are not covered.
 
 [Argument escaping](lean/SudoRsProofs/Escape.lean) for `sudo -s`/`-i`: the extracted
 `escaped` (`src/common/command.rs`) equals `SudoersSpec.Escape.escapeArgs` for every input
