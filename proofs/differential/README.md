@@ -437,6 +437,27 @@ closed bracket expressions (lists, `!` negation and ranges). It does not cover `
 other bracket dialects, escapes, other locales, non-ASCII paths, path canonicalization,
 or command-argument matching.
 
+## Environment rebuild and validation conformance
+
+[`env/rebuild-run.sh`](env/rebuild-run.sh) compares sudo-rs's environment decision with
+C sudo 1.9.18's own environment code, as an ordinary user and in one process. The C side
+links the actual `rebuild_env`, `validate_env_vars` and `insert_env_vars` routines from a
+pinned source tree (`d58e85d8…`, `plugins/sudoers/env.c` sha256 `e5145d71…`); the Rust side
+observes the real `get_target_environment` through an opt-in test hook. Both sides read the
+same fixture: `sudoers`-style `env_keep`/`env_check` lists, `secure_path`, the invoking
+environment and explicit `NAME=value` assignments. The default fixture in the tree is six
+ordinary cases; `SUDO_RS_ENV_CASES` selects another file.
+
+Job `assurance-env-public-186b35` compared the default fixture: four inherited cases
+(7 observations) and two assignment cases (2 observations) all agreed, with no incomplete
+observation. A larger ordinary fixture kept outside the tree (22 cases: 18 inherited, 4
+assignments; sha256 `249479b1…`) was compared in `assurance-env-rebuild-b9bd83`: all
+observations were complete, 26 of 27 inherited-key rows agreed and all four assignment rows
+agreed (two accepted, two rejected). The single differing row is a compatibility difference
+on that input; the run exits 1 for a complete comparison with a difference and 2 when the
+evidence is invalid or incomplete. This is in-process comparison, not a test of PAM,
+credential changes, `sudoers` evaluation, or command execution.
+
 ## What limits coverage
 
 - **Fragment.** The three-way policy generator never produces:
