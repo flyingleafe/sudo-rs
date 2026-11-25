@@ -19,9 +19,11 @@ cargo install --locked kani-verifier && cargo kani setup     # once
 `run.sh` runs one Kani process per harness and reports result, wall time (including
 compilation) and peak memory. On the verification machine each harness gets its own
 memory-limited scope and the peak is that scope's; without the limiter (`KANI_LIMITED` naming a
-missing file) it is the largest process's maximum resident set (GNU `time`). Results: PASS;
-FAIL (Kani reports a failed check); VACUOUS (a `kani::cover!` is not satisfied, so a path
-verified nothing); TIME, OOM; ERROR (no verdict: build error or Kani/CBMC stopped).
+missing file) it is the largest process's maximum resident set (GNU `time`). A `PASS` needs a
+successful proof and every coverage witness. `FAIL` reports a failed check; `VACUOUS` reports
+an unmet coverage witness. `TIME`, `OOM` (including solver-reported memory exhaustion),
+`UNSUPPORTED` (for example a foreign call without an effective stub) and `ERROR` do not
+establish a counterexample or a proof. All non-`PASS` statuses make the runner fail.
 
 At `f20cfeb7` all 36 harnesses passed in one Slurm job (8 CPUs, 24 GB requested, GCC 11.5).
 Three groups ran concurrently; each group ran its harnesses serially with a 3600 s timeout.

@@ -85,8 +85,10 @@ for h in "${selected[@]}"; do
     res=PASS
   elif [ $rc -eq 124 ]; then
     res=TIME; failed=1
-  elif [ $rc -eq 99 ]; then
+  elif [ $rc -eq 99 ] || grep -q '^CBMC appears to have run out of memory\.' "$log"; then
     res=OOM; failed=1
+  elif grep -q '^Failed Checks: .*not currently supported by Kani\.' "$log"; then
+    res=UNSUPPORTED; failed=1
   elif grep -q 'VERIFICATION:- FAILED' "$log"; then
     res=FAIL; failed=1
   elif [ -n "$uncovered" ]; then
