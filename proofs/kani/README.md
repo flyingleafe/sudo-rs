@@ -88,6 +88,28 @@ The complete job took 12 minutes, including setup and checks on the planted copi
 | created_record_identifies_target_user_targetpw | same; the record carries the target user's uid | targetpw | PASS | 33 s | 574 |
 | created_record_identifies_root_rootpw | same; `resolve_root_for_rootpw` yields uid 0 | rootpw, lookup returns an entry | PASS | 131 s | 605 |
 
+### Secure file opening and credential changes
+
+The [file-policy harnesses](../../src/system/audit/kani_proofs.rs) check every `u32`
+owner/group/mode triple. The second harness also varies metadata-read success, and
+checks that the *same handle* is returned after acceptance and dropped on failure.
+The [credential harnesses](../../src/system/kani_proofs.rs) use the same generic
+drivers as production with a local recorder in place of the native system calls.
+
+| Check | Bound | Property |
+|---|---|---|
+| `inject_group_{empty,one_entry,two_entries}` | 0, 1 or 2 initial groups, arbitrary IDs, capacity 3 | The primary group is inserted or moved to the front; other groups and duplicates are preserved. |
+| `credential_application_order_and_fail_stop` | 0–3 prepared groups, all IDs, every first failing setter | The calls use the intended groups, GID and UID in that order. A failed setter prevents all later setters. |
+| `temporary_credentials_switch_and_restore` | 0–3 target and 0–2 saved groups | A failed snapshot or switch cannot call the operation. The guard restores the saved credentials in reverse order. |
+| `temporary_credentials_restore_is_fail_stop` | Same group bounds, failure at each restore step | The driver does not return normally after a restoration failure. |
+
+In `assurance-kani-credscore-41b384`, six harnesses passed on their unchanged
+definitions; `assurance-kani-credscore-5d6f51` checked both temporary-switch
+harnesses after their success and failure witnesses were separated. All 28 intended
+coverage obligations were reached across the two runs. These are bounded driver
+proofs, not verification of `open`/`fstat`, NSS, filesystem races, OS credential
+effects, `errno`, panic unwinding, or the standard library's `pre_exec`/exec behavior.
+
 ## Planted bugs
 
 Each planted bug is a patch applied to a copy of the tree at `f20cfeb7` (never committed; the
